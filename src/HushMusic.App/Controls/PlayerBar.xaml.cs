@@ -1,5 +1,7 @@
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
+using HushMusic.App.Controls.RadioMatch;
 using HushMusic.App.Helpers;
 using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.Shell;
@@ -8,7 +10,8 @@ namespace HushMusic.App.Controls;
 
 /// <summary>
 /// Floating glass player bar (Standard layout). Logic lives in <see cref="PlayerViewModel"/> and
-/// <see cref="NowPlayingViewModel"/>; this tracks seek drags and accepts tracks dropped from pages (added to the queue).
+/// <see cref="NowPlayingViewModel"/>; this tracks seek drags, accepts tracks dropped from pages (added to the queue) and
+/// opens "On YouTube Music" from a live station's song title.
 /// </summary>
 public sealed partial class PlayerBar : UserControl
 {
@@ -63,6 +66,14 @@ public sealed partial class PlayerBar : UserControl
         finally
         {
             deferral.Complete();
+        }
+    }
+
+    private void OnTitleClick(object sender, RoutedEventArgs e)
+    {
+        if (!RadioMatchFlyout.TryShowOnAir(TitleButton, ViewModel, FlyoutPlacementMode.TopEdgeAlignedLeft))
+        {
+            NowPlaying.ToggleCommand.Execute(null);
         }
     }
 

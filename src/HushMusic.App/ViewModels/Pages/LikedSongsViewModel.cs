@@ -5,7 +5,7 @@ using HushMusic.Core.Models;
 
 namespace HushMusic.App.ViewModels.Pages;
 
-public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITrackListHost
+public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITrackListHost, ITrackSelectionHost
 {
     // YouTube Music's id for the "Liked music" auto playlist.
     private const string LikedMusicPlaylistId = "LM";
@@ -17,9 +17,14 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
     {
         _library = library;
         Tracks = TrackItem.CreateList((c, ct) => _library.GetLikedSongsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
+        Selection = new TrackSelection(Tracks, services.Actions, () => Source);
     }
 
     public IncrementalCollection<TrackItem> Tracks { get; }
+
+    public TrackSelection Selection { get; }
+
+    private static QueueSource Source => new(QueueSourceKind.LikedSongs, LikedMusicPlaylistId, "Liked songs");
 
     protected override string LoadErrorTitle => "Couldn't load your liked songs";
 
@@ -29,7 +34,7 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
         var index = tracks.FindIndex(t => ReferenceEquals(t, track));
         return index < 0
             ? Task.CompletedTask
-            : Actions.PlayTracksAsync(tracks, index, new QueueSource(QueueSourceKind.LikedSongs, LikedMusicPlaylistId, "Liked songs"));
+            : Actions.PlayTracksAsync(tracks, index, Source);
     }
 
     public bool CanRemoveFromPlaylist(Track track) => false;
@@ -45,6 +50,7 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
     protected override void OnNavigatedFromCore()
     {
         Services.Likes.Changed -= OnTrackRated;
+        Selection.Exit();
         base.OnNavigatedFromCore();
     }
 
@@ -79,6 +85,7 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
         {
             if (Tracks[i].Track.VideoId == e.VideoId)
             {
+                Selection.Forget([Tracks[i]]);
                 Tracks.RemoveAt(i);
             }
         }

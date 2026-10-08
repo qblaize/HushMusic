@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:HushMusic.App.Helpers"
     xmlns:items="using:HushMusic.App.Controls.Items"
-    xmlns:models="using:HushMusic.Core.Models">
+    xmlns:vm="using:HushMusic.App.ViewModels.Pages">
 
     <Grid>
         <ScrollViewer items:Reveal.IsShown="{x:Bind ViewModel.HasContent, Mode=OneWay}">
@@ -109,9 +109,13 @@
 
                     <ItemsRepeater ItemsSource="{x:Bind ViewModel.Sections}">
                         <ItemsRepeater.ItemTemplate>
-                            <DataTemplate x:DataType="models:Shelf">
+                            <DataTemplate x:DataType="vm:SeeAllShelf">
                                 <StackPanel Margin="0,40,0,0" Spacing="14">
-                                    <items:SectionHeader Title="{x:Bind Title}" Eyebrow="{x:Bind Subtitle}" />
+                                    <items:SectionHeader
+                                        Title="{x:Bind Title}"
+                                        ActionText="{x:Bind SeeAllText}"
+                                        Command="{x:Bind SeeAllCommand}"
+                                        Eyebrow="{x:Bind Subtitle}" />
                                     <items:Carousel ItemClick="OnItemClick" ItemsSource="{x:Bind Items}" />
                                 </StackPanel>
                             </DataTemplate>

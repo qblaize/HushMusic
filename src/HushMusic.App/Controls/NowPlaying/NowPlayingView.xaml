@@ -149,13 +149,29 @@
                                     Accent="{StaticResource AccentOnDarkBrush}"
                                     AutomationProperties.AutomationId="NowPlayingLive"
                                     Visibility="{x:Bind ViewModel.Player.IsLive, Mode=OneWay}" />
+                                <!--  Closes the view; while a station announces its song, finds that song on YouTube Music.  -->
                                 <Button
+                                    x:Name="TitleButton"
                                     AutomationProperties.AutomationId="NowPlayingTitle"
+                                    AutomationProperties.HelpText="{x:Bind ViewModel.TitleToolTip, Mode=OneWay}"
                                     AutomationProperties.Name="{x:Bind ViewModel.Player.Title, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.CloseCommand}"
+                                    Click="OnTitleClick"
                                     Style="{StaticResource ShellTitleLinkButtonStyle}"
-                                    ToolTipService.ToolTip="Close Now Playing">
-                                    <TextBlock Style="{StaticResource NowPlayingTitleTextStyle}" Text="{x:Bind ViewModel.Player.Title, Mode=OneWay}" />
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.TitleToolTip, Mode=OneWay}">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource NowPlayingTitleTextStyle}" Text="{x:Bind ViewModel.Player.Title, Mode=OneWay}" />
+                                        <FontIcon
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            FontSize="15"
+                                            Foreground="{ThemeResource TextTertiaryBrush}"
+                                            Glyph="&#xE721;"
+                                            Visibility="{x:Bind ViewModel.Player.CanFindOnYouTubeMusic, Mode=OneWay}" />
+                                    </Grid>
                                 </Button>
                                 <local:CreditsText Credits="{x:Bind ViewModel.Credits, Mode=OneWay}" TextStyle="{StaticResource NowPlayingCreditsTextStyle}" />
                             </StackPanel>
@@ -400,7 +416,7 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!--  Hidden for live radio, which has only Up next.  -->
+                    <!--  Songs: Up next, Lyrics, Related (live radio has its own pair below).  -->
                     <Border
                         Margin="16,16,16,10"
                         Padding="2"
@@ -439,10 +455,44 @@
                         </Grid>
                     </Border>
 
+                    <!--  Live radio: the stations, and the songs heard on this one.  -->
+                    <Border
+                        Margin="16,16,16,10"
+                        Padding="2"
+                        Background="{ThemeResource HoverFillBrush}"
+                        CornerRadius="16"
+                        Visibility="{x:Bind ViewModel.HasRadioTabs, Mode=OneWay}">
+                        <Grid ColumnSpacing="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton
+                                AutomationProperties.AutomationId="NowPlayingStationsTab"
+                                AutomationProperties.Name="Up next tab"
+                                Command="{x:Bind ViewModel.ShowUpNextCommand}"
+                                Content="Up next"
+                                IsChecked="{x:Bind ViewModel.IsUpNextTab, Mode=OneWay}"
+                                Style="{StaticResource SegmentButtonStyle}" />
+                            <ToggleButton
+                                Grid.Column="1"
+                                AutomationProperties.AutomationId="NowPlayingHeardTab"
+                                AutomationProperties.Name="Heard on air tab"
+                                Command="{x:Bind ViewModel.ShowHeardCommand}"
+                                Content="Heard on air"
+                                IsChecked="{x:Bind ViewModel.IsHeardTab, Mode=OneWay}"
+                                Style="{StaticResource SegmentButtonStyle}" />
+                        </Grid>
+                    </Border>
+
                     <local:UpNextPanel
                         x:Name="UpNext"
                         Grid.Row="1"
                         Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsUpNextTab), Mode=OneWay}" />
+                    <local:HeardOnAirPanel
+                        x:Name="HeardPanel"
+                        Grid.Row="1"
+                        Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsHeardTab), Mode=OneWay}" />
                     <local:LyricsPanel
                         x:Name="Lyrics"
                         Grid.Row="1"

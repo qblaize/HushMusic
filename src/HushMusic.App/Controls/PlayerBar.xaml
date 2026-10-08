@@ -107,13 +107,29 @@
                             Margin="0,0,0,3"
                             AutomationProperties.AutomationId="PlayerBarLive"
                             Visibility="{x:Bind ViewModel.IsLive, Mode=OneWay}" />
+                        <!--  Opens Now Playing; while a station announces its song, finds that song on YouTube Music.  -->
                         <Button
+                            x:Name="TitleButton"
                             AutomationProperties.AutomationId="PlayerBarTitle"
+                            AutomationProperties.HelpText="{x:Bind ViewModel.TitleToolTip, Mode=OneWay}"
                             AutomationProperties.Name="{x:Bind ViewModel.Title, Mode=OneWay}"
-                            Command="{x:Bind NowPlaying.ToggleCommand}"
+                            Click="OnTitleClick"
                             Style="{StaticResource ShellTitleLinkButtonStyle}"
-                            ToolTipService.ToolTip="Now Playing">
-                            <TextBlock Style="{StaticResource HeadlineStyle}" Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+                            ToolTipService.ToolTip="{x:Bind ViewModel.TitleToolTip, Mode=OneWay}">
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource HeadlineStyle}" Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+                                <FontIcon
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    FontSize="11"
+                                    Foreground="{ThemeResource TextTertiaryBrush}"
+                                    Glyph="&#xE721;"
+                                    Visibility="{x:Bind ViewModel.CanFindOnYouTubeMusic, Mode=OneWay}" />
+                            </Grid>
                         </Button>
                         <np:CreditsText Credits="{x:Bind NowPlaying.ArtistCredits, Mode=OneWay}" TextStyle="{StaticResource SubheadStyle}" />
                     </StackPanel>

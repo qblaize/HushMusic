@@ -84,6 +84,24 @@ public sealed class AppSettings
     /// <summary>"Standard" or "Minimal" (a calmer, docked player bar and a plain Now Playing view).</summary>
     public string PlayerLayout { get; set; } = "Standard";
 
+    /// <summary>Crossfade between songs in seconds: 0 (off: the next song is preloaded for a gapless start) to 12.</summary>
+    public double CrossfadeSeconds { get; set; }
+
+    /// <summary>When an album or playlist ends, keep playing similar songs (a radio from the last track).</summary>
+    public bool AutoplayWhenQueueEnds { get; set; } = true;
+
+    /// <summary>A Windows notification with the cover when a new song starts (only while Hush isn't in front).</summary>
+    public bool ShowTrackNotifications { get; set; }
+
+    /// <summary>Where the taskbar player appears: "Primary", "All", or one display's device name (e.g. \\.\DISPLAY2).</summary>
+    public string TaskbarWidgetDisplays { get; set; } = "Primary";
+
+    /// <summary>System-wide keyboard shortcuts (work while Hush isn't focused). Off by default.</summary>
+    public bool GlobalHotkeysEnabled { get; set; }
+
+    /// <summary>Action name → key gesture ("Ctrl+Alt+Right"). Missing actions use the built-in defaults.</summary>
+    public Dictionary<string, string> GlobalHotkeys { get; set; } = [];
+
     /// <summary>Evens out loudness between tracks using YouTube's per-track loudness (only ever turns loud tracks down).</summary>
     public bool NormalizeVolume { get; set; } = true;
 

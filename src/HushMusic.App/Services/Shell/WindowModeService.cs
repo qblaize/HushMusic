@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Windowing;
 using Windows.Graphics;
 using HushMusic.App.Hosting;
+using HushMusic.App.Services.Hotkeys;
+using HushMusic.App.Services.Notifications;
 using HushMusic.App.Services.Windowing;
 using HushMusic.App.Services.Windowing.TaskbarWidget;
 using HushMusic.Core.Abstractions;
@@ -28,7 +30,8 @@ public interface IWindowModeService
 /// <summary>
 /// Runs the main window's modes and its Windows integration: the mini player (CompactOverlay presenter, its own
 /// in-session size and position), close to the notification area, the tray icon and menu, taskbar thumbnail buttons
-/// and progress, the taskbar player and the start-with-Windows entry. <see cref="MainWindow"/> attaches itself on creation.
+/// and progress, the taskbar player, global shortcuts, song notifications and the start-with-Windows entry.
+/// <see cref="MainWindow"/> attaches itself on creation.
 /// </summary>
 public sealed class WindowModeService : IWindowModeService, IDisposable
 {
@@ -41,6 +44,8 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
     private readonly INotificationService _notifications;
     private readonly IThemeService _theme;
     private readonly TaskbarPlayerService _taskbarPlayer;
+    private readonly GlobalHotkeyService _hotkeys;
+    private readonly TrackNotificationService _trackNotifications;
     private readonly ILogger<WindowModeService> _logger;
     private readonly bool _testInstance = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_BACKGROUND") == "1";
 
@@ -66,6 +71,8 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         INotificationService notifications,
         IThemeService theme,
         TaskbarPlayerService taskbarPlayer,
+        GlobalHotkeyService hotkeys,
+        TrackNotificationService trackNotifications,
         ILogger<WindowModeService> logger)
     {
         _player = player;
@@ -74,6 +81,8 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         _notifications = notifications;
         _theme = theme;
         _taskbarPlayer = taskbarPlayer;
+        _hotkeys = hotkeys;
+        _trackNotifications = trackNotifications;
         _logger = logger;
     }
 
@@ -124,6 +133,8 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         _autoStart = new AutoStartRegistration(_settings, _logger);
         _autoStart.Start();
         _taskbarPlayer.Attach(ShowMainWindow);
+        _hotkeys.Attach(ToggleFromShortcut);
+        _trackNotifications.Attach(ShowMainWindow, () => _remote?.Next());
         UpdateTray();
     }
 
@@ -358,6 +369,31 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         }
     }
 
+    // The Show/hide global shortcut: brings Hush to the front, or puts it away when it already is in front (to the
+    // notification area when the window closes to it, else minimized). The mini player stays the mini player.
+    private void ToggleFromShortcut()
+    {
+        if (_window is null || _detached)
+        {
+            return;
+        }
+
+        var appWindow = _window.AppWindow;
+        var minimized = appWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+        if (!appWindow.IsVisible || minimized || Win32.GetForegroundWindow() != _hwnd)
+        {
+            Present();
+        }
+        else if (_settings.Current.CloseToTray && _tray is not null)
+        {
+            HideToTray();
+        }
+        else
+        {
+            Win32.ShowWindow(_hwnd, Win32.SwMinimize);
+        }
+    }
+
     private void OnTrayCommand(TrayCommand command)
     {
         switch (command)
@@ -436,6 +472,8 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         _player.TrackChanged -= OnTrackChanged;
         _autoStart?.Dispose();
         _taskbarPlayer.Dispose();
+        _hotkeys.Dispose();
+        _trackNotifications.Dispose();
         _tray?.Dispose();
         _hook?.Dispose();
         _taskbar?.Dispose();

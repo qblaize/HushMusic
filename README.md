@@ -42,9 +42,17 @@ Windows taskbar.
 
 - Home with your recommendations and Quick picks, search with suggestions and filters (songs, albums, artists,
   playlists), album, artist and playlist pages.
+- **Explore**: new releases, trending songs, moods & genres, and charts by country.
+- Artist pages with **See all** for the full list of albums, singles and videos.
 - Your library, playlists, liked songs and history once you sign in. Like and unlike songs, add them to playlists,
   create, rename and delete playlists. Changes go straight to your account.
 - Start a radio from any song; radio and up-next queues keep topping themselves up.
+- When an album or playlist ends, it keeps going with similar songs (you can turn this off).
+- Save the current queue as a playlist.
+- Edit your playlists: drag songs to reorder them, or select several (**Select**, or Ctrl/Shift-click) to play, queue,
+  add to another playlist or remove them, with Undo.
+- **Your stats** (Library → Your stats): top artists, songs and albums, listening time and when you listen, by week,
+  month, year or all time. Kept only on this PC.
 - Songs you play show up in your YouTube Music history, as they would in the official app (you can turn this off).
 - Drag songs onto the queue, the player bar or a playlist.
 
@@ -58,6 +66,7 @@ Windows taskbar.
 
 **Listening**
 
+- **Crossfade** (up to 12 seconds) between songs; with crossfade off, the next song is preloaded so it starts without a gap.
 - Volume normalization from YouTube's per-track loudness data.
 - Resume where you left off: the queue, song and position come back, paused.
 - Sleep timer (15 to 60 minutes, or the end of the song) with a fade-out.
@@ -68,6 +77,8 @@ Windows taskbar.
 - A hand-picked grid per genre: Deep House, Tech House, Smooth & Lounge, Fresh, Chillout, Techno and Lo-fi.
 - Search the whole [Radio Browser](https://www.radio-browser.info) directory, and keep favourites.
 - Stations show a LIVE badge and the song on air. Next and Previous switch stations.
+- Heard something you like? Click the song on air to find it on YouTube Music, then play it, queue it, like it or add
+  it to a playlist. Now Playing keeps a list of what played on the station.
 
 **Windows**
 
@@ -79,6 +90,11 @@ Windows taskbar.
 - Keep playing from the notification area when the window is closed, and start with Windows.
 - Taskbar player (optional): cover, title and controls in the empty left part of the Windows 11 taskbar. Scroll over
   it to change the volume; click it for a flyout with seek, shuffle, repeat, like, volume and the next three songs.
+  Show it on the main display, on all displays, or on one you choose.
+- **Global shortcuts** (optional, rebindable): control playback, volume and likes from anywhere, even while Hush is
+  in the background.
+- **Song notifications** (optional): a silent notification with the cover and a Next button when a new song starts
+  while Hush is in the background.
 - Keyboard: <kbd>Space</kbd> play/pause, <kbd>Ctrl</kbd>+<kbd>←</kbd>/<kbd>→</kbd> previous/next,
   <kbd>Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Alt</kbd>+<kbd>←</kbd> back, <kbd>Esc</kbd> closes Now Playing.
 
@@ -161,6 +177,7 @@ Everything is in `%LOCALAPPDATA%\HushMusic`. The app itself is installed in `%LO
 | `cache\lastfm-queue.json` | Scrobbles waiting to be sent. |
 | `cache\visitor_id.txt` | YouTube's anonymous visitor id (not a credential). |
 | `radio-favorites.json` | Your favourite stations. |
+| `history\plays-YYYY.jsonl` | Your listening log for **Your stats** (one line per play). Clear it from the stats page. |
 | `tools\yt-dlp\<version>\`, `tools\deno\<version>\` | The app-managed yt-dlp and Deno. |
 | `logs\hushmusic-*.log` | Daily log files, kept for 14 days. Settings → Diagnostics sets the level and opens the folder. |
 
@@ -273,9 +290,9 @@ parser details in [docs/innertube-requests.md](docs/innertube-requests.md) and
   10–30 % of the stream's bandwidth while a station plays). Shoutcast v1 servers show no titles, and HLS-only stations
   are left out.
 - The taskbar player relies on an unsupported technique: Windows 11 has no API for adding to the taskbar, so Hush
-  places a small window of its own inside it. A Windows update can break or misplace it. It works on the primary,
-  horizontal taskbar only, and it keeps clear of other things on the left of the taskbar (turn off other taskbar media
-  widgets rather than running both).
+  places a small window of its own inside it. A Windows update can break or misplace it. It works on horizontal
+  taskbars only, and it keeps clear of other things on the left of the taskbar (turn off other taskbar media widgets
+  rather than running both).
 - "Start with Windows" uses the per-user Run key.
 
 ## Disclaimer

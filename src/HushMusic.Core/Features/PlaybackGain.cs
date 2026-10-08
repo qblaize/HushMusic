@@ -1,7 +1,7 @@
 namespace HushMusic.Core.Features;
 
 /// <summary>
-/// Gain maths for volume normalization and the sleep-timer fade. Gains are linear amplitude factors (0 – 1)
+/// Gain maths for volume normalization, the sleep-timer fade and crossfades. Gains are linear amplitude factors (0 – 1)
 /// multiplied onto the user's volume; the user's volume itself is never changed.
 /// </summary>
 public static class PlaybackGain
@@ -24,10 +24,18 @@ public static class PlaybackGain
     public static double Interpolate(double from, double to, double progress, RampCurve curve)
     {
         var p = double.IsFinite(progress) ? Math.Clamp(progress, 0, 1) : 1;
+        var remaining = curve switch
+        {
+            // The remaining distance shrinks with (1 − p)², so a fade to silence drops evenly in loudness
+            // instead of lingering near full volume and cutting off at the end.
+            RampCurve.FadeOut => (1 - p) * (1 - p),
 
-        // FadeOut: the remaining distance shrinks with (1 − p)², so a fade to silence drops evenly in loudness
-        // instead of lingering near full volume and cutting off at the end.
-        var remaining = curve == RampCurve.FadeOut ? (1 - p) * (1 - p) : 1 - p;
+            // A quarter sine/cosine: the two halves of a crossfade keep in² + out² = 1, so the blend holds its loudness
+            // instead of dipping in the middle as two linear ramps would (-3 dB each at the halfway point).
+            RampCurve.EqualPowerIn => 1 - Math.Sin(p * Math.PI / 2),
+            RampCurve.EqualPowerOut => Math.Cos(p * Math.PI / 2),
+            _ => 1 - p,
+        };
         return to + ((from - to) * remaining);
     }
 }
@@ -38,6 +46,12 @@ public enum RampCurve
 
     /// <summary>Quadratic, for fades towards silence.</summary>
     FadeOut,
+
+    /// <summary>The incoming half of an equal-power crossfade: sin(p·π/2) of the way from start to target.</summary>
+    EqualPowerIn,
+
+    /// <summary>The outgoing half of an equal-power crossfade: cos(p·π/2) of the distance left to the target.</summary>
+    EqualPowerOut,
 }
 
 /// <summary>A gain moving from <see cref="From"/> to <see cref="To"/> over <see cref="DurationMs"/>, on a millisecond clock.</summary>

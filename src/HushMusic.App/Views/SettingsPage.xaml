@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:HushMusic.App.Helpers"
     xmlns:settings="using:HushMusic.App.Controls.Settings"
-    xmlns:shell="using:HushMusic.App.Controls.Shell">
+    xmlns:shell="using:HushMusic.App.Controls.Shell"
+    xmlns:viewmodels="using:HushMusic.App.ViewModels">
 
     <ScrollViewer x:Name="Scroller">
         <!--  One centred column (max SettingsColumnMaxWidth) in the space right of the rail.  -->
@@ -149,6 +150,30 @@
                             <ToggleSwitch IsOn="{x:Bind ViewModel.NormalizeVolume, Mode=TwoWay}" />
                         </settings:SettingsRow>
                         <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Crossfade" Description="Blend the end of a song into the next one. Off starts the next song without a gap.">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Slider
+                                    Width="160"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.AutomationId="CrossfadeSlider"
+                                    AutomationProperties.Name="Crossfade (seconds)"
+                                    Maximum="12"
+                                    Minimum="0"
+                                    SnapsTo="StepValues"
+                                    StepFrequency="1"
+                                    Value="{x:Bind ViewModel.CrossfadeSeconds, Mode=TwoWay}" />
+                                <TextBlock
+                                    MinWidth="32"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource SubheadStyle}"
+                                    Text="{x:Bind ViewModel.CrossfadeLabel, Mode=OneWay}" />
+                            </StackPanel>
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Keep playing when the queue ends" Description="After an album or playlist, continue with similar songs.">
+                            <ToggleSwitch AutomationProperties.AutomationId="AutoplayToggle" IsOn="{x:Bind ViewModel.AutoplayWhenQueueEnds, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Resume where I left off" Description="Opens with your last queue and song, paused at the same spot.">
                             <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeLastSession, Mode=TwoWay}" />
                         </settings:SettingsRow>
@@ -178,11 +203,89 @@
                             <ToggleSwitch IsOn="{x:Bind ViewModel.StartWithWindows, Mode=TwoWay}" />
                         </settings:SettingsRow>
                         <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Song notifications" Description="Show a notification with the cover when a new song starts while Hush is in the background.">
+                            <ToggleSwitch AutomationProperties.AutomationId="TrackNotificationsToggle" IsOn="{x:Bind ViewModel.ShowTrackNotifications, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Show player on the taskbar" Description="A small player in the empty space of the taskbar. Scroll over it to change the volume; click it for the full controls.">
                             <ToggleSwitch AutomationProperties.AutomationId="ShowTaskbarWidgetToggle" IsOn="{x:Bind ViewModel.ShowTaskbarWidget, Mode=TwoWay}" />
                         </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Taskbar player on" Description="Other displays need &quot;Show my taskbar on all displays&quot; turned on in Windows.">
+                            <ComboBox
+                                MinWidth="200"
+                                AutomationProperties.AutomationId="TaskbarWidgetDisplaysCombo"
+                                IsEnabled="{x:Bind ViewModel.ShowTaskbarWidget, Mode=OneWay}"
+                                ItemsSource="{x:Bind ViewModel.TaskbarDisplayOptions, Mode=OneWay}"
+                                SelectedIndex="{x:Bind ViewModel.TaskbarDisplayIndex, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:SettingsChoice">
+                                        <TextBlock Text="{x:Bind Label}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </settings:SettingsRow>
                     </StackPanel>
                 </Border>
+
+                <!--  ===== Global shortcuts =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader('Global shortcuts')}" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <settings:SettingsRow Title="Use global shortcuts" Description="Control Hush from any app, even while it's in the background or in the notification area.">
+                            <ToggleSwitch AutomationProperties.AutomationId="GlobalHotkeysToggle" IsOn="{x:Bind ViewModel.GlobalHotkeysEnabled, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <ItemsControl
+                            IsEnabled="{x:Bind ViewModel.GlobalHotkeysEnabled, Mode=OneWay}"
+                            IsTabStop="False"
+                            ItemsSource="{x:Bind ViewModel.Hotkeys}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="viewmodels:HotkeySettingViewModel">
+                                    <StackPanel>
+                                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                                        <Grid Style="{StaticResource SettingsRowStyle}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="{x:Bind Title}" />
+                                                <TextBlock
+                                                    AutomationProperties.LiveSetting="Polite"
+                                                    Foreground="{ThemeResource WarningBrush}"
+                                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                                    Text="{x:Bind Problem, Mode=OneWay}"
+                                                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(Problem), Mode=OneWay}" />
+                                            </StackPanel>
+                                            <settings:HotkeyBox
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                ActionName="{x:Bind Title}"
+                                                Gesture="{x:Bind Gesture, Mode=TwoWay}"
+                                                IsCapturing="{x:Bind IsCapturing, Mode=TwoWay}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Button
+                                Margin="-6,0,0,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="ResetHotkeysButton"
+                                Command="{x:Bind ViewModel.ResetHotkeysCommand}"
+                                Content="Reset to defaults"
+                                IsEnabled="{x:Bind ViewModel.GlobalHotkeysEnabled, Mode=OneWay}"
+                                Style="{StaticResource TextActionButtonStyle}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource SettingsFooterStyle}" Text="To change a shortcut, select it and press the new keys: a key with Ctrl, Alt or Win. Esc cancels, Backspace removes the shortcut. If another app already uses the keys, choose different ones." />
 
                 <!--  ===== Last.fm =====  -->
                 <TextBlock

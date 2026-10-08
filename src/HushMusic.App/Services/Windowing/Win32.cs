@@ -3,7 +3,7 @@ using Microsoft.Win32;
 
 namespace HushMusic.App.Services.Windowing;
 
-/// <summary>Win32 declarations for the taskbar, the notification area, window subclassing and window placement.</summary>
+/// <summary>Win32 declarations for the taskbar, the notification area, window subclassing, window placement and hotkeys.</summary>
 internal static class Win32
 {
     public const uint WmNull = 0x0000;
@@ -13,17 +13,22 @@ internal static class Win32
     public const uint WmNcDestroy = 0x0082;
     public const uint WmCommand = 0x0111;
     public const uint WmSettingChange = 0x001A;
+    public const uint WmHotKey = 0x0312;
     public const uint WmLButtonDblClk = 0x0203;
     public const uint WmApp = 0x8000;
 
     public const int SwShowNormal = 1;
     public const int SwShowMaximized = 3;
     public const int SwShowNoActivate = 4;
+    public const int SwMinimize = 6;
     public const int SwShowMinNoActive = 7;
 
     public const int SmCxSmIcon = 49;
     public const uint ImageIcon = 1;
     public const uint LrLoadFromFile = 0x0010;
+
+    /// <summary>Parent of message-only windows.</summary>
+    public static readonly IntPtr HwndMessage = new(-3);
 
     public delegate IntPtr SubclassProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, UIntPtr idSubclass, UIntPtr refData);
 
@@ -202,6 +207,29 @@ internal static class Win32
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint virtualKey);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    /// <summary>True when the window in front belongs to this process (the main window, the mini player or a flyout).</summary>
+    public static bool IsForegroundInThisProcess()
+    {
+        var foreground = GetForegroundWindow();
+        return foreground != IntPtr.Zero
+            && GetWindowThreadProcessId(foreground, out var processId) != 0
+            && processId == (uint)Environment.ProcessId;
+    }
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

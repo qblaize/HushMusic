@@ -35,7 +35,13 @@ public sealed partial class AlbumDetailPage : Page
 
     protected override void OnNavigatedFrom(NavigationEventArgs e) => ViewModel.OnNavigatedFrom();
 
-    private void OnTrackClick(object sender, ItemClickEventArgs e) => ViewModel.PlayTrackCommand.Execute(e.ClickedItem);
+    private void OnTrackClick(object sender, ItemClickEventArgs e)
+    {
+        if (!TrackSelectionList.HandleClick(sender, e.ClickedItem))
+        {
+            ViewModel.PlayTrackCommand.Execute(e.ClickedItem);
+        }
+    }
 
     private void OnItemClick(object sender, ItemClickEventArgs e) => ViewModel.OpenItemCommand.Execute(e.ClickedItem);
 }

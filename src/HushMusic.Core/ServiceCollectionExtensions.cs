@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Features;
 using HushMusic.Core.Features.LastFm;
+using HushMusic.Core.Features.Stats;
 using HushMusic.Core.Queue;
 using HushMusic.Core.Radio;
 using HushMusic.Core.Services;
@@ -30,7 +31,11 @@ public static class ServiceCollectionExtensions
 
         services.AddHostedService<PlayHistoryReporter>();
         services.AddHostedService<QueueAutoExtender>();
+        services.AddSingleton<QueueAutoplay>();
+        services.AddSingleton<IQueueAutoplay>(sp => sp.GetRequiredService<QueueAutoplay>());
+        services.AddHostedService(sp => sp.GetRequiredService<QueueAutoplay>());
         services.AddHostedService<PlaybackSessionKeeper>();
+        services.AddListeningStats();
 
         services.AddHttpClient(LastFmClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(20));
         services.AddSingleton<LastFmService>();
@@ -55,6 +60,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<RadioNowPlayingService>();
         services.AddSingleton<IRadioNowPlaying>(sp => sp.GetRequiredService<RadioNowPlayingService>());
         services.AddHostedService<RadioClickReporter>();
+        services.AddSingleton<IRadioTrackMatcher, RadioTrackMatcher>();
         return services;
     }
 }

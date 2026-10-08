@@ -13,6 +13,9 @@ public enum NowPlayingTab
     UpNext,
     Lyrics,
     Related,
+
+    /// <summary>Live radio: the songs heard on the station this session.</summary>
+    Heard,
 }
 
 /// <summary>
@@ -34,6 +37,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         RelatedViewModel related,
         SleepTimerViewModel sleepTimer,
         CoverFlowViewModel coverFlow,
+        RadioHeardViewModel heard,
         INavigationService navigation,
         IWindowModeService windowMode,
         ISettingsService settings)
@@ -44,6 +48,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         Related = related;
         SleepTimer = sleepTimer;
         CoverFlow = coverFlow;
+        Heard = heard;
         _navigation = navigation;
         _windowMode = windowMode;
         _settings = settings;
@@ -76,12 +81,15 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     /// <summary>The covers before and after the current one; off (the single artwork shows) when the setting is Single.</summary>
     public CoverFlowViewModel CoverFlow { get; }
 
+    /// <summary>Live radio: the songs heard on the station this session.</summary>
+    public RadioHeardViewModel Heard { get; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsUpNextActive), nameof(IsLyricsActive))]
     public partial bool IsOpen { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsUpNextTab), nameof(IsLyricsTab), nameof(IsRelatedTab), nameof(IsUpNextActive), nameof(IsLyricsActive))]
+    [NotifyPropertyChangedFor(nameof(IsUpNextTab), nameof(IsLyricsTab), nameof(IsRelatedTab), nameof(IsHeardTab), nameof(IsUpNextActive), nameof(IsLyricsActive))]
     public partial NowPlayingTab Tab { get; set; }
 
     /// <summary>
@@ -133,14 +141,22 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     /// <summary>Lyrics and Related exist for YouTube tracks only, not live radio.</summary>
     public bool HasSongTabs => !Player.IsLive;
 
+    /// <summary>Live radio has Up next (the stations) and Heard on air instead.</summary>
+    public bool HasRadioTabs => Player.IsLive;
+
     /// <summary>The player bar's lyrics button.</summary>
     public bool CanShowLyrics => Player.HasTrack && !Player.IsLive;
+
+    /// <summary>The big title closes the view, or finds a station's song on YouTube Music.</summary>
+    public string TitleToolTip => Player.CanFindOnYouTubeMusic ? "Find on YouTube Music" : "Close Now Playing";
 
     public bool IsUpNextTab => Tab == NowPlayingTab.UpNext;
 
     public bool IsLyricsTab => Tab == NowPlayingTab.Lyrics;
 
     public bool IsRelatedTab => Tab == NowPlayingTab.Related;
+
+    public bool IsHeardTab => Tab == NowPlayingTab.Heard;
 
     /// <summary>Player bar toggles: checked while Now Playing shows that tab.</summary>
     public bool IsUpNextActive => IsOpen && IsUpNextTab;
@@ -211,6 +227,9 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     private void ShowRelated() => ShowTab(NowPlayingTab.Related);
 
     [RelayCommand]
+    private void ShowHeard() => ShowTab(NowPlayingTab.Heard);
+
+    [RelayCommand]
     private void EnterMiniPlayer()
     {
         Close();
@@ -249,7 +268,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
 
     private void ToggleTab(NowPlayingTab tab)
     {
-        if (tab != NowPlayingTab.UpNext && !HasSongTabs)
+        if (!IsAvailable(tab))
         {
             return;
         }
@@ -265,18 +284,26 @@ public sealed partial class NowPlayingViewModel : ObservableObject
 
     private void ShowTab(NowPlayingTab tab)
     {
-        if (tab != NowPlayingTab.UpNext && !HasSongTabs)
+        if (!IsAvailable(tab))
         {
             tab = NowPlayingTab.UpNext;
         }
 
         Tab = tab;
 
-        // The segments are toggle buttons: re-assert all three, also when the tab didn't change (a click unchecks it locally).
+        // The segments are toggle buttons: re-assert all of them, also when the tab didn't change (a click unchecks it locally).
         OnPropertyChanged(nameof(IsUpNextTab));
         OnPropertyChanged(nameof(IsLyricsTab));
         OnPropertyChanged(nameof(IsRelatedTab));
+        OnPropertyChanged(nameof(IsHeardTab));
     }
+
+    private bool IsAvailable(NowPlayingTab tab) => tab switch
+    {
+        NowPlayingTab.Lyrics or NowPlayingTab.Related => HasSongTabs,
+        NowPlayingTab.Heard => HasRadioTabs,
+        _ => true,
+    };
 
     private void OnPlayerPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -287,6 +314,10 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         else if (e.PropertyName == nameof(PlayerViewModel.Subtitle) && Player.IsLive)
         {
             UpdateLiveCredits();
+        }
+        else if (e.PropertyName == nameof(PlayerViewModel.CanFindOnYouTubeMusic))
+        {
+            OnPropertyChanged(nameof(TitleToolTip));
         }
         else if (e.PropertyName == nameof(PlayerViewModel.IsMinimalLayout))
         {
@@ -311,7 +342,13 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         var track = Player.Track;
 
         OnPropertyChanged(nameof(HasSongTabs));
+        OnPropertyChanged(nameof(HasRadioTabs));
         OnPropertyChanged(nameof(CanShowLyrics));
+        if (!IsAvailable(Tab))
+        {
+            ShowTab(NowPlayingTab.UpNext);
+        }
+
         if (track?.IsLiveRadio == true)
         {
             // A station: its artwork is drawn by StationArt (logos come in every size); the logo also colours the backdrop.
@@ -319,11 +356,6 @@ public sealed partial class NowPlayingViewModel : ObservableObject
             HeroArtUrl = null;
             BackdropArtUrl = NowPlayingArt.Small(track);
             UpdateLiveCredits();
-            if (Tab != NowPlayingTab.UpNext)
-            {
-                ShowTab(NowPlayingTab.UpNext);
-            }
-
             return;
         }
 

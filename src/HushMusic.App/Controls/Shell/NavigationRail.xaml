@@ -50,6 +50,13 @@
                 Style="{StaticResource RailButtonStyle}" />
             <shell:RailButton
                 Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="Explore"
+                Glyph="&#xE909;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Explore'), Mode=OneWay}"
+                Label="Explore"
+                Style="{StaticResource RailButtonStyle}" />
+            <shell:RailButton
+                Command="{x:Bind ViewModel.NavigateToCommand}"
                 CommandParameter="Radio"
                 Glyph="&#xEC05;"
                 IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Radio'), Mode=OneWay}"

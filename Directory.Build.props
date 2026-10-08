@@ -9,6 +9,6 @@
     <Product>HushMusic</Product>
     <NeutralLanguage>en</NeutralLanguage>
     <!-- The one app version: assemblies, Settings -> About, and the release package (build/release.ps1 reads it). -->
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
   </PropertyGroup>
 </Project>

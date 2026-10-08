@@ -6,8 +6,9 @@ using HushMusic.Core.Services;
 namespace HushMusic.App.Services.Windowing.TaskbarWidget;
 
 /// <summary>
-/// The taskbar player: a layered window parented into the primary taskbar (Shell_TrayWnd), drawn with GDI+ and
-/// updated with UpdateLayeredWindow. Windows 11 has no API for this; it is the technique tools like TrafficMonitor use.
+/// The taskbar player: a layered window parented into a taskbar (the main Shell_TrayWnd, or the Shell_SecondaryTrayWnd
+/// of another display), drawn with GDI+ and updated with UpdateLayeredWindow. Windows 11 has no API for this; it is the
+/// technique tools like TrafficMonitor use. One instance per taskbar.
 /// <para>
 /// Everything runs on a dedicated thread with its own message loop. A child window whose parent belongs to another
 /// thread shares that thread's input queue (the system attaches them), so this thread and Explorer's taskbar thread
@@ -43,6 +44,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
     [ThreadStatic]
     private static TaskbarWidgetWindow? t_current;
 
+    private readonly string? _display;
     private readonly ITaskbarWidgetSink _sink;
     private readonly ILogger _logger;
     private readonly uint _taskbarCreatedMessage = Win32.RegisterWindowMessage("TaskbarCreated");
@@ -73,8 +75,9 @@ internal sealed class TaskbarWidgetWindow : IDisposable
     private int _dibHeight;
     private string? _lastProblem;
 
-    private TaskbarWidgetWindow(TaskbarWidgetState state, ITaskbarWidgetSink sink, ILogger logger)
+    private TaskbarWidgetWindow(string? display, TaskbarWidgetState state, ITaskbarWidgetSink sink, ILogger logger)
     {
+        _display = display;
         _state = state;
         _sink = sink;
         _logger = logger;
@@ -82,10 +85,16 @@ internal sealed class TaskbarWidgetWindow : IDisposable
         _thread.SetApartmentState(ApartmentState.STA);
     }
 
-    /// <summary>Starts the widget thread; the player appears once there is a track and room on the taskbar.</summary>
-    public static TaskbarWidgetWindow Start(TaskbarWidgetState state, ITaskbarWidgetSink sink, ILogger logger)
+    /// <summary>"main taskbar" or "taskbar on Display 2", for the log.</summary>
+    private string TaskbarName => _display is null ? "main taskbar" : "taskbar on " + TaskbarDisplayChoice.ShortName(_display);
+
+    /// <summary>
+    /// Starts the widget thread for the taskbar on <paramref name="display"/> (a device name; null for the main
+    /// taskbar). The player appears once there is a track, the taskbar exists and it has room.
+    /// </summary>
+    public static TaskbarWidgetWindow Start(string? display, TaskbarWidgetState state, ITaskbarWidgetSink sink, ILogger logger)
     {
-        var window = new TaskbarWidgetWindow(state, sink, logger);
+        var window = new TaskbarWidgetWindow(display, state, sink, logger);
         window._thread.Start();
         return window;
     }
@@ -211,7 +220,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
             }
 
             t_current = null;
-            _logger.LogDebug("Taskbar player stopped");
+            _logger.LogDebug("Taskbar player on the {Name} stopped", TaskbarName);
         }
     }
 
@@ -284,6 +293,8 @@ internal sealed class TaskbarWidgetWindow : IDisposable
                 RequestProbe();
                 return IntPtr.Zero;
             case WidgetNative.WmDisplayChange:
+                // Displays added or removed may change which taskbars get a player.
+                _sink.OnDisplaysChanged();
                 RequestProbe();
                 Relayout();
                 return IntPtr.Zero;
@@ -291,7 +302,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
 
         if (msg == _taskbarCreatedMessage && msg != 0)
         {
-            _logger.LogInformation("Explorer restarted; putting the taskbar player back");
+            _logger.LogInformation("Explorer restarted; putting the taskbar player back on the {Name}", TaskbarName);
             Embed();
             return IntPtr.Zero;
         }
@@ -375,7 +386,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
 
     private void OnLayoutTimer()
     {
-        var taskbar = WidgetNative.FindWindow("Shell_TrayWnd", null);
+        var taskbar = TaskbarWindows.Find(_display);
         if (taskbar != _taskbar || _widget == IntPtr.Zero || !WidgetNative.IsWindow(_widget) || WidgetNative.GetParent(_widget) != taskbar)
         {
             Embed();
@@ -398,10 +409,11 @@ internal sealed class TaskbarWidgetWindow : IDisposable
     private void Embed()
     {
         DestroyWidget();
-        _taskbar = WidgetNative.FindWindow("Shell_TrayWnd", null);
+        _taskbar = TaskbarWindows.Find(_display);
         if (_taskbar == IntPtr.Zero)
         {
-            Problem("No taskbar (Shell_TrayWnd) yet; the taskbar player waits for Explorer");
+            // Another display's taskbar is missing whenever "Show my taskbar on all displays" is off: not worth a warning.
+            Problem($"No {TaskbarName} yet; the taskbar player waits for it", _display is null ? LogLevel.Warning : LogLevel.Debug);
             return;
         }
 
@@ -437,7 +449,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
         }
 
         _lastProblem = null;
-        _logger.LogDebug("Taskbar player attached to taskbar {Taskbar:X}", (long)_taskbar);
+        _logger.LogDebug("Taskbar player attached to the {Name} ({Taskbar:X})", TaskbarName, (long)_taskbar);
         RequestProbe();
         Relayout();
     }
@@ -495,7 +507,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
             WidgetNative.SetWindowPos(_widget, WidgetNative.HwndTop, rect.X, rect.Y, rect.Width, rect.Height, WidgetNative.SwpNoActivate | WidgetNative.SwpShowWindow);
             if (_placed != rect)
             {
-                _logger.LogDebug("Taskbar player at {X},{Y} {Width}x{Height} (scale {Scale})", rect.X, rect.Y, rect.Width, rect.Height, scale);
+                _logger.LogDebug("Taskbar player on the {Name} at {X},{Y} {Width}x{Height} (scale {Scale})", TaskbarName, rect.X, rect.Y, rect.Width, rect.Height, scale);
             }
 
             _placed = rect;
@@ -556,11 +568,16 @@ internal sealed class TaskbarWidgetWindow : IDisposable
             }
         }
 
+        // The taskbars on other displays have no TrayNotifyWnd; their clock shows up in UI Automation.
         var trayLeft = client.Right;
         var tray = WidgetNative.FindWindowEx(_taskbar, IntPtr.Zero, "TrayNotifyWnd", null);
         if (tray != IntPtr.Zero && Win32.GetWindowRect(tray, out var trayRect) && trayRect.Right > trayRect.Left)
         {
             trayLeft = Math.Clamp(trayRect.Left - origin.X, 0, client.Right);
+        }
+        else if (probe.TrayLeft is { } probedTray)
+        {
+            trayLeft = Math.Clamp(probedTray - origin.X, 0, client.Right);
         }
 
         var place = TaskbarWidgetLayout.Place(new TaskbarContent(client.Right, client.Bottom, scale, icons, trayLeft, occupied));

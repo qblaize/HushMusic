@@ -8,6 +8,7 @@ namespace HushMusic.Core.Queue;
 /// "Play this" entry points: build the queue (from the watch endpoint where YouTube Music does) and start the player.
 /// Unavailable tracks are skipped. Player errors surface through <see cref="IPlayer.PlaybackFailed"/>;
 /// errors fetching what to play are thrown to the caller.
+/// "Add to queue" goes after the user's own songs but before songs autoplay suggested (<see cref="IQueueAutoplay"/>).
 /// </summary>
 public sealed class PlaybackActions(
     IQueueService queue,
@@ -15,7 +16,8 @@ public sealed class PlaybackActions(
     IWatchApi watchApi,
     IBrowseApi browseApi,
     INotificationService notifications,
-    ILogger<PlaybackActions> logger) : IPlaybackActions
+    ILogger<PlaybackActions> logger,
+    IQueueAutoplay? autoplay = null) : IPlaybackActions
 {
     private readonly object _gate = new();
     private CancellationTokenSource? _fillCts;
@@ -79,7 +81,9 @@ public sealed class PlaybackActions(
     public void AddToQueue(IReadOnlyList<Track> tracks)
     {
         ArgumentNullException.ThrowIfNull(tracks);
-        queue.Enqueue([.. tracks.Where(t => t.IsAvailable)]);
+        List<Track> playable = [.. tracks.Where(t => t.IsAvailable)];
+        queue.Enqueue(playable);
+        MoveBeforeSuggestions(playable.Count);
     }
 
     public void PlayNext(IReadOnlyList<Track> tracks)
@@ -161,6 +165,33 @@ public sealed class PlaybackActions(
 
         queue.Load(tracks, 0, source, watch.Continuation);
         await player.PlayQueueIndexAsync(0, cancellationToken).ConfigureAwait(false);
+    }
+
+    // The songs just appended move up to the first suggestion still to come, so they play before the suggestions do.
+    private void MoveBeforeSuggestions(int added)
+    {
+        var suggested = autoplay?.SuggestedItemIds;
+        if (added == 0 || suggested is not { Count: > 0 })
+        {
+            return;
+        }
+
+        var items = queue.Items;
+        var end = items.Count - added;
+        var target = -1;
+        for (var i = Math.Max(queue.CurrentIndex + 1, 0); i < end; i++)
+        {
+            if (suggested.Contains(items[i].Id))
+            {
+                target = i;
+                break;
+            }
+        }
+
+        for (var i = 0; target >= 0 && i < added; i++)
+        {
+            queue.Move(end + i, target + i);
+        }
     }
 
     private CancellationToken BeginFill()

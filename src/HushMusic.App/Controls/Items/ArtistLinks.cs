@@ -34,6 +34,9 @@ public sealed partial class ArtistLinks : UserControl
         IsTabStop = false;
         Content = _text;
         Visibility = Visibility.Collapsed;
+
+        // Hyperlinks copy the text colour when they're built; theme brushes are per theme, so rebuild on a switch.
+        ActualThemeChanged += (_, _) => Rebuild();
     }
 
     public IReadOnlyList<ArtistRef>? Artists

@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISearchApi, SearchApi>();
         services.AddSingleton<ILibraryApi, LibraryApi>();
         services.AddSingleton<IWatchApi, WatchApi>();
+        services.AddSingleton<IExploreApi, ExploreApi>();
         services.AddSingleton<IAccountApi, AccountApi>();
         return services;
     }

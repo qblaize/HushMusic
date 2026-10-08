@@ -61,17 +61,17 @@ internal sealed class TaskbarProbe(IntPtr notify, uint doneMessage, ILogger logg
                 }
 
                 var taskbar = Interlocked.CompareExchange(ref _taskbar, IntPtr.Zero, IntPtr.Zero);
-                IReadOnlyList<TaskbarElement>? elements = null;
+                TaskbarReading? reading = null;
                 try
                 {
-                    elements = automation.Query(taskbar);
+                    reading = automation.Query(taskbar);
                 }
                 catch (Exception ex)
                 {
                     logger.LogDebug(ex, "Reading the taskbar layout failed");
                 }
 
-                _latest = new ProbeResult(taskbar, elements);
+                _latest = new ProbeResult(taskbar, reading?.Elements, reading?.TrayLeft);
                 if (!_stopped)
                 {
                     Win32.PostMessage(notify, doneMessage, IntPtr.Zero, IntPtr.Zero);
@@ -91,4 +91,5 @@ internal sealed class TaskbarProbe(IntPtr notify, uint doneMessage, ILogger logg
 }
 
 /// <summary>A UI Automation read of one taskbar window; <see cref="Elements"/> is null when it failed.</summary>
-internal sealed record ProbeResult(IntPtr Taskbar, IReadOnlyList<TaskbarElement>? Elements);
+/// <param name="TrayLeft">Where the notification area starts, in screen pixels, when UI Automation showed it.</param>
+internal sealed record ProbeResult(IntPtr Taskbar, IReadOnlyList<TaskbarElement>? Elements, int? TrayLeft);

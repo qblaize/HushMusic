@@ -9,7 +9,7 @@ namespace HushMusic.App.Controls.NowPlaying;
 
 /// <summary>
 /// The "Up next" tab. Logic lives in <see cref="QueuePanelViewModel"/>; this is list glue: scrolling to the current
-/// song, drag to reorder, drops from pages at the pointer, hover.
+/// song, drag to reorder, drops from pages at the pointer, hover, and the name prompt of "Save as playlist".
 /// </summary>
 public sealed partial class UpNextPanel : UserControl
 {
@@ -62,6 +62,17 @@ public sealed partial class UpNextPanel : UserControl
         if (e.ClickedItem is QueueItemViewModel item)
         {
             item.PlayCommand.Execute(null);
+        }
+    }
+
+    // The header is inside the first suggestion's row: a press there must not start that row's click or drag.
+    private void OnSuggestionsHeaderPointerPressed(object sender, PointerRoutedEventArgs e) => e.Handled = true;
+
+    private async void OnSaveAsPlaylistClick(object sender, RoutedEventArgs e)
+    {
+        if (await SaveQueueDialog.AskAsync(ViewModel.DefaultPlaylistName, ViewModel.SavableCount) is { } name)
+        {
+            await ViewModel.SaveAsPlaylistAsync(name);
         }
     }
 

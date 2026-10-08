@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.BarChart"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- One equal-width column per value: the bar grows up from the baseline, its label sits underneath. -->
+    <Grid x:Name="Columns">
+        <Grid.RowDefinitions>
+            <RowDefinition x:Name="PlotRow" Height="120" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Rectangle
+            x:Name="Baseline"
+            Height="1"
+            VerticalAlignment="Bottom"
+            Fill="{ThemeResource SeparatorBrush}" />
+    </Grid>
+</UserControl>

@@ -11,6 +11,8 @@ namespace HushMusic.Playback;
 /// <summary>
 /// Drives the System Media Transport Controls (media keys, Windows media flyout, lock screen) by hand.
 /// MediaPlayer's own command manager is turned off because the queue lives in Core, not in a MediaPlaybackList.
+/// The session belongs to one MediaPlayer for the app's lifetime, also while the other player (crossfades, gapless
+/// starts) is the one playing: everything shown here comes from the player service, not from that MediaPlayer.
 /// </summary>
 internal sealed class SmtcController : IDisposable
 {

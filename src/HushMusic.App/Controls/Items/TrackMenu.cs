@@ -15,6 +15,8 @@ namespace HushMusic.App.Controls.Items;
 /// <item><c>TrackMenu.Host</c> on an ancestor (usually the page root, bound to the view model) supplies the
 /// page context: "Play" plays within the album/playlist and "Remove from playlist" appears on owned playlists.</item>
 /// </list>
+/// In a list with multi-select (<see cref="TrackSelectionList"/>) the menu offers "Select", and on a selected song while
+/// several are selected it acts on the whole selection.
 /// </summary>
 public static class TrackMenu
 {
@@ -52,8 +54,9 @@ public static class TrackMenu
 
     /// <summary>Opens the menu under <paramref name="target"/>, e.g. from a "more" button.</summary>
     /// <remarks>Like any flyout, the menu takes the theme of the element it opens from (light window or dark Now Playing).</remarks>
-    public static void ShowAt(FrameworkElement target, Track track) =>
-        Create(track, FindHost(target)).ShowAt(target, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight });
+    public static void ShowAt(FrameworkElement target, Track track, TrackItem? item = null) =>
+        Create(track, FindHost(target), item, TrackSelectionList.Find(target))
+            .ShowAt(target, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight });
 
     private static void OnTrackChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -96,23 +99,24 @@ public static class TrackMenu
         }
 
         var container = VisualTreeSearch.FindAncestorOrSelf<SelectorItem>(source, list);
-        var track = container is null ? null : list.ItemFromContainer(container) switch
+        var item = container is null ? null : list.ItemFromContainer(container);
+        var track = item switch
         {
             Track t => t,
-            TrackItem item => item.Track,
+            TrackItem trackItem => trackItem.Track,
             _ => null,
         };
 
         if (container is not null && track is not null)
         {
             args.Handled = true;
-            Show(container, track, args);
+            Show(container, track, args, item as TrackItem);
         }
     }
 
-    private static void Show(FrameworkElement target, Track track, ContextRequestedEventArgs args)
+    private static void Show(FrameworkElement target, Track track, ContextRequestedEventArgs args, TrackItem? item = null)
     {
-        var menu = Create(track, FindHost(target));
+        var menu = Create(track, FindHost(target), item, item is null ? null : TrackSelectionList.Find(target));
         if (args.TryGetPosition(target, out var point))
         {
             menu.ShowAt(target, new FlyoutShowOptions { Position = point });
@@ -136,11 +140,16 @@ public static class TrackMenu
         return null;
     }
 
-    private static MenuFlyout Create(Track track, ITrackListHost? host)
+    private static MenuFlyout Create(Track track, ITrackListHost? host, TrackItem? item = null, TrackSelection? selection = null)
     {
         if (track.Station is { } station)
         {
             return CreateStationMenu(station);
+        }
+
+        if (item is not null && selection is { IsActive: true, Count: > 1 } && selection.IsSelected(item))
+        {
+            return CreateSelectionMenu(selection);
         }
 
         var actions = App.GetService<IMediaItemActions>();
@@ -194,6 +203,38 @@ public static class TrackMenu
             menu.Items.Add(Item("Remove from playlist", "", () => host.RemoveFromPlaylistAsync(track)));
         }
 
+        if (item is not null && selection is not null)
+        {
+            menu.Items.Add(new MenuFlyoutSeparator());
+            menu.Items.Add(selection.IsSelected(item)
+                ? Item("Deselect", "", () => selection.Toggle(item))
+                : Item("Select", "", () => selection.Toggle(item)));
+        }
+
+        return menu;
+    }
+
+    // Right-click on one of several selected songs: the actions of the selection bar.
+    private static MenuFlyout CreateSelectionMenu(TrackSelection selection)
+    {
+        var menu = new MenuFlyout { MenuFlyoutPresenterStyle = PresenterStyle };
+        menu.Items.Add(Item($"Play {selection.Count} songs", "", () => selection.PlayCommand.ExecuteAsync(null)));
+        menu.Items.Add(Item("Play next", "", () => selection.PlayNextCommand.Execute(null)));
+        menu.Items.Add(Item("Add to queue", "", () => selection.AddToQueueCommand.Execute(null)));
+        if (selection.IsSignedIn)
+        {
+            menu.Items.Add(new MenuFlyoutSeparator());
+            menu.Items.Add(Item("Add to playlist…", "", () => selection.AddToPlaylistCommand.ExecuteAsync(null)));
+        }
+
+        if (selection.CanRemove)
+        {
+            menu.Items.Add(new MenuFlyoutSeparator());
+            menu.Items.Add(Item("Remove from playlist", "", () => selection.RemoveCommand.ExecuteAsync(null)));
+        }
+
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(Item("Clear selection", "", selection.Exit));
         return menu;
     }
 

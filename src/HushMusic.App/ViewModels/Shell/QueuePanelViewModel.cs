@@ -11,6 +11,8 @@ namespace HushMusic.App.ViewModels.Shell;
 /// <summary>
 /// Mirrors <see cref="IQueueService.Items"/> for the "Up next" tab. Every change goes through the queue service;
 /// the collection is re-synced from its snapshot (diffed by <see cref="QueueItem.Id"/> so the list doesn't flicker).
+/// Songs autoplay added (<see cref="IQueueAutoplay"/>) get a "Similar songs" header above the first of them; signed in,
+/// the queue can be saved as a playlist.
 /// </summary>
 public sealed partial class QueuePanelViewModel : ObservableObject
 {
@@ -19,6 +21,9 @@ public sealed partial class QueuePanelViewModel : ObservableObject
     private readonly IMediaItemActions _actions;
     private readonly INotificationService _notifications;
     private readonly IUiDispatcher _dispatcher;
+    private readonly IQueueAutoplay _autoplay;
+    private readonly IAuthService _auth;
+    private readonly IAccountActionsService _accountActions;
     private QueueItemViewModel? _dragged;
     private int _dragFrom = -1;
     private bool _syncPending;
@@ -29,21 +34,71 @@ public sealed partial class QueuePanelViewModel : ObservableObject
         IPlayer player,
         IMediaItemActions actions,
         INotificationService notifications,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        IQueueAutoplay autoplay,
+        IAuthService auth,
+        IAccountActionsService accountActions)
     {
         _queue = queue;
         _player = player;
         _actions = actions;
         _notifications = notifications;
         _dispatcher = dispatcher;
+        _autoplay = autoplay;
+        _auth = auth;
+        _accountActions = accountActions;
         _queue.Changed += (_, _) => _dispatcher.Run(Sync);
         _queue.CurrentChanged += (_, _) => _dispatcher.Run(Sync);
+        _autoplay.Changed += (_, _) => _dispatcher.Run(Sync);
+        _auth.StatusChanged += (_, _) => _dispatcher.Run(() => OnPropertyChanged(nameof(CanSaveAsPlaylist)));
         _player.StatusChanged += (_, e) => _dispatcher.Run(() => SetPlaying(IsActive(e.Status)));
         _isPlaying = IsActive(player.Status);
         _dispatcher.Run(Sync);
     }
 
     public ObservableCollection<QueueItemViewModel> Items { get; } = [];
+
+    /// <summary>Signed in, with YouTube songs in the queue (stations can't go in a playlist).</summary>
+    public bool CanSaveAsPlaylist => _auth.Status == AuthStatus.SignedIn && SavableCount > 0;
+
+    /// <summary>The distinct YouTube songs in the queue, played ones included: what "Save as playlist" saves.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSaveAsPlaylist))]
+    public partial int SavableCount { get; set; }
+
+    /// <summary>A name to start from: where the queue came from.</summary>
+    public string DefaultPlaylistName => _queue.Source switch
+    {
+        { Kind: QueueSourceKind.Radio, Title.Length: > 0 } source => $"{source.Title} radio",
+        { Kind: QueueSourceKind.UpNext, Title.Length: > 0 } source => $"{source.Title} mix",
+        { Kind: not QueueSourceKind.LiveRadio, Title.Length: > 0 } source => source.Title,
+        _ => "My queue",
+    };
+
+    /// <summary>Creates a private playlist with the queue's songs, in queue order, and reports the result.</summary>
+    public async Task SaveAsPlaylistAsync(string title)
+    {
+        var name = title.Trim();
+        List<string> videoIds = [.. SavableVideoIds()];
+        if (name.Length == 0 || videoIds.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await _accountActions.CreatePlaylistAsync(name, null, PrivacyStatus.Private, videoIds);
+            var songs = videoIds.Count == 1 ? "1 song" : $"{videoIds.Count} songs";
+            _notifications.Show(new AppNotification(NotificationSeverity.Success, "Queue saved as a playlist", $"“{name}”, {songs}, private"));
+        }
+        catch (Exception ex)
+        {
+            _notifications.ShowError("Couldn't save the queue as a playlist", ex);
+        }
+    }
+
+    private IEnumerable<string> SavableVideoIds() =>
+        _queue.Items.Select(i => i.Track).Where(t => !t.IsLiveRadio && t.IsAvailable).Select(t => t.VideoId).Distinct(StringComparer.Ordinal);
 
     [ObservableProperty]
     public partial QueueItemViewModel? Current { get; set; }
@@ -52,9 +107,18 @@ public sealed partial class QueuePanelViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(CountText))]
     public partial int Count { get; set; }
 
-    public string CountText => _queue.Source?.Kind == QueueSourceKind.LiveRadio
-        ? Count == 1 ? "1 station" : $"{Count} stations"
-        : Count == 1 ? "1 song" : $"{Count} songs";
+    // Stations and songs can share a queue (a song found on a station's "On YouTube Music", played next).
+    public string CountText
+    {
+        get
+        {
+            var stations = Items.Count(i => i.IsStation);
+            var songs = Count - stations;
+            var stationText = stations == 1 ? "1 station" : $"{stations} stations";
+            var songText = songs == 1 ? "1 song" : $"{songs} songs";
+            return stations == 0 ? songText : songs == 0 ? stationText : $"{stationText}, {songText}";
+        }
+    }
 
     [ObservableProperty]
     public partial string? SourceText { get; set; }
@@ -150,6 +214,9 @@ public sealed partial class QueuePanelViewModel : ObservableObject
     }
 
     private bool CanClearQueue() => UpcomingCount > 0;
+
+    private string SuggestionsNote() =>
+        _autoplay.Seed is { } seed ? $"Autoplay · based on “{seed.Title}”" : "Autoplay";
 
     private static bool IsActive(PlaybackStatus status) =>
         status is PlaybackStatus.Playing or PlaybackStatus.Loading or PlaybackStatus.Buffering;
@@ -275,6 +342,8 @@ public sealed partial class QueuePanelViewModel : ObservableObject
         }
 
         QueueItemViewModel? current = null;
+        var suggested = _autoplay.SuggestedItemIds;
+        var suggestionsStart = false;
         for (var i = 0; i < Items.Count; i++)
         {
             var item = Items[i];
@@ -288,8 +357,14 @@ public sealed partial class QueuePanelViewModel : ObservableObject
             {
                 current = item;
             }
+
+            var isStart = !suggestionsStart && suggested.Contains(item.Id);
+            suggestionsStart |= isStart;
+            item.SuggestionsNote = isStart ? SuggestionsNote() : null;
+            item.IsSuggestionsStart = isStart;
         }
 
+        SavableCount = Items.Where(i => !i.IsStation).Select(i => i.Track.VideoId).Distinct(StringComparer.Ordinal).Count();
         Count = Items.Count;
         OnPropertyChanged(nameof(CountText));
         UpcomingCount = currentIndex >= 0 ? Items.Count - currentIndex - 1 : Items.Count;
@@ -344,6 +419,14 @@ public sealed partial class QueueItemViewModel : ObservableObject
     /// <summary>Current and playing: the equaliser bounces.</summary>
     [ObservableProperty]
     public partial bool IsPlaying { get; set; }
+
+    /// <summary>The first song autoplay added after the end of the queue: a "Similar songs" header goes above it.</summary>
+    [ObservableProperty]
+    public partial bool IsSuggestionsStart { get; set; }
+
+    /// <summary>The header's second line ("Autoplay · based on …"), set with <see cref="IsSuggestionsStart"/>.</summary>
+    [ObservableProperty]
+    public partial string? SuggestionsNote { get; set; }
 
     /// <summary>The track, for dragging a queue row elsewhere.</summary>
     public Track Track { get; }

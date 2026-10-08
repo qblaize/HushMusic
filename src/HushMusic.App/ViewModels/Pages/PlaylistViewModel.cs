@@ -7,17 +7,25 @@ using HushMusic.Core.Models;
 
 namespace HushMusic.App.ViewModels.Pages;
 
-public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHost
+public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHost, ITrackSelectionHost
 {
     private const string LikedMusicId = "LM";
 
     private readonly IBrowseApi _browse;
     private readonly IAccountActionsService _account;
     private readonly IPlaylistDialogService _dialogs;
+
+    // Moves go to YouTube Music one at a time, in the order they were made.
+    private readonly SemaphoreSlim _moveGate = new(1, 1);
     private string? _playlistId;
     private int? _trackCount;
     private string? _durationText;
     private string? _year;
+    private int _listVersion;
+    private int _pendingMoves;
+    private int _ownEdits;
+    private TrackItem? _dragItem;
+    private int _dragFrom = -1;
 
     public PlaylistViewModel(IBrowseApi browse, IAccountActionsService account, IPlaylistDialogService dialogs, PageServices services)
         : base(services)
@@ -29,9 +37,12 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
             (continuation, ct) => _browse.GetPlaylistTracksAsync(continuation, ct),
             ex => ReportError("Couldn't load more songs", ex),
             () => NavigationToken);
+        Selection = new TrackSelection(Tracks, services.Actions, CurrentSource, RemoveTracksAsync, () => IsOwned);
     }
 
     public IncrementalCollection<TrackItem> Tracks { get; }
+
+    public TrackSelection Selection { get; }
 
     [ObservableProperty]
     public partial Playlist? Playlist { get; set; }
@@ -56,6 +67,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
 
     /// <summary>Account-only actions ("Add to playlist…") are offered when signed in.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanReorder))]
     public partial bool IsSignedIn { get; set; }
 
     [ObservableProperty]
@@ -70,42 +82,66 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EditCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
+    [NotifyPropertyChangedFor(nameof(CanReorder))]
     public partial bool IsOwned { get; set; }
+
+    /// <summary>Songs can be dragged into a new order (your own playlists).</summary>
+    public bool CanReorder => IsOwned && IsSignedIn && _playlistId is not (LikedMusicId or "VL" + LikedMusicId);
 
     public Task PlayFromTrackAsync(Track track) => PlayFromIndexAsync(IndexOf(track));
 
     public bool CanRemoveFromPlaylist(Track track) => IsOwned && track.SetVideoId is not null;
 
-    public async Task RemoveFromPlaylistAsync(Track track)
+    public Task RemoveFromPlaylistAsync(Track track)
     {
-        if (Playlist is not { } playlist || !CanRemoveFromPlaylist(track))
+        var index = IndexOf(track);
+        return index < 0 ? Task.CompletedTask : RemoveTracksAsync([Tracks[index]]);
+    }
+
+    /// <summary>The list started dragging a row (to reorder it, or out to the queue or a playlist).</summary>
+    public void BeginReorder(object? item)
+    {
+        _dragItem = item as TrackItem;
+        _dragFrom = _dragItem is null ? -1 : Tracks.IndexOf(_dragItem);
+    }
+
+    /// <summary>
+    /// The drag ended. When the list moved the row (<paramref name="moved"/>), the new order is saved to the playlist; if
+    /// that fails the row goes back.
+    /// </summary>
+    public void CompleteReorder(bool moved)
+    {
+        var item = _dragItem;
+        var from = _dragFrom;
+        _dragItem = null;
+        _dragFrom = -1;
+        if (!moved || item is null || from < 0 || Playlist is not { } playlist)
         {
             return;
         }
 
-        try
+        var to = Tracks.IndexOf(item);
+        if (to < 0 || to == from)
         {
-            await _account.RemoveFromPlaylistAsync(playlist.PlaylistId, [track]);
-            var index = IndexOf(track);
-            if (index >= 0)
-            {
-                Tracks.RemoveAt(index);
-            }
-
-            if (_trackCount is { } count)
-            {
-                _trackCount = Math.Max(0, count - 1);
-            }
-
-            UpdateStats();
-            UpdateKicker();
-            IsEmpty = Tracks.Count == 0 && !Tracks.HasMoreItems;
-            Notifications.Show(new AppNotification(NotificationSeverity.Success, "Removed from playlist", track.Title));
+            return;
         }
-        catch (Exception ex)
+
+        var successor = to + 1 < Tracks.Count ? Tracks[to + 1] : null;
+        if (!CanReorder || item.Track.SetVideoId is null || successor is { Track.SetVideoId: null })
         {
-            Notifications.ShowError("Couldn't remove the song", ex);
+            MoveRow(to, from);
+            return;
         }
+
+        if (successor is null && Tracks.HasMoreItems)
+        {
+            // The last loaded song isn't the end of the playlist, and the entry after it isn't known yet.
+            MoveRow(to, from);
+            Notifications.ShowInfo("Can't move the song there yet", "Scroll down until the rest of the playlist has loaded, then move it again.");
+            return;
+        }
+
+        _ = SaveMoveAsync(playlist.PlaylistId, item, from, to, successor);
     }
 
     protected override Task OnNavigatedToCoreAsync(object? parameter)
@@ -125,7 +161,11 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         return LoadAsync();
     }
 
-    protected override void OnNavigatedFromCore() => _account.PlaylistChanged -= OnPlaylistChanged;
+    protected override void OnNavigatedFromCore()
+    {
+        _account.PlaylistChanged -= OnPlaylistChanged;
+        Selection.Exit();
+    }
 
     protected override Task LoadAsync()
     {
@@ -155,6 +195,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
                 UpdateKicker();
                 UpdateStats();
 
+                _listVersion++;
                 Tracks.Reset(TrackItem.From(page.Tracks.Items), page.Tracks.Continuation);
                 IsEmpty = Tracks.Count == 0 && !Tracks.HasMoreItems;
                 Services.Warmup.Warm(page.Tracks.Items.FirstOrDefault(t => t.IsAvailable));
@@ -257,17 +298,208 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         }
     }
 
+    // ===== Removing songs (optimistic, with Undo) =====
+
+    private async Task RemoveTracksAsync(IReadOnlyList<TrackItem> items)
+    {
+        if (Playlist is not { } playlist)
+        {
+            return;
+        }
+
+        List<RemovedRow> rows =
+        [
+            .. items
+                .Select(item => new RemovedRow(item, Tracks.IndexOf(item)))
+                .Where(row => row.Index >= 0 && CanRemoveFromPlaylist(row.Item.Track))
+                .OrderBy(row => row.Index),
+        ];
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        // What followed each entry, so Undo can put it back in place. The entry after the last loaded song isn't known.
+        List<RemovedPlaylistEntry> entries =
+        [
+            .. rows.Select(row => new RemovedPlaylistEntry(row.Item.Track, row.Index + 1 < Tracks.Count ? Tracks[row.Index + 1].Track.SetVideoId : null)),
+        ];
+        var version = _listVersion;
+        for (var i = rows.Count - 1; i >= 0; i--)
+        {
+            Tracks.RemoveAt(rows[i].Index);
+        }
+
+        Selection.Forget(rows.Select(row => row.Item));
+        if (!Selection.HasSelection)
+        {
+            Selection.Exit();
+        }
+
+        AdjustTrackCount(-rows.Count);
+
+        Interlocked.Increment(ref _ownEdits);
+        try
+        {
+            await _account.RemoveFromPlaylistAsync(playlist.PlaylistId, [.. rows.Select(row => row.Item.Track)]);
+            var title = rows.Count == 1 ? "Removed from playlist" : $"Removed {rows.Count} songs";
+            var message = rows.Count == 1 ? rows[0].Item.Track.Title : playlist.Title;
+            Notifications.Show(new AppNotification(NotificationSeverity.Success, title, message)
+            {
+                Action = new NotificationAction("Undo", () => _ = UndoRemoveAsync(playlist.PlaylistId, rows, entries, version)),
+            });
+        }
+        catch (Exception ex)
+        {
+            if (version == _listVersion)
+            {
+                PutBack(rows);
+            }
+            else
+            {
+                _ = LoadAsync(); // reloaded meanwhile: show what the playlist really has
+            }
+
+            Notifications.ShowError(rows.Count == 1 ? "Couldn't remove the song" : "Couldn't remove the songs", ex);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _ownEdits);
+        }
+    }
+
+    /// <param name="version">The list the rows were removed from; their indexes only apply to it.</param>
+    private async Task UndoRemoveAsync(string playlistId, List<RemovedRow> rows, List<RemovedPlaylistEntry> entries, int version)
+    {
+        // The notification can outlive the page: the account is updated either way, the list only while it is shown.
+        var onPage = !NavigationToken.IsCancellationRequested && Playlist?.PlaylistId == playlistId;
+        var inPlace = onPage && version == _listVersion;
+        if (inPlace)
+        {
+            PutBack(rows);
+        }
+
+        Interlocked.Increment(ref _ownEdits);
+        try
+        {
+            var restored = await _account.RestorePlaylistItemsAsync(playlistId, entries);
+            if (inPlace && version == _listVersion)
+            {
+                // The entries came back as new ones: keep their new ids for the next move or removal.
+                for (var i = 0; i < rows.Count && i < restored.Count; i++)
+                {
+                    var index = Tracks.IndexOf(rows[i].Item);
+                    if (index >= 0)
+                    {
+                        Tracks[index] = new TrackItem(restored[i], rows[i].Item.Number);
+                    }
+                }
+            }
+            else if (onPage && !NavigationToken.IsCancellationRequested)
+            {
+                _ = LoadAsync();
+            }
+
+            Notifications.Show(new AppNotification(
+                NotificationSeverity.Success,
+                rows.Count == 1 ? "Song put back" : $"{rows.Count} songs put back",
+                rows.Count == 1 ? rows[0].Item.Track.Title : string.Empty));
+        }
+        catch (Exception ex)
+        {
+            Notifications.ShowError(rows.Count == 1 ? "Couldn't put the song back" : "Couldn't put the songs back", ex);
+            if (onPage && !NavigationToken.IsCancellationRequested)
+            {
+                _ = LoadAsync();
+            }
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _ownEdits);
+        }
+    }
+
+    // Rows go back to their old places (in ascending order, so every index is right when it is used).
+    private void PutBack(List<RemovedRow> rows)
+    {
+        foreach (var row in rows)
+        {
+            if (Tracks.IndexOf(row.Item) < 0)
+            {
+                Tracks.Insert(Math.Min(row.Index, Tracks.Count), row.Item);
+            }
+        }
+
+        AdjustTrackCount(rows.Count);
+    }
+
+    // ===== Reordering =====
+
+    private async Task SaveMoveAsync(string playlistId, TrackItem item, int from, int to, TrackItem? successor)
+    {
+        _pendingMoves++;
+        Interlocked.Increment(ref _ownEdits);
+        await _moveGate.WaitAsync();
+        try
+        {
+            await _account.MovePlaylistItemAsync(playlistId, item.Track, successor?.Track);
+        }
+        catch (Exception ex)
+        {
+            // Put the song back; with later moves still on their way its old place may have changed, so reload instead.
+            if (_pendingMoves == 1 && Tracks.IndexOf(item) == to)
+            {
+                MoveRow(to, from);
+            }
+            else if (!NavigationToken.IsCancellationRequested)
+            {
+                _ = LoadAsync();
+            }
+
+            Notifications.ShowError("Couldn't move the song", ex);
+        }
+        finally
+        {
+            _pendingMoves--;
+            Interlocked.Decrement(ref _ownEdits);
+            _moveGate.Release();
+        }
+    }
+
+    // Remove + insert rather than Move: list views handle these two notifications everywhere.
+    private void MoveRow(int from, int to)
+    {
+        var item = Tracks[from];
+        Tracks.RemoveAt(from);
+        Tracks.Insert(Math.Min(to, Tracks.Count), item);
+    }
+
+    // ===== Helpers =====
+
+    private QueueSource CurrentSource() => Playlist is { } playlist
+        ? new QueueSource(playlist.PlaylistId == LikedMusicId ? QueueSourceKind.LikedSongs : QueueSourceKind.Playlist, playlist.PlaylistId, playlist.Title)
+        : new QueueSource(QueueSourceKind.Manual, null, Title);
+
     private Task PlayFromIndexAsync(int index)
     {
-        if (index < 0 || Playlist is not { } playlist)
+        if (index < 0 || Playlist is null)
         {
             return Task.CompletedTask;
         }
 
-        var source = playlist.PlaylistId == LikedMusicId
-            ? new QueueSource(QueueSourceKind.LikedSongs, playlist.PlaylistId, playlist.Title)
-            : new QueueSource(QueueSourceKind.Playlist, playlist.PlaylistId, playlist.Title);
-        return Actions.PlayTracksAsync([.. Tracks.Select(t => t.Track)], index, source);
+        return Actions.PlayTracksAsync([.. Tracks.Select(t => t.Track)], index, CurrentSource());
+    }
+
+    private void AdjustTrackCount(int delta)
+    {
+        if (_trackCount is { } count)
+        {
+            _trackCount = Math.Max(0, count + delta);
+        }
+
+        UpdateStats();
+        UpdateKicker();
+        IsEmpty = Tracks.Count == 0 && !Tracks.HasMoreItems;
     }
 
     private void UpdateKicker() => Kicker = ItemFormat.Join("Playlist", ItemFormat.TrackCount(_trackCount), ItemFormat.PrivacyText(Privacy));
@@ -289,12 +521,15 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         return -1;
     }
 
-    // Songs added from elsewhere (track menus, player bar) while this playlist is open: reload to show them.
+    // Songs added from elsewhere (track menus, player bar) while this playlist is open: reload to show them. This page's
+    // own edits (Undo adds songs back) are already on screen.
     private void OnPlaylistChanged(object? sender, PlaylistChangedEventArgs e)
     {
-        if (e.Kind == PlaylistChangeKind.ItemsAdded && Playlist is { } playlist && e.PlaylistId == playlist.PlaylistId)
+        if (e.Kind == PlaylistChangeKind.ItemsAdded && Volatile.Read(ref _ownEdits) == 0 && Playlist is { } playlist && e.PlaylistId == playlist.PlaylistId)
         {
             Services.Dispatcher.Run(() => _ = LoadAsync());
         }
     }
+
+    private sealed record RemovedRow(TrackItem Item, int Index);
 }

@@ -7,8 +7,13 @@
     xmlns:items="using:HushMusic.App.Controls.Items">
 
     <Grid items:TrackMenu.Host="{x:Bind ViewModel}">
+        <!-- Your own playlists: drag a song to reorder it (saved to the playlist right away). -->
         <ListView
             Padding="{StaticResource ListPagePadding}"
+            AllowDrop="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
+            CanReorderItems="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
+            DragItemsCompleted="OnDragItemsCompleted"
+            DragItemsStarting="OnDragItemsStarting"
             IsItemClickEnabled="True"
             ItemClick="OnTrackClick"
             ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
@@ -18,7 +23,8 @@
             Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.ShowError), Mode=OneWay}"
             items:ListFooter.FollowsItems="True"
             items:TrackDrag.IsEnabled="True"
-            items:TrackMenu.IsEnabled="True">
+            items:TrackMenu.IsEnabled="True"
+            items:TrackSelectionList.Selection="{x:Bind ViewModel.Selection}">
             <ListView.Header>
                 <!-- Reaches the page edges (undoes the list padding) so the artwork wash spans the whole width. -->
                 <StackPanel>
@@ -62,6 +68,17 @@
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <FontIcon FontSize="13" Glyph="&#xE70F;" />
                                         <TextBlock Text="Edit" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    AutomationProperties.Name="{x:Bind ViewModel.Selection.ModeButtonText, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.Selection.ToggleModeCommand}"
+                                    Style="{StaticResource PillSecondaryButtonStyle}"
+                                    ToolTipService.ToolTip="Select several songs (or Ctrl-click them)"
+                                    Visibility="{x:Bind ViewModel.HasContent, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon FontSize="13" Glyph="&#xE762;" />
+                                        <TextBlock Text="{x:Bind ViewModel.Selection.ModeButtonText, Mode=OneWay}" />
                                     </StackPanel>
                                 </Button>
                                 <Button
@@ -143,6 +160,7 @@
         </ListView>
 
         <ProgressBar Style="{StaticResource BusyBarStyle}" Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <items:SelectionBar Selection="{x:Bind ViewModel.Selection}" />
         <items:EmptyState
             ActionText="Try again"
             Command="{x:Bind ViewModel.RetryCommand}"

@@ -14,7 +14,8 @@ public sealed partial class ArtistViewModel(IBrowseApi browse, PageServices serv
 
     public ObservableCollection<TrackItem> TopSongs { get; } = [];
 
-    public ObservableCollection<Shelf> Sections { get; } = [];
+    /// <summary>Albums, singles, videos... in page order, with "See all" where the artist page links a full list.</summary>
+    public ObservableCollection<SeeAllShelf> Sections { get; } = [];
 
     [ObservableProperty]
     public partial Artist? Artist { get; set; }
@@ -97,7 +98,7 @@ public sealed partial class ArtistViewModel(IBrowseApi browse, PageServices serv
                 Sections.Clear();
                 foreach (var section in page.Sections.Where(s => s.Items.Count > 0))
                 {
-                    Sections.Add(section);
+                    Sections.Add(new SeeAllShelf(section, SeeAllCommandFor(section, page.Artist.Title)));
                 }
 
                 HasContent = true;
@@ -121,4 +122,14 @@ public sealed partial class ArtistViewModel(IBrowseApi browse, PageServices serv
 
     [RelayCommand]
     private Task PlayTrackAsync(TrackItem? item) => item is null ? Task.CompletedTask : Actions.PlayTrackAsync(item.Track);
+
+    // Albums / singles link the discography grid ("MPAD" + channel id, with params); videos link a playlist. Other links
+    // (a channel's "Live performances", "Playlists by ...") lead to pages that are empty without an account: no "See all".
+    private RelayCommand? SeeAllCommandFor(Shelf section, string artistName) => section.MoreBrowseId switch
+    {
+        { } id when id.StartsWith("MPAD", StringComparison.Ordinal) => new RelayCommand(() =>
+            Services.Navigation.NavigateTo(PageKey.ArtistDiscography, new ArtistDiscographyRequest(id, section.MoreParams, section.Title, artistName))),
+        { } id when id.StartsWith("VL", StringComparison.Ordinal) => new RelayCommand(() => Actions.OpenPlaylist(id[2..])),
+        _ => null,
+    };
 }

@@ -77,7 +77,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasTrack), nameof(CanRate), nameof(Title), nameof(Subtitle), nameof(CoverUrl), nameof(IsLive), nameof(IsNotLive))]
-    [NotifyPropertyChangedFor(nameof(LiveNowPlaying), nameof(LiveArtUrl), nameof(StationName))]
+    [NotifyPropertyChangedFor(nameof(LiveNowPlaying), nameof(LiveArtUrl), nameof(StationName), nameof(CanFindOnYouTubeMusic), nameof(TitleToolTip))]
     public partial Track? Track { get; set; }
 
     [ObservableProperty]
@@ -155,6 +155,14 @@ public sealed partial class PlayerViewModel : ObservableObject
     public string? LiveArtUrl => IsLive ? LiveNowPlaying?.ArtworkUrl ?? Track?.Station?.LogoUrl : null;
 
     public string? StationName => Track?.Station?.Name;
+
+    /// <summary>
+    /// The live station announced its song: the title opens "On YouTube Music" (find, play, queue, like or save it)
+    /// instead of toggling Now Playing.
+    /// </summary>
+    public bool CanFindOnYouTubeMusic => LiveNowPlaying is not null;
+
+    public string TitleToolTip => CanFindOnYouTubeMusic ? "Find on YouTube Music" : "Now Playing";
 
     public bool CanSeek => HasTrack && DurationSeconds > 0;
 
@@ -523,6 +531,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         OnPropertyChanged(nameof(Subtitle));
         OnPropertyChanged(nameof(LiveNowPlaying));
         OnPropertyChanged(nameof(LiveArtUrl));
+        OnPropertyChanged(nameof(CanFindOnYouTubeMusic));
+        OnPropertyChanged(nameof(TitleToolTip));
     }
 
     private void OnTrackRated(string videoId, LikeStatus status)

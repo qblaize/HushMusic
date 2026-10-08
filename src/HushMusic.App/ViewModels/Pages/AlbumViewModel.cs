@@ -8,11 +8,21 @@ using HushMusic.Core.Models;
 
 namespace HushMusic.App.ViewModels.Pages;
 
-public sealed partial class AlbumViewModel(IBrowseApi browse, PageServices services) : PageViewModelBase(services), ITrackListHost
+public sealed partial class AlbumViewModel : PageViewModelBase, ITrackListHost, ITrackSelectionHost
 {
+    private readonly IBrowseApi _browse;
     private string? _browseId;
 
+    public AlbumViewModel(IBrowseApi browse, PageServices services)
+        : base(services)
+    {
+        _browse = browse;
+        Selection = new TrackSelection(Tracks, services.Actions, CurrentSource);
+    }
+
     public ObservableCollection<TrackItem> Tracks { get; } = [];
+
+    public TrackSelection Selection { get; }
 
     [ObservableProperty]
     public partial Album? Album { get; set; }
@@ -73,6 +83,8 @@ public sealed partial class AlbumViewModel(IBrowseApi browse, PageServices servi
         return LoadAsync();
     }
 
+    protected override void OnNavigatedFromCore() => Selection.Exit();
+
     protected override Task LoadAsync()
     {
         if (string.IsNullOrWhiteSpace(_browseId))
@@ -86,7 +98,7 @@ public sealed partial class AlbumViewModel(IBrowseApi browse, PageServices servi
         return RunAsync(
             async ct =>
             {
-                var page = await browse.GetAlbumAsync(browseId, ct);
+                var page = await _browse.GetAlbumAsync(browseId, ct);
                 var album = page.Album;
                 Album = album;
                 Title = album.Title;
@@ -97,6 +109,7 @@ public sealed partial class AlbumViewModel(IBrowseApi browse, PageServices servi
                 Stats = ItemFormat.Join(ItemFormat.TrackCount(page.TrackCount ?? page.Tracks.Count), page.DurationText);
                 OtherVersions = page.OtherVersions;
 
+                Selection.Exit();
                 Tracks.Clear();
                 foreach (var item in TrackItem.From(page.Tracks))
                 {
@@ -143,14 +156,15 @@ public sealed partial class AlbumViewModel(IBrowseApi browse, PageServices servi
 
     private Task PlayFromIndexAsync(int index)
     {
-        if (index < 0 || Album is not { } album)
+        if (index < 0 || CurrentSource() is not { } source)
         {
             return Task.CompletedTask;
         }
 
-        var source = new QueueSource(QueueSourceKind.Album, album.BrowseId, album.Title);
         return Actions.PlayTracksAsync([.. Tracks.Select(t => t.Track)], index, source);
     }
+
+    private QueueSource? CurrentSource() => Album is { } album ? new QueueSource(QueueSourceKind.Album, album.BrowseId, album.Title) : null;
 
     private int IndexOf(Track track)
     {

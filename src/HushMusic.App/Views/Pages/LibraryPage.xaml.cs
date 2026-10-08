@@ -24,7 +24,13 @@ public sealed partial class LibraryPage : Page
         ViewModel.OpenItemCommand.Execute(e.ClickedItem);
     }
 
-    private void OnSongClick(object sender, ItemClickEventArgs e) => ViewModel.PlaySongCommand.Execute(e.ClickedItem);
+    private void OnSongClick(object sender, ItemClickEventArgs e)
+    {
+        if (!TrackSelectionList.HandleClick(sender, e.ClickedItem))
+        {
+            ViewModel.PlaySongCommand.Execute(e.ClickedItem);
+        }
+    }
 
     // The initial IsChecked fires during InitializeComponent; the first load comes from OnNavigatedTo instead.
     private void OnTabChecked(object sender, RoutedEventArgs e)

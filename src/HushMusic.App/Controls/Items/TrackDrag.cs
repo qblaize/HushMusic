@@ -1,3 +1,4 @@
+using Windows.ApplicationModel.DataTransfer;
 using HushMusic.App.Helpers;
 using HushMusic.App.ViewModels.Pages;
 using HushMusic.Core.Models;
@@ -14,7 +15,8 @@ internal interface IHoverReset
 /// <c>items:TrackDrag.IsEnabled="True"</c> on a ListView/GridView makes its track items drag sources
 /// (<see cref="TrackDragData"/>): drop them on Up next, the player bar or one of your playlists. Other items (albums,
 /// artists, playlists) don't drag. Uses the list's own item dragging, so click, double-click, hover and the context
-/// menu behave as before.
+/// menu behave as before. Dragging one of several selected songs (<see cref="TrackSelectionList"/>) drags them all; a list
+/// with <c>CanReorderItems</c> also gets single songs back as a move.
 /// </summary>
 public static class TrackDrag
 {
@@ -47,7 +49,10 @@ public static class TrackDrag
 
     private static void OnDragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
-        List<Track> tracks = [.. e.Items.Select(AsTrack).OfType<Track>().Where(t => t.IsAvailable)];
+        var selection = sender is DependencyObject list ? TrackSelectionList.GetSelection(list) : null;
+        var dragsSelection = selection is { Count: > 1 } && e.Items.Count == 1 && e.Items[0] is TrackItem dragged && selection.IsSelected(dragged);
+        var items = dragsSelection ? selection!.SelectedItems.Cast<object>() : e.Items;
+        List<Track> tracks = [.. items.Select(AsTrack).OfType<Track>().Where(t => t.IsAvailable)];
         if (tracks.Count == 0)
         {
             e.Cancel = true;
@@ -55,6 +60,12 @@ public static class TrackDrag
         }
 
         TrackDragData.Set(e.Data, tracks, Caption(tracks));
+
+        // Reordering moves the one row the list drags; with a multi-song drag it would move only that one.
+        if (!dragsSelection && sender is ListViewBase { CanReorderItems: true })
+        {
+            e.Data.RequestedOperation = DataPackageOperation.Copy | DataPackageOperation.Move;
+        }
     }
 
     private static void OnDragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)

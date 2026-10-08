@@ -78,6 +78,15 @@ public interface IStreamResolver
 /// cursor on next/previous/track end. Implemented by HushMusic.Playback (MediaPlayer + SMTC).
 /// Events are raised on a background thread.
 /// </summary>
+/// <remarks>
+/// With crossfade on (<see cref="AppSettings.CrossfadeSeconds"/>) the next track starts that many seconds before the
+/// current one ends, and becomes current right then: the queue advances, <see cref="TrackCompleted"/> is raised for the
+/// outgoing track, then <see cref="TrackChanged"/> and (once its audio runs) <see cref="TrackStarted"/> for the incoming
+/// one. From that moment <see cref="CurrentTrack"/>, <see cref="Position"/>, <see cref="Duration"/>,
+/// <see cref="PositionChanged"/> and <see cref="Status"/> describe the incoming track; the outgoing one is only heard
+/// under it until the fade ends. With crossfade off, the next track is opened ahead of time and starts as soon as the
+/// current one ends (the events are the same as without preloading).
+/// </remarks>
 public interface IPlayer
 {
     PlaybackStatus Status { get; }
@@ -94,7 +103,7 @@ public interface IPlayer
     /// </summary>
     bool IsLive => CurrentTrack?.IsLiveRadio == true;
 
-    /// <summary>The user's volume, 0.0 – 1.0. Volume normalization and the sleep-timer fade are applied on top of it.</summary>
+    /// <summary>The user's volume, 0.0 – 1.0. Volume normalization, crossfades and the sleep-timer fade are applied on top of it.</summary>
     double Volume { get; set; }
 
     bool IsMuted { get; set; }
@@ -119,13 +128,16 @@ public interface IPlayer
 
     event EventHandler<PlaybackStatusChangedEventArgs>? StatusChanged;
 
-    /// <summary>A new track became current (it may still be loading).</summary>
+    /// <summary>A new track became current (it may still be loading). With crossfade on, when the fade into it starts.</summary>
     event EventHandler<TrackChangedEventArgs>? TrackChanged;
 
     /// <summary>Audio actually started for the current track (first time only).</summary>
     event EventHandler<TrackChangedEventArgs>? TrackStarted;
 
-    /// <summary>The current track played to its end.</summary>
+    /// <summary>
+    /// The current track played to its end, or, with crossfade on, reached the start of the fade into the next track
+    /// (its last seconds are then heard under the next one, which is already current). Never raised for a skip.
+    /// </summary>
     event EventHandler<TrackChangedEventArgs>? TrackCompleted;
 
     /// <summary>Raised about 4 times per second while playing.</summary>

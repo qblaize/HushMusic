@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.SelectionBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    HorizontalAlignment="Center"
+    VerticalAlignment="Bottom"
+    Loaded="OnLoaded"
+    Unloaded="OnUnloaded">
+
+    <!-- A floating glass bar above the player: what is selected, and what can be done with it. -->
+    <Border
+        x:Name="Surface"
+        Padding="6,6,10,6"
+        AutomationProperties.LandmarkType="Custom"
+        AutomationProperties.LocalizedLandmarkType="Selection"
+        AutomationProperties.Name="Selected songs"
+        Background="{ThemeResource GlassStrongBrush}"
+        BorderBrush="{ThemeResource SeparatorBrush}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource RadiusLarge}"
+        Shadow="{StaticResource ShellShadow}"
+        Translation="0,0,24"
+        Visibility="{x:Bind helpers:Format.VisibleIf(Selection.IsActive), Mode=OneWay, FallbackValue=Collapsed}">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+            <Button
+                AutomationProperties.Name="Close selection"
+                Command="{x:Bind Selection.ExitCommand, Mode=OneWay}"
+                Content="&#xE711;"
+                FontSize="12"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTipService.ToolTip="Done (Esc)" />
+            <TextBlock
+                MinWidth="128"
+                Margin="4,0,8,0"
+                VerticalAlignment="Center"
+                AutomationProperties.LiveSetting="Polite"
+                Style="{StaticResource HeadlineStyle}"
+                Text="{x:Bind Selection.Summary, Mode=OneWay}"
+                Typography.NumeralAlignment="Tabular" />
+            <Button
+                Margin="0,0,8,0"
+                VerticalAlignment="Center"
+                Command="{x:Bind Selection.SelectAllCommand, Mode=OneWay}"
+                Content="Select all"
+                Style="{StaticResource TextActionButtonStyle}"
+                ToolTipService.ToolTip="Select all (Ctrl+A)" />
+
+            <Rectangle
+                Width="1"
+                Height="24"
+                Margin="0,0,6,0"
+                VerticalAlignment="Center"
+                Fill="{ThemeResource SeparatorBrush}" />
+
+            <Button
+                MinWidth="0"
+                Margin="0,0,4,0"
+                AutomationProperties.Name="Play selected"
+                Command="{x:Bind Selection.PlayCommand, Mode=OneWay}"
+                IsEnabled="{x:Bind Selection.HasSelection, Mode=OneWay}"
+                Style="{StaticResource PillButtonStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon FontSize="12" Glyph="&#xF5B0;" />
+                    <TextBlock Text="Play" />
+                </StackPanel>
+            </Button>
+            <Button
+                AutomationProperties.Name="Play next"
+                Command="{x:Bind Selection.PlayNextCommand, Mode=OneWay}"
+                Content="&#xE893;"
+                IsEnabled="{x:Bind Selection.HasSelection, Mode=OneWay}"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTipService.ToolTip="Play next" />
+            <Button
+                AutomationProperties.Name="Add to queue"
+                Command="{x:Bind Selection.AddToQueueCommand, Mode=OneWay}"
+                Content="&#xE8FD;"
+                IsEnabled="{x:Bind Selection.HasSelection, Mode=OneWay}"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTipService.ToolTip="Add to queue" />
+            <Button
+                AutomationProperties.Name="Add to playlist"
+                Command="{x:Bind Selection.AddToPlaylistCommand, Mode=OneWay}"
+                Content="&#xE710;"
+                IsEnabled="{x:Bind Selection.HasSelection, Mode=OneWay}"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTipService.ToolTip="Add to playlist…"
+                Visibility="{x:Bind helpers:Format.VisibleIf(Selection.IsSignedIn), Mode=OneWay}" />
+            <Button
+                AutomationProperties.Name="Remove from this playlist"
+                Command="{x:Bind Selection.RemoveCommand, Mode=OneWay}"
+                Content="&#xE74D;"
+                IsEnabled="{x:Bind Selection.HasSelection, Mode=OneWay}"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTipService.ToolTip="Remove from this playlist"
+                Visibility="{x:Bind helpers:Format.VisibleIf(Selection.CanRemove), Mode=OneWay}" />
+        </StackPanel>
+    </Border>
+</UserControl>

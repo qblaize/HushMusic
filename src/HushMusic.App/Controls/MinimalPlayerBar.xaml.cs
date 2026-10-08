@@ -1,5 +1,7 @@
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using HushMusic.App.Controls.NowPlaying;
+using HushMusic.App.Controls.RadioMatch;
 using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.Shell;
 using HushMusic.Core.Abstractions;
@@ -10,7 +12,7 @@ namespace HushMusic.App.Controls;
 /// The player bar of the Minimal layout: docked under the pages, transport in the middle, volume and a "More" menu
 /// (like, shuffle, repeat, lyrics, up next, sleep timer, mini player) on the right. Logic lives in
 /// <see cref="PlayerViewModel"/> and <see cref="NowPlayingViewModel"/>; this is UI glue: the progress line that turns
-/// into a seek slider, seek drags, the menu's check marks and dropped tracks.
+/// into a seek slider, seek drags, the menu's check marks, dropped tracks and "On YouTube Music" from a station's song.
 /// </summary>
 public sealed partial class MinimalPlayerBar : UserControl
 {
@@ -35,6 +37,14 @@ public sealed partial class MinimalPlayerBar : UserControl
     /// <summary>The played part of the track, 0 to 1: the width of the progress line.</summary>
     public double Fraction(double position, double duration) =>
         duration > 0 && double.IsFinite(position) ? Math.Clamp(position / duration, 0, 1) : 0;
+
+    private void OnTitleClick(object sender, RoutedEventArgs e)
+    {
+        if (!RadioMatchFlyout.TryShowOnAir(TitleButton, ViewModel, FlyoutPlacementMode.TopEdgeAlignedLeft))
+        {
+            NowPlaying.ToggleCommand.Execute(null);
+        }
+    }
 
     // ===== Progress line / seek slider =====
 

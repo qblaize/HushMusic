@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Navigation;
+using Windows.ApplicationModel.DataTransfer;
 using HushMusic.App.Controls.Items;
 using HushMusic.App.ViewModels.Pages;
 
@@ -35,5 +36,18 @@ public sealed partial class PlaylistDetailPage : Page
 
     protected override void OnNavigatedFrom(NavigationEventArgs e) => ViewModel.OnNavigatedFrom();
 
-    private void OnTrackClick(object sender, ItemClickEventArgs e) => ViewModel.PlayTrackCommand.Execute(e.ClickedItem);
+    private void OnTrackClick(object sender, ItemClickEventArgs e)
+    {
+        if (!TrackSelectionList.HandleClick(sender, e.ClickedItem))
+        {
+            ViewModel.PlayTrackCommand.Execute(e.ClickedItem);
+        }
+    }
+
+    // A reorder ends as a Move inside the list; drops on the queue or a playlist are copies.
+    private void OnDragItemsStarting(object sender, DragItemsStartingEventArgs e) =>
+        ViewModel.BeginReorder(e.Items.Count == 1 ? e.Items[0] : null);
+
+    private void OnDragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args) =>
+        ViewModel.CompleteReorder(args.DropResult == DataPackageOperation.Move);
 }

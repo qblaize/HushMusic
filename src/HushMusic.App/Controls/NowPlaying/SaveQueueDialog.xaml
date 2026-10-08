@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="HushMusic.App.Controls.NowPlaying.SaveQueueDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    CloseButtonText="Cancel"
+    PrimaryButtonText="Save"
+    Title="Save as playlist">
+
+    <StackPanel MinWidth="380" Spacing="10">
+        <!--
+            Borderless field on Surface2, like the other playlist dialogs. Aliases to theme tokens live in theme
+            dictionaries: a plain StaticResource alias would keep one theme's value.
+        -->
+        <StackPanel.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Default">
+                        <StaticResource x:Key="TextControlBackground" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="TextPrimaryBrush" />
+                        <StaticResource x:Key="TextControlHeaderForeground" ResourceKey="TextSecondaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="TextTertiaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="TextTertiaryBrush" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#33FFFFFF" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Light">
+                        <StaticResource x:Key="TextControlBackground" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="TextPrimaryBrush" />
+                        <StaticResource x:Key="TextControlHeaderForeground" ResourceKey="TextSecondaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="TextTertiaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="TextTertiaryBrush" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#29000000" />
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+                <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+            </ResourceDictionary>
+        </StackPanel.Resources>
+
+        <TextBox
+            x:Name="NameBox"
+            Padding="12,9"
+            AutomationProperties.AutomationId="SaveQueueName"
+            CornerRadius="{StaticResource RadiusMedium}"
+            Header="Name"
+            KeyDown="OnNameKeyDown"
+            MaxLength="150"
+            PlaceholderText="My playlist"
+            TextChanged="OnNameChanged" />
+        <TextBlock
+            x:Name="NoteText"
+            Style="{StaticResource FootnoteStyle}"
+            TextTrimming="None"
+            TextWrapping="Wrap" />
+    </StackPanel>
+</ContentDialog>

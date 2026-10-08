@@ -20,6 +20,9 @@ public sealed partial class CreditsText : UserControl
     {
         IsTabStop = false;
         Content = _text;
+
+        // Hyperlinks copy the text colour when they're built; theme brushes are per theme, so rebuild on a switch.
+        ActualThemeChanged += (_, _) => Rebuild();
     }
 
     public IReadOnlyList<CreditLink>? Credits

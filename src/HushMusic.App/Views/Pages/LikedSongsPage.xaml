@@ -17,7 +17,8 @@
             SelectionMode="None"
             Visibility="{x:Bind helpers:Format.CollapsedIfAny(ViewModel.RequiresSignIn, ViewModel.ShowError), Mode=OneWay}"
             items:TrackDrag.IsEnabled="True"
-            items:TrackMenu.IsEnabled="True">
+            items:TrackMenu.IsEnabled="True"
+            items:TrackSelectionList.Selection="{x:Bind ViewModel.Selection}">
             <ListView.Header>
                 <StackPanel Margin="8,0,8,24" Spacing="18">
                     <TextBlock
@@ -43,6 +44,17 @@
                                 <TextBlock Text="Shuffle" />
                             </StackPanel>
                         </Button>
+                        <Button
+                            AutomationProperties.Name="{x:Bind ViewModel.Selection.ModeButtonText, Mode=OneWay}"
+                            Command="{x:Bind ViewModel.Selection.ToggleModeCommand}"
+                            Style="{StaticResource PillSecondaryButtonStyle}"
+                            ToolTipService.ToolTip="Select several songs (or Ctrl-click them)"
+                            Visibility="{x:Bind ViewModel.HasContent, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="13" Glyph="&#xE762;" />
+                                <TextBlock Text="{x:Bind ViewModel.Selection.ModeButtonText, Mode=OneWay}" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <!-- First load (a ListView keeps its Footer at the bottom of the window, so not there). -->
                     <items:Skeleton Margin="-8,6,-8,0" Visibility="{x:Bind ViewModel.ShowLoading, Mode=OneWay}">
@@ -59,6 +71,7 @@
         </ListView>
 
         <ProgressBar Style="{StaticResource BusyBarStyle}" Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <items:SelectionBar Selection="{x:Bind ViewModel.Selection}" />
         <items:EmptyState
             Glyph="&#xEB51;"
             Heading="Sign in to see your liked songs"

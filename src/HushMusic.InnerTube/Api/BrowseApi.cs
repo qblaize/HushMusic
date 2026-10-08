@@ -51,6 +51,32 @@ internal sealed class BrowseApi(IInnerTubeClient client, ILogger<BrowseApi> logg
         return ArtistParser.Parse(response, channelId, logger);
     }
 
+    public Task<Paged<Album>> GetArtistAlbumsAsync(string browseId, string? browseParams, string? continuation = null, CancellationToken cancellationToken = default)
+    {
+        if (continuation is null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(browseId);
+        }
+
+        // ytmusicapi get_artist_albums: browseId and params both come from the artist page's section link.
+        var body = new JsonObject { ["browseId"] = browseId };
+        if (!string.IsNullOrEmpty(browseParams))
+        {
+            body["params"] = browseParams;
+        }
+
+        return QueryPaging.GetAsync(
+            client,
+            "browse",
+            ContinuationScope.ArtistAlbums,
+            body,
+            continuation,
+            requiresAuth: false,
+            response => ArtistParser.ParseDiscography(response, logger),
+            response => ArtistParser.ParseDiscographyContinuation(response, logger),
+            cancellationToken);
+    }
+
     public Task<PlaylistPage> GetPlaylistAsync(string playlistId, CancellationToken cancellationToken = default) =>
         PlaylistPaging.GetPageAsync(client, playlistId, requiresAuth: false, logger, cancellationToken);
 

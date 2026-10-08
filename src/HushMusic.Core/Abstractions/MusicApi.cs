@@ -14,6 +14,12 @@ public interface IBrowseApi
 
     Task<ArtistPage> GetArtistAsync(string channelId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every album or single behind an artist section's "See all": <see cref="Shelf.MoreBrowseId"/> ("MPAD...") and
+    /// <see cref="Shelf.MoreParams"/>. With a continuation the browse id and params are not used.
+    /// </summary>
+    Task<Paged<Album>> GetArtistAlbumsAsync(string browseId, string? browseParams, string? continuation = null, CancellationToken cancellationToken = default);
+
     /// <summary>Accepts a playlist id with or without the "VL" prefix.</summary>
     Task<PlaylistPage> GetPlaylistAsync(string playlistId, CancellationToken cancellationToken = default);
 
@@ -25,6 +31,29 @@ public interface ISearchApi
     Task<SearchResults> SearchAsync(string query, SearchFilter filter = SearchFilter.All, string? continuation = null, CancellationToken cancellationToken = default);
 
     Task<SearchSuggestions> GetSuggestionsAsync(string input, CancellationToken cancellationToken = default);
+}
+
+/// <summary>The Explore tab: new releases, charts, moods and genres. Everything works signed out.</summary>
+public interface IExploreApi
+{
+    Task<ExplorePage> GetExploreAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MoodCategoryGroup>> GetMoodCategoriesAsync(CancellationToken cancellationToken = default);
+
+    /// <param name="categoryParams"><see cref="MoodCategory.Params"/>, or the <see cref="Shelf.MoreParams"/> of a mood page's shelf.</param>
+    Task<MoodPage> GetMoodPlaylistsAsync(string categoryParams, CancellationToken cancellationToken = default);
+
+    /// <param name="country">
+    /// ISO 3166-1 alpha-2 code, "ZZ" for the global charts (one of <see cref="ChartsPage.Countries"/>). Null or empty
+    /// lets YouTube Music pick.
+    /// </param>
+    Task<ChartsPage> GetChartsAsync(string? country = "ZZ", CancellationToken cancellationToken = default);
+
+    /// <summary>Every album and single behind "New albums &amp; singles".</summary>
+    Task<IReadOnlyList<Album>> GetNewReleasesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Every video behind "New music videos".</summary>
+    Task<IReadOnlyList<Track>> GetNewVideosAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Signed-in user's library. Every method throws <see cref="AuthRequiredException"/> when signed out.</summary>
@@ -82,10 +111,20 @@ public interface IAccountApi
     /// <summary>Returns the new playlist id.</summary>
     Task<string> CreatePlaylistAsync(string title, string? description, PrivacyStatus privacy, IReadOnlyList<string>? videoIds = null, CancellationToken cancellationToken = default);
 
-    Task AddPlaylistItemsAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns the new entries with their <see cref="Track.SetVideoId"/>, in the order YouTube Music reports them (empty when
+    /// the response doesn't say).
+    /// </summary>
+    Task<IReadOnlyList<PlaylistEntryRef>> AddPlaylistItemsAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default);
 
     /// <summary>Tracks must carry <see cref="Track.SetVideoId"/> (as returned by playlist pages).</summary>
     Task RemovePlaylistItemsAsync(string playlistId, IReadOnlyList<Track> tracks, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves the playlist entry <paramref name="setVideoId"/> so that it sits right before the entry
+    /// <paramref name="successorSetVideoId"/>; without a successor it goes to the end.
+    /// </summary>
+    Task MovePlaylistItemAsync(string playlistId, string setVideoId, string? successorSetVideoId = null, CancellationToken cancellationToken = default);
 
     /// <summary>Null arguments are left unchanged.</summary>
     Task EditPlaylistAsync(string playlistId, string? title = null, string? description = null, PrivacyStatus? privacy = null, CancellationToken cancellationToken = default);

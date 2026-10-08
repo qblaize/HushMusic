@@ -84,7 +84,7 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
         throw new InnerTubeException(endpoint, "YouTube Music did not return an id for the new playlist.");
     }
 
-    public async Task AddPlaylistItemsAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PlaylistEntryRef>> AddPlaylistItemsAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(playlistId);
         ArgumentNullException.ThrowIfNull(videoIds);
@@ -108,7 +108,8 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
             actions.Add(action);
         }
 
-        await EditPlaylistCoreAsync(playlistId, actions, allowRetry: false, cancellationToken).ConfigureAwait(false);
+        var response = await EditPlaylistCoreAsync(playlistId, actions, allowRetry: false, cancellationToken).ConfigureAwait(false);
+        return ParseAddedEntries(response);
     }
 
     public async Task RemovePlaylistItemsAsync(string playlistId, IReadOnlyList<Track> tracks, CancellationToken cancellationToken = default)
@@ -138,6 +139,21 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
         }
 
         await EditPlaylistCoreAsync(playlistId, actions, allowRetry: true, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task MovePlaylistItemAsync(string playlistId, string setVideoId, string? successorSetVideoId = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(playlistId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(setVideoId);
+
+        // ytmusicapi edit_playlist(moveItem=setVideoId or (setVideoId, successor)): the successor key only when there is one.
+        var action = new JsonObject { ["action"] = "ACTION_MOVE_VIDEO_BEFORE", ["setVideoId"] = setVideoId };
+        if (!string.IsNullOrEmpty(successorSetVideoId))
+        {
+            action["movedSetVideoIdSuccessor"] = successorSetVideoId;
+        }
+
+        await EditPlaylistCoreAsync(playlistId, [action], allowRetry: true, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task EditPlaylistAsync(string playlistId, string? title = null, string? description = null, PrivacyStatus? privacy = null, CancellationToken cancellationToken = default)
@@ -213,7 +229,31 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
         _ => throw new ArgumentOutOfRangeException(nameof(privacy), privacy, "Unknown privacy status."),
     };
 
-    private async Task EditPlaylistCoreAsync(string playlistId, JsonArray actions, bool allowRetry, CancellationToken cancellationToken)
+    /// <summary>
+    /// ytmusicapi <c>add_playlist_items</c>: <c>playlistEditResults[].playlistEditVideoAddedResultData</c> holds the video id
+    /// and the new set id of each added entry.
+    /// </summary>
+    internal static IReadOnlyList<PlaylistEntryRef> ParseAddedEntries(JsonNode response)
+    {
+        if (JsonLookup.Get(response, "playlistEditResults") is not JsonArray results)
+        {
+            return [];
+        }
+
+        List<PlaylistEntryRef> entries = [];
+        foreach (var result in results)
+        {
+            var data = JsonLookup.Get(result, "playlistEditVideoAddedResultData");
+            if (JsonLookup.GetString(data, "videoId") is { Length: > 0 } videoId && JsonLookup.GetString(data, "setVideoId") is { Length: > 0 } setVideoId)
+            {
+                entries.Add(new PlaylistEntryRef(videoId, setVideoId));
+            }
+        }
+
+        return entries;
+    }
+
+    private async Task<JsonNode> EditPlaylistCoreAsync(string playlistId, JsonArray actions, bool allowRetry, CancellationToken cancellationToken)
     {
         var body = new JsonObject
         {
@@ -225,6 +265,7 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
             new InnerTubeRequest(EditPlaylistEndpoint, body) { RequiresAuth = true, AllowRetry = allowRetry },
             cancellationToken).ConfigureAwait(false);
         EnsureSucceeded(response, EditPlaylistEndpoint);
+        return response;
     }
 
     /// <summary>

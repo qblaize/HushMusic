@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.Pages.ExploreCategoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    xmlns:models="using:HushMusic.Core.Models"
+    xmlns:pages="using:HushMusic.App.Views.Pages"
+    xmlns:vm="using:HushMusic.App.ViewModels.Pages">
+
+    <Page.Resources>
+        <!-- A carousel with an optional "See all"; song shelves ("Songs" on genre pages) show compact rows. -->
+        <DataTemplate x:Key="ShelfTemplate" x:DataType="vm:SeeAllShelf">
+            <StackPanel Margin="0,32,0,0" Spacing="14">
+                <items:SectionHeader
+                    Title="{x:Bind Title}"
+                    ActionText="{x:Bind SeeAllText}"
+                    Command="{x:Bind SeeAllCommand}"
+                    Eyebrow="{x:Bind Subtitle}" />
+                <items:Carousel
+                    ItemClick="OnItemClick"
+                    ItemsSource="{x:Bind CardItems}"
+                    Visibility="{x:Bind helpers:Format.CollapsedIf(ShowsRows)}" />
+                <items:Carousel
+                    ItemClick="OnItemClick"
+                    ItemsSource="{x:Bind RowItems}"
+                    ShowAsRows="True"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(ShowsRows)}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Chart artists: position, movement, then a compact artist row. -->
+        <DataTemplate x:Key="RankedArtistTemplate" x:DataType="vm:RankedArtist">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="36" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    Style="{StaticResource HeadlineStyle}"
+                    Text="{x:Bind RankText}" />
+                <FontIcon
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="{x:Bind TrendName}"
+                    FontSize="10"
+                    Foreground="{x:Bind pages:ExploreFormat.TrendBrush(Trend)}"
+                    Glyph="{x:Bind pages:ExploreFormat.TrendGlyph(Trend)}"
+                    Visibility="{x:Bind pages:ExploreFormat.VisibleIfTrend(Trend)}" />
+                <items:MediaRow Grid.Column="2" Item="{x:Bind Artist}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="MoodGroupTemplate" x:DataType="models:MoodCategoryGroup">
+            <StackPanel Margin="0,32,0,0" Spacing="14">
+                <items:SectionHeader Title="{x:Bind Title}" />
+                <ItemsRepeater ItemsSource="{x:Bind Categories}">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout
+                            ItemsStretch="Fill"
+                            MinColumnSpacing="12"
+                            MinItemHeight="52"
+                            MinItemWidth="176"
+                            MinRowSpacing="12" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="models:MoodCategory">
+                            <pages:ExploreMoodTile Category="{x:Bind}" Click="OnMoodClick" />
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+            </StackPanel>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Padding="40,28,40,4" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Bottom" Spacing="2">
+                <TextBlock
+                    Style="{StaticResource EyebrowStyle}"
+                    Text="{x:Bind items:ItemFormat.Upper(ViewModel.Eyebrow), Mode=OneWay}"
+                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.Eyebrow), Mode=OneWay}" />
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level1"
+                    Style="{StaticResource PageTitleStyle}"
+                    Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+            </StackPanel>
+            <ProgressRing
+                Grid.Column="1"
+                Width="16"
+                Height="16"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,10"
+                Foreground="{ThemeResource TextSecondaryBrush}"
+                IsActive="{x:Bind ViewModel.IsChartsBusy, Mode=OneWay}" />
+            <ComboBox
+                Grid.Column="2"
+                MinWidth="200"
+                MaxDropDownHeight="420"
+                Margin="0,0,0,2"
+                VerticalAlignment="Bottom"
+                AutomationProperties.Name="Chart country"
+                CornerRadius="{StaticResource RadiusMedium}"
+                ItemsSource="{x:Bind ViewModel.Countries}"
+                SelectedIndex="{x:Bind ViewModel.SelectedCountryIndex, Mode=TwoWay}"
+                Visibility="{x:Bind ViewModel.ShowCharts, Mode=OneWay}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CountryOption">
+                        <TextBlock Text="{x:Bind Name}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </Grid>
+
+        <!-- One list: a wrapping grid of cards (virtualized, it can be long). -->
+        <GridView
+            Grid.Row="1"
+            Padding="{StaticResource GridPagePadding}"
+            IsItemClickEnabled="True"
+            ItemClick="OnGridItemClick"
+            ItemContainerStyle="{StaticResource CardGridItemContainerStyle}"
+            ItemTemplateSelector="{x:Bind pages:ExploreFormat.CardTemplates(ViewModel.IsVideoGrid), Mode=OneWay}"
+            ItemsSource="{x:Bind ViewModel.GridItems}"
+            SelectionMode="None"
+            items:Reveal.IsShown="{x:Bind ViewModel.ShowGrid, Mode=OneWay}"
+            items:TrackDrag.IsEnabled="True"
+            items:TrackMenu.IsEnabled="True" />
+
+        <!-- Carousels, mood tiles or charts. -->
+        <ScrollViewer Grid.Row="1" Visibility="{x:Bind helpers:Format.VisibleIfAndNot(ViewModel.HasContent, ViewModel.ShowGrid), Mode=OneWay}">
+            <StackPanel Padding="40,0,40,120" items:Reveal.IsShown="{x:Bind ViewModel.HasContent, Mode=OneWay}">
+                <StackPanel
+                    Margin="0,28,0,0"
+                    Spacing="10"
+                    Visibility="{x:Bind ViewModel.HasTopArtists, Mode=OneWay}">
+                    <items:SectionHeader Title="Top artists" />
+                    <GridView
+                        x:Name="ArtistGrid"
+                        Margin="-8,0"
+                        Padding="0"
+                        IsItemClickEnabled="True"
+                        ItemClick="OnArtistClick"
+                        ItemContainerStyle="{StaticResource GridTrackRowContainerStyle}"
+                        ItemTemplate="{StaticResource RankedArtistTemplate}"
+                        ItemsSource="{x:Bind ViewModel.TopArtists}"
+                        ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                        ScrollViewer.VerticalScrollMode="Disabled"
+                        SelectionMode="None"
+                        SizeChanged="OnArtistGridSizeChanged">
+                        <GridView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <ItemsWrapGrid ItemHeight="{StaticResource RowHeight}" Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </GridView.ItemsPanel>
+                    </GridView>
+                </StackPanel>
+
+                <ItemsRepeater ItemTemplate="{StaticResource ShelfTemplate}" ItemsSource="{x:Bind ViewModel.Sections}" />
+
+                <ItemsRepeater
+                    ItemTemplate="{StaticResource MoodGroupTemplate}"
+                    ItemsSource="{x:Bind ViewModel.MoodGroups}"
+                    Visibility="{x:Bind ViewModel.ShowMoods, Mode=OneWay}" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <items:Skeleton
+            Grid.Row="1"
+            Padding="40,12,20,0"
+            Visibility="{x:Bind ViewModel.ShowLoading, Mode=OneWay}">
+            <items:SkeletonCards Count="12" IsGrid="True" />
+        </items:Skeleton>
+
+        <ProgressBar
+            Grid.Row="1"
+            Style="{StaticResource BusyBarStyle}"
+            Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            Glyph="&#xE909;"
+            Heading="Nothing here yet"
+            Message="{x:Bind ViewModel.EmptyMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            ActionText="Try again"
+            Command="{x:Bind ViewModel.RetryCommand}"
+            Glyph="&#xE783;"
+            Heading="Couldn't load this category"
+            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.ShowError, Mode=OneWay}" />
+    </Grid>
+</Page>

@@ -24,6 +24,9 @@ internal static partial class TwoRowItemParser
             _ when PageTypes.IsArtist(pageType) => SearchTypes.Artist,
             PageTypes.Playlist => SearchTypes.Playlist,
             PageTypes.PodcastShow => SearchTypes.Podcast,
+
+            // A video uploaded as an episode links its title to the episode page; it still plays by its videoId.
+            PageTypes.NonMusicAudioTrack => null,
             _ => "unknown",
         };
 
@@ -200,8 +203,11 @@ internal static partial class TwoRowItemParser
         };
     }
 
-    /// <summary>Song or video card (ytmusicapi parse_song / parse_video).</summary>
-    private static Track? ParseSong(JsonObject card, ParseScope scope)
+    /// <summary>
+    /// Song or video card (ytmusicapi parse_song / parse_video). Grids that only hold videos ("New music videos") use it
+    /// directly, like ytmusicapi, because a video uploaded as an episode links its title to an episode page.
+    /// </summary>
+    public static Track? ParseSong(JsonObject card, ParseScope scope)
     {
         var title = card.Str("title", "runs", 0, "text");
         var videoId = card.Str("navigationEndpoint", "watchEndpoint", "videoId") ?? QueueVideoId(card);
@@ -218,7 +224,10 @@ internal static partial class TwoRowItemParser
             VideoId = videoId,
             PlaylistId = card.Str("navigationEndpoint", "watchEndpoint", "playlistId"),
             Thumbnails = Thumbnails.OfTwoRow(card),
-            Type = VideoTypes.ToTrackType(VideoTypes.Of(card.Obj("navigationEndpoint")), TrackType.Song),
+            Type = VideoTypes.ToTrackType(
+                VideoTypes.Of(card.Obj("navigationEndpoint"))
+                    ?? VideoTypes.Of(card.Obj("thumbnailOverlay", "musicItemThumbnailOverlayRenderer", "content", "musicPlayButtonRenderer", "playNavigationEndpoint")),
+                TrackType.Song),
             Artists = info.Artists,
             Album = info.Album,
             Views = info.Views,

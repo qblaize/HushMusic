@@ -5,11 +5,14 @@ using Serilog.Core;
 using Serilog.Events;
 using Windows.UI;
 using HushMusic.App.Controls.Settings;
+using HushMusic.App.Services.Hotkeys;
 using HushMusic.App.Services.Shell;
 using HushMusic.App.Services.Updates;
+using HushMusic.App.Services.Windowing.TaskbarWidget;
 using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.Shell;
 using HushMusic.Core.Abstractions;
+using HushMusic.Core.Services;
 
 namespace HushMusic.App.ViewModels;
 
@@ -25,6 +28,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     private readonly ILastFmService _lastFm;
     private readonly IUiDispatcher _dispatcher;
     private readonly IUpdateService _appUpdates;
+    private readonly IGlobalHotkeyService _hotkeys;
     private CancellationTokenSource? _updateCts;
     private CancellationTokenSource? _lastFmCts;
     private Uri? _lastFmApprovalPage;
@@ -41,6 +45,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         ILastFmService lastFm,
         IUiDispatcher dispatcher,
         IUpdateService appUpdates,
+        IGlobalHotkeyService hotkeys,
         INotificationService notifications)
         : base(notifications)
     {
@@ -52,8 +57,10 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         _lastFm = lastFm;
         _dispatcher = dispatcher;
         _appUpdates = appUpdates;
+        _hotkeys = hotkeys;
         Account = account;
         AccentSwatches = BuildAccentSwatches();
+        Hotkeys = [.. GlobalHotkeyMap.Actions.Select(a => new HotkeySettingViewModel(a, OnHotkeyEdited, hotkeys.Pause))];
     }
 
     public AccountViewModel Account { get; }
@@ -133,6 +140,19 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     public partial bool NormalizeVolume { get; set; }
 
+    /// <summary>0 = off; the slider shows whole seconds.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CrossfadeLabel))]
+    public partial double CrossfadeSeconds { get; set; }
+
+    public string CrossfadeLabel => CrossfadeSeconds < 0.5 ? "Off" : $"{CrossfadeSeconds:0} s";
+
+    [ObservableProperty]
+    public partial bool AutoplayWhenQueueEnds { get; set; }
+
+    [ObservableProperty]
+    public partial bool ShowTrackNotifications { get; set; }
+
     [ObservableProperty]
     public partial bool ResumeLastSession { get; set; }
 
@@ -144,6 +164,22 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     [ObservableProperty]
     public partial bool ShowTaskbarWidget { get; set; }
+
+    /// <summary>"Main display", "All displays", then each connected display (and a chosen one that isn't connected).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<SettingsChoice> TaskbarDisplayOptions { get; set; } = [];
+
+    /// <summary>Index into <see cref="TaskbarDisplayOptions"/> (a ComboBox's SelectedIndex).</summary>
+    [ObservableProperty]
+    public partial int TaskbarDisplayIndex { get; set; }
+
+    // ===== Global shortcuts =====
+
+    [ObservableProperty]
+    public partial bool GlobalHotkeysEnabled { get; set; }
+
+    /// <summary>One row per action, in a fixed order.</summary>
+    public IReadOnlyList<HotkeySettingViewModel> Hotkeys { get; }
 
     // ===== Content / stream resolver / diagnostics =====
 
@@ -293,10 +329,15 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         ReportPlaybackHistory = current.ReportPlaybackHistory;
         UseAccountForStreams = current.UseAccountForStreams;
         NormalizeVolume = current.NormalizeVolume;
+        CrossfadeSeconds = Math.Clamp(Math.Round(current.CrossfadeSeconds), 0, 12);
+        AutoplayWhenQueueEnds = current.AutoplayWhenQueueEnds;
+        ShowTrackNotifications = current.ShowTrackNotifications;
         ResumeLastSession = current.ResumeLastSession;
         CloseToTray = current.CloseToTray;
         StartWithWindows = current.StartWithWindows;
         ShowTaskbarWidget = current.ShowTaskbarWidget;
+        RefreshTaskbarDisplays();
+        GlobalHotkeysEnabled = current.GlobalHotkeysEnabled;
         LastFmScrobbling = current.LastFmScrobbling;
         CheckYtDlpUpdatesOnStartup = current.CheckYtDlpUpdatesOnStartup;
         YtDlpPath = current.YtDlpPath;
@@ -313,9 +354,11 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             _lastFm.StateChanged += OnLastFmStateChanged;
             _settings.Changed += OnSettingsChanged;
             _appUpdates.StateChanged += OnAppUpdateStateChanged;
+            _hotkeys.StatusChanged += OnHotkeyStatusChanged;
         }
 
         AccentSwatches = BuildAccentSwatches();
+        RefreshHotkeys();
         RefreshLastFm();
         RefreshAppUpdate();
 
@@ -334,6 +377,12 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             _lastFm.StateChanged -= OnLastFmStateChanged;
             _settings.Changed -= OnSettingsChanged;
             _appUpdates.StateChanged -= OnAppUpdateStateChanged;
+            _hotkeys.StatusChanged -= OnHotkeyStatusChanged;
+        }
+
+        foreach (var hotkey in Hotkeys)
+        {
+            hotkey.EndCapture();
         }
 
         CancelPendingWork();
@@ -407,6 +456,10 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     [RelayCommand]
     private void RestartToUpdate() => _appUpdates.RestartToUpdate();
+
+    // Missing actions use the defaults, so an empty map is "all defaults".
+    [RelayCommand]
+    private void ResetHotkeys() => Save(s => s.GlobalHotkeys = []);
 
     [RelayCommand]
     private async Task OpenLastFmApiAccountPageAsync() => await LaunchAsync(LastFmApiAccountPage);
@@ -518,6 +571,12 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     partial void OnNormalizeVolumeChanged(bool value) => Save(s => s.NormalizeVolume = value);
 
+    partial void OnCrossfadeSecondsChanged(double value) => Save(s => s.CrossfadeSeconds = Math.Clamp(Math.Round(value), 0, 12));
+
+    partial void OnAutoplayWhenQueueEndsChanged(bool value) => Save(s => s.AutoplayWhenQueueEnds = value);
+
+    partial void OnShowTrackNotificationsChanged(bool value) => Save(s => s.ShowTrackNotifications = value);
+
     partial void OnResumeLastSessionChanged(bool value) => Save(s => s.ResumeLastSession = value);
 
     partial void OnCloseToTrayChanged(bool value) => Save(s => s.CloseToTray = value);
@@ -525,6 +584,17 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     partial void OnStartWithWindowsChanged(bool value) => Save(s => s.StartWithWindows = value);
 
     partial void OnShowTaskbarWidgetChanged(bool value) => Save(s => s.ShowTaskbarWidget = value);
+
+    partial void OnTaskbarDisplayIndexChanged(int value)
+    {
+        if (value >= 0 && value < TaskbarDisplayOptions.Count)
+        {
+            var choice = TaskbarDisplayOptions[value].Value;
+            Save(s => s.TaskbarWidgetDisplays = choice);
+        }
+    }
+
+    partial void OnGlobalHotkeysEnabledChanged(bool value) => Save(s => s.GlobalHotkeysEnabled = value);
 
     partial void OnLastFmScrobblingChanged(bool value) => Save(s => s.LastFmScrobbling = value);
 
@@ -589,7 +659,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     // The Windows accent colour changed while the page is open. Arrives on a background thread.
     private void OnSystemAccentChanged(object? sender, EventArgs e) => _dispatcher.Run(() => AccentSwatches = BuildAccentSwatches());
 
-    // The taskbar player can turn itself off from its menu while this page is open. Arrives on a background thread.
+    // The taskbar player can turn itself off from its menu while this page is open, and shortcut edits come back
+    // through here. Arrives on a background thread.
     private void OnSettingsChanged(object? sender, EventArgs e) => _dispatcher.Run(() =>
     {
         if (ShowTaskbarWidget != _settings.Current.ShowTaskbarWidget)
@@ -598,7 +669,62 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             ShowTaskbarWidget = _settings.Current.ShowTaskbarWidget;
             _loading = false;
         }
+
+        RefreshHotkeys();
     });
+
+    // Raised on the UI thread.
+    private void OnHotkeyStatusChanged(object? sender, EventArgs e) => RefreshHotkeys();
+
+    private void RefreshHotkeys()
+    {
+        var saved = _settings.Current.GlobalHotkeys;
+        var enabled = _settings.Current.GlobalHotkeysEnabled;
+        var status = _hotkeys.Status;
+        foreach (var hotkey in Hotkeys)
+        {
+            if (!hotkey.IsCapturing)
+            {
+                hotkey.Sync(GlobalHotkeyMap.Resolve(saved, hotkey.Action), status.GetValueOrDefault(hotkey.Action), enabled);
+            }
+        }
+    }
+
+    // A capture box recorded new keys (or Backspace removed them). A new map, so nothing reads one being changed.
+    private void OnHotkeyEdited(HotkeySettingViewModel hotkey)
+    {
+        var action = hotkey.Action.ToString();
+        var gesture = hotkey.Gesture;
+        Save(s => s.GlobalHotkeys = new Dictionary<string, string>(s.GlobalHotkeys, StringComparer.OrdinalIgnoreCase) { [action] = gesture });
+    }
+
+    private void RefreshTaskbarDisplays()
+    {
+        var saved = TaskbarDisplayChoice.Normalize(_settings.Current.TaskbarWidgetDisplays);
+        List<SettingsChoice> options =
+        [
+            new(TaskbarDisplayChoice.Primary, "Main display"),
+            new(TaskbarDisplayChoice.All, "All displays"),
+        ];
+
+        try
+        {
+            options.AddRange(TaskbarPlayerService.Displays().Select(d => new SettingsChoice(d.DeviceName, TaskbarDisplayChoice.Label(d))));
+        }
+        catch (Exception ex)
+        {
+            // Without the list, the main and all-displays choices still work.
+            Notifications.ShowError("Couldn't list the displays", ex);
+        }
+
+        if (!options.Any(o => TaskbarDisplayChoice.SameDevice(o.Value, saved)))
+        {
+            options.Add(new SettingsChoice(saved, TaskbarDisplayChoice.ShortName(saved) + " (not connected)"));
+        }
+
+        TaskbarDisplayOptions = options;
+        TaskbarDisplayIndex = options.FindIndex(o => TaskbarDisplayChoice.SameDevice(o.Value, saved));
+    }
 
     // Last.fm events arrive on background threads.
     private void OnLastFmStateChanged(object? sender, EventArgs e) => _dispatcher.Run(RefreshLastFm);

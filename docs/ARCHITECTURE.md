@@ -34,7 +34,7 @@ changes something the fix lives in one project:
 
 | Concern | Interfaces (in Core) | Only implementation |
 |---|---|---|
-| YouTube Music's private API | `IBrowseApi`, `ISearchApi`, `ILibraryApi`, `IWatchApi`, `IAccountApi` | `HushMusic.InnerTube` |
+| YouTube Music's private API | `IBrowseApi`, `IExploreApi`, `ISearchApi`, `ILibraryApi`, `IWatchApi`, `IAccountApi` | `HushMusic.InnerTube` |
 | Finding a playable stream | `IStreamResolver` | `HushMusic.Playback` (yt-dlp); live radio uses its own resolver in Core, never yt-dlp |
 | Signing in and signing requests | `IAuthService`, `IRequestAuthenticator` | `HushMusic.Auth` |
 
@@ -61,6 +61,12 @@ Rules that follow from this:
 3. `MediaPlayerService` wraps `Windows.Media.Playback.MediaPlayer` and `SmtcController` drives the system media
    controls.
 4. The queue lives in Core (`QueueService`), not in `MediaPlaybackList`, so features can read and change it.
+5. Crossfade and gapless playback use two `MediaPlayer`s that swap roles. The next item is resolved and opened, paused,
+   on the spare player ahead of time (`TransitionPlanner` decides when). With a crossfade the spare starts that many
+   seconds before the end and the two blend on equal-power curves; without one it starts the moment the current song
+   ends. When the fade starts, the queue advances: `TrackCompleted` fires for the outgoing song, then `TrackChanged` and
+   `TrackStarted` for the incoming one. Live radio, repeat-one, the sleep timer's end-of-track pause and short songs are
+   never faded. The system media controls stay bound to one player's session.
 
 yt-dlp and Deno are installed by the app into `%LOCALAPPDATA%\HushMusic\tools\<tool>\<version>\` from their official
 GitHub releases, checked against the published SHA-256, and replaced side by side when a new version comes out (a
@@ -85,7 +91,9 @@ Hooks available to a feature:
 | `IQueueService` | the whole queue (read, insert, move, remove, shuffle, repeat), `Changed`, `CurrentChanged`, `GetSnapshot` / `Restore` |
 | `IPlaybackActions` | play a track with up-next, start radio, play an album or playlist, add to queue, play next |
 | `IAccountActionsService` | like and unlike; create, edit and delete playlists; add and remove items; raises `TrackRated` and `PlaylistChanged` |
-| `IBrowseApi` / `ISearchApi` / `ILibraryApi` / `IWatchApi` | read-only YouTube Music data |
+| `IBrowseApi` / `IExploreApi` / `ISearchApi` / `ILibraryApi` / `IWatchApi` | read-only YouTube Music data |
+| `IQueueAutoplay` | similar songs appended when a finite queue (album, playlist) ends |
+| `IRadioTrackMatcher` | finds the YouTube Music song for a radio station's on-air title |
 | `IAuthService` | sign-in state and `StatusChanged` |
 | `ISleepTimer` | start, end of track, cancel; `Changed` |
 | `ILastFmService` | Last.fm connection state, user name, pending scrobbles |
@@ -130,4 +138,10 @@ a blurred backdrop, a floating glass player bar and a full-window Now Playing vi
 - **Taskbar thumbnail buttons and progress.** `TaskbarButtons` and `TaskbarList` (ITaskbarList3).
 - **Taskbar player.** A layered Win32 window on its own thread, parented into `Shell_TrayWnd` and drawn with GDI+,
   plus a WinUI flyout window. Windows has no API for this, so it is opt-in and documented as fragile.
+- **Taskbar player displays.** One widget window (and thread) per chosen taskbar: `Shell_TrayWnd` and the
+  `Shell_SecondaryTrayWnd`s of other displays.
+- **Global shortcuts.** `GlobalHotkeyService` registers the configured gestures with `RegisterHotKey` on a message-only
+  window; gesture parsing lives in Core (`GlobalHotkeys`). A gesture another app already holds is reported in Settings.
+- **Song notifications.** `TrackNotificationService` shows a silent Windows App SDK app notification (the payload is
+  built in Core by `TrackNotificationContent`) when a new song starts while the window isn't in front.
 - **Updates.** Velopack (`Services/Updates`), with GitHub Releases as the feed.

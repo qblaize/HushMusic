@@ -15,12 +15,13 @@ public enum LibraryTab
     Artists,
 }
 
-public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrackListHost
+public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrackListHost, ITrackSelectionHost
 {
     private static readonly PropertyChangedEventArgs IsTabLoadingArgs = new(nameof(IsTabLoading));
     private static readonly PropertyChangedEventArgs ShowCardSkeletonArgs = new(nameof(ShowCardSkeleton));
     private static readonly PropertyChangedEventArgs ShowRowSkeletonArgs = new(nameof(ShowRowSkeleton));
     private static readonly PropertyChangedEventArgs ShowTabBusyBarArgs = new(nameof(ShowTabBusyBar));
+    private static readonly PropertyChangedEventArgs CanSelectSongsArgs = new(nameof(CanSelectSongs));
 
     private readonly ILibraryApi _library;
     private readonly HashSet<LibraryTab> _loadedTabs = [];
@@ -33,6 +34,7 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
         Songs = TrackItem.CreateList((c, ct) => _library.GetSongsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
         Albums = new IncrementalCollection<Album>((c, ct) => _library.GetAlbumsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
         Artists = new IncrementalCollection<Artist>((c, ct) => _library.GetArtistsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
+        Selection = new TrackSelection(Songs, services.Actions, () => SongsSource);
     }
 
     public IncrementalCollection<Playlist> Playlists { get; }
@@ -43,12 +45,16 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
 
     public IncrementalCollection<Artist> Artists { get; }
 
+    /// <summary>Multi-select on the Songs tab.</summary>
+    public TrackSelection Selection { get; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsPlaylistsTab))]
     [NotifyPropertyChangedFor(nameof(IsSongsTab))]
     [NotifyPropertyChangedFor(nameof(IsAlbumsTab))]
     [NotifyPropertyChangedFor(nameof(IsArtistsTab))]
     [NotifyPropertyChangedFor(nameof(EmptyMessage))]
+    [NotifyPropertyChangedFor(nameof(CanSelectSongs))]
     public partial LibraryTab SelectedTab { get; set; }
 
     public bool IsPlaylistsTab => SelectedTab == LibraryTab.Playlists;
@@ -58,6 +64,9 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
     public bool IsAlbumsTab => SelectedTab == LibraryTab.Albums;
 
     public bool IsArtistsTab => SelectedTab == LibraryTab.Artists;
+
+    /// <summary>The Songs tab shows its "Select" button.</summary>
+    public bool CanSelectSongs => IsSongsTab && !RequiresSignIn;
 
     /// <summary>The selected tab is loading for the first time (its list is still empty): show placeholders.</summary>
     public bool IsTabLoading => IsBusy && !RequiresSignIn && !_loadedTabs.Contains(SelectedTab);
@@ -85,7 +94,15 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
         var index = tracks.FindIndex(t => ReferenceEquals(t, track));
         return index < 0
             ? Task.CompletedTask
-            : Actions.PlayTracksAsync(tracks, index, new QueueSource(QueueSourceKind.Library, null, "Library songs"));
+            : Actions.PlayTracksAsync(tracks, index, SongsSource);
+    }
+
+    private static QueueSource SongsSource => new(QueueSourceKind.Library, null, "Library songs");
+
+    protected override void OnNavigatedFromCore()
+    {
+        Selection.Exit();
+        base.OnNavigatedFromCore();
     }
 
     public bool CanRemoveFromPlaylist(Track track) => false;
@@ -136,6 +153,7 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
             return Task.CompletedTask;
         }
 
+        Selection.Exit();
         SelectedTab = tab;
         if (_loadedTabs.Contains(tab))
         {
@@ -150,6 +168,11 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
+        if (e.PropertyName is nameof(RequiresSignIn))
+        {
+            base.OnPropertyChanged(CanSelectSongsArgs);
+        }
+
         if (e.PropertyName is nameof(IsBusy) or nameof(SelectedTab) or nameof(RequiresSignIn) or nameof(HasContent))
         {
             base.OnPropertyChanged(IsTabLoadingArgs);
@@ -161,6 +184,10 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
 
     [RelayCommand]
     private Task PlaySongAsync(TrackItem? item) => item is null ? Task.CompletedTask : PlayFromTrackAsync(item.Track);
+
+    /// <summary>"Your stats": local listening statistics (no account needed).</summary>
+    [RelayCommand]
+    private void OpenStats() => Services.Navigation.NavigateTo(PageKey.Stats);
 
     private void UpdateIsEmpty()
     {

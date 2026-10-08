@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Input;
+using Windows.System;
 using HushMusic.App.Services.Pages;
+using HushMusic.App.Services.Shell;
 using HushMusic.App.ViewModels.Pages;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Models;
@@ -10,7 +12,8 @@ namespace HushMusic.App.Controls.Items;
 /// <summary>
 /// One track in a list: art (or track number), title, explicit badge, artist links, album link, like heart, duration
 /// and a "more" menu. The heart and "more" appear on hover; the playing track gets an accent title and an equaliser.
-/// <see cref="Item"/> accepts a <see cref="Track"/> or a <see cref="TrackItem"/>.
+/// <see cref="Item"/> accepts a <see cref="Track"/> or a <see cref="TrackItem"/>. In a list with a
+/// <see cref="TrackSelectionList.SelectionProperty"/>, select mode adds a check mark in front of the row.
 /// </summary>
 public sealed partial class TrackRow : UserControl, IHoverReset
 {
@@ -34,6 +37,7 @@ public sealed partial class TrackRow : UserControl, IHoverReset
 
     private ILikeStateService? _likes;
     private INowPlayingService? _nowPlaying;
+    private TrackSelection? _selection;
     private bool _isLiked;
     private bool _isHovered;
     private bool _isCurrent;
@@ -106,7 +110,7 @@ public sealed partial class TrackRow : UserControl, IHoverReset
         row._isHovered = false;
         row.UpdateLiked();
         row.UpdateNowPlaying();
-        AutomationProperties.SetName(row, row.CurrentTrack is { } current ? $"{current.Title}, {current.ArtistsText}" : string.Empty);
+        row.UpdateSelection();
     }
 
     private static void OnLayoutChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -120,8 +124,15 @@ public sealed partial class TrackRow : UserControl, IHoverReset
     {
         Likes.Changed += OnTrackRated;
         NowPlaying.Changed += OnNowPlayingChanged;
+        _selection = TrackSelectionList.Find(this);
+        if (_selection is not null)
+        {
+            _selection.Changed += OnSelectionChanged;
+        }
+
         UpdateLiked();
         UpdateNowPlaying();
+        UpdateSelection();
         UpdateLayoutColumns(ActualWidth);
 
         // A true hairline: one physical pixel at any display scale.
@@ -135,6 +146,11 @@ public sealed partial class TrackRow : UserControl, IHoverReset
     {
         Likes.Changed -= OnTrackRated;
         NowPlaying.Changed -= OnNowPlayingChanged;
+        if (_selection is not null)
+        {
+            _selection.Changed -= OnSelectionChanged;
+            _selection = null;
+        }
     }
 
     private void OnTrackRated(object? sender, TrackRatedEventArgs e)
@@ -147,6 +163,48 @@ public sealed partial class TrackRow : UserControl, IHoverReset
     }
 
     private void OnNowPlayingChanged(object? sender, EventArgs e) => UpdateNowPlaying();
+
+    private void OnSelectionChanged(object? sender, EventArgs e) => UpdateSelection();
+
+    private void UpdateSelection()
+    {
+        var item = Item as TrackItem;
+        var selectable = item is not null && _selection is { IsActive: true };
+        var selected = selectable && _selection!.IsSelected(item!);
+        if (selectable && SelectCheck is null)
+        {
+            FindName(nameof(SelectCheck));
+        }
+
+        VisualStateManager.GoToState(this, !selectable ? "NotSelectable" : selected ? "Selected" : "Selectable", false);
+
+        var name = CurrentTrack is { } track ? $"{track.Title}, {track.ArtistsText}" : string.Empty;
+        AutomationProperties.SetName(this, selected ? name + ", selected" : name);
+        if (SelectCheck is { } check)
+        {
+            var label = selected ? "Deselect" : "Select";
+            AutomationProperties.SetName(check, CurrentTrack is { } current ? $"{label} {current.Title}" : label);
+        }
+    }
+
+    // Shift extends the selection from the last clicked row, like Shift-clicking the row itself.
+    private void OnSelectCheckClick(object sender, RoutedEventArgs e)
+    {
+        if (_selection is not { } selection || Item is not TrackItem item)
+        {
+            return;
+        }
+
+        var modifiers = ShortcutFocusPolicy.CurrentModifiers();
+        if (modifiers.HasFlag(VirtualKeyModifiers.Shift))
+        {
+            selection.SelectRange(item, keepOthers: modifiers.HasFlag(VirtualKeyModifiers.Control));
+        }
+        else
+        {
+            selection.Toggle(item);
+        }
+    }
 
     private void UpdateLiked()
     {
@@ -230,7 +288,7 @@ public sealed partial class TrackRow : UserControl, IHoverReset
     {
         if (CurrentTrack is { } track)
         {
-            TrackMenu.ShowAt(MoreButton, track);
+            TrackMenu.ShowAt(MoreButton, track, Item as TrackItem);
         }
     }
 }

@@ -6,6 +6,10 @@ namespace HushMusic.App.Services.Windowing.TaskbarWidget;
 /// <summary>One thing the Windows 11 taskbar draws (Start, an app button, the Widgets button, a mod), in screen pixels.</summary>
 internal readonly record struct TaskbarElement(string? AutomationId, PixelRect Bounds);
 
+/// <summary>A UI Automation read of a taskbar: what its frame holds, and where its notification area starts.</summary>
+/// <param name="TrayLeft">Left edge of the notification-area buttons (clock included) in screen pixels, or null when unknown.</param>
+internal sealed record TaskbarReading(IReadOnlyList<TaskbarElement> Elements, int? TrayLeft);
+
 /// <summary>
 /// Reads the Windows 11 taskbar's layout through UI Automation, read-only: the XAML taskbar has no HWNDs for its
 /// buttons, so this is the only way to see where the Start button is. Called through the vtables (like
@@ -41,6 +45,7 @@ internal sealed class TaskbarAutomation : IDisposable
     private IntPtr _trueCondition;
     private IntPtr _frameCondition;
     private IntPtr _frame;
+    private IntPtr _frameHost;
     private IntPtr _frameOwner;
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -68,20 +73,53 @@ internal sealed class TaskbarAutomation : IDisposable
     private delegate int GetElementFn(IntPtr self, int index, out IntPtr element);
 
     /// <summary>
-    /// The visible children of the taskbar frame. Returns null when UI Automation or the frame is unavailable (older
-    /// taskbars, Explorer restarting); the caller then falls back to the legacy HWNDs.
+    /// The visible children of the taskbar frame, and the notification area beside it. Returns null when UI Automation
+    /// or the frame is unavailable (older taskbars, Explorer restarting); the caller then falls back to the legacy HWNDs.
     /// </summary>
-    public IReadOnlyList<TaskbarElement>? Query(IntPtr taskbar)
+    public TaskbarReading? Query(IntPtr taskbar)
     {
         if (!EnsureAutomation() || !EnsureFrame(taskbar))
         {
             return null;
         }
 
-        if (Call<FindFn>(_frame, FindAllSlot)(_frame, TreeScopeChildren, _trueCondition, out var array) < 0 || array == IntPtr.Zero)
+        if (Children(_frame) is not { } elements)
         {
             // The cached frame died with its Explorer; find it again next time.
             ReleaseFrame();
+            return null;
+        }
+
+        // The notification area: the clock and icon buttons next to the frame. The main taskbar also has the legacy
+        // TrayNotifyWnd, but the taskbars on other displays don't.
+        int? trayLeft = null;
+        if (_frameHost != IntPtr.Zero && Children(_frameHost) is { } siblings)
+        {
+            foreach (var sibling in siblings)
+            {
+                if (sibling.AutomationId is "SystemTrayIcon" or "NotifyItemIcon")
+                {
+                    trayLeft = Math.Min(trayLeft ?? int.MaxValue, sibling.Bounds.X);
+                }
+            }
+        }
+
+        return new TaskbarReading(elements, trayLeft);
+    }
+
+    public void Dispose()
+    {
+        ReleaseFrame();
+        Release(ref _frameCondition);
+        Release(ref _trueCondition);
+        Release(ref _automation);
+    }
+
+    // The visible children of an element, or null when the element is gone.
+    private List<TaskbarElement>? Children(IntPtr parent)
+    {
+        if (Call<FindFn>(parent, FindAllSlot)(parent, TreeScopeChildren, _trueCondition, out var array) < 0 || array == IntPtr.Zero)
+        {
             return null;
         }
 
@@ -119,14 +157,6 @@ internal sealed class TaskbarAutomation : IDisposable
         {
             Marshal.Release(array);
         }
-    }
-
-    public void Dispose()
-    {
-        ReleaseFrame();
-        Release(ref _frameCondition);
-        Release(ref _trueCondition);
-        Release(ref _automation);
     }
 
     private static T Call<T>(IntPtr instance, int slot)
@@ -221,7 +251,10 @@ internal sealed class TaskbarAutomation : IDisposable
 
         try
         {
-            if (Call<FindFn>(root, FindFirstSlot)(root, TreeScopeDescendants, _frameCondition, out _frame) < 0 || _frame == IntPtr.Zero)
+            // Usually the frame is a child of the XAML island, one level down, beside the notification area: keep both.
+            // Otherwise search the whole tree (without a notification area).
+            if (!FindFrameInChildren(root)
+                && (Call<FindFn>(root, FindFirstSlot)(root, TreeScopeDescendants, _frameCondition, out _frame) < 0 || _frame == IntPtr.Zero))
             {
                 _frame = IntPtr.Zero;
                 return false;
@@ -236,9 +269,49 @@ internal sealed class TaskbarAutomation : IDisposable
         }
     }
 
+    private bool FindFrameInChildren(IntPtr root)
+    {
+        if (Call<FindFn>(root, FindAllSlot)(root, TreeScopeChildren, _trueCondition, out var array) < 0 || array == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (Call<GetLengthFn>(array, LengthSlot)(array, out var count) < 0)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                if (Call<GetElementFn>(array, GetElementSlot)(array, i, out var child) < 0 || child == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                if (Call<FindFn>(child, FindFirstSlot)(child, TreeScopeChildren, _frameCondition, out var frame) >= 0 && frame != IntPtr.Zero)
+                {
+                    _frame = frame;
+                    _frameHost = child;
+                    return true;
+                }
+
+                Marshal.Release(child);
+            }
+
+            return false;
+        }
+        finally
+        {
+            Marshal.Release(array);
+        }
+    }
+
     private void ReleaseFrame()
     {
         Release(ref _frame);
+        Release(ref _frameHost);
         _frameOwner = IntPtr.Zero;
     }
 

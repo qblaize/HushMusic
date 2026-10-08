@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
@@ -29,8 +30,21 @@ namespace HushMusic.Playback;
 /// and Play reconnects at the live edge; a stream that drops or ends is reconnected with a backoff
 /// (<see cref="LiveReconnectPolicy"/>) instead of moving on; the ICY title reader runs only while the station plays.
 /// </para>
+/// <para>
+/// Transitions use two MediaPlayers. One plays the current item; the other is the spare. Shortly before the current
+/// track ends (<see cref="TransitionPlanner"/>) the next queue item is resolved and opened, paused, on the spare
+/// ("preload"). With crossfade on (<see cref="AppSettings.CrossfadeSeconds"/>) the spare starts that many seconds before
+/// the end and the two are blended with equal-power curves; with crossfade off it starts the moment the current track
+/// ends. Either way the players then swap roles. The incoming item becomes current when it starts: the queue advances,
+/// <see cref="TrackCompleted"/> is raised for the outgoing item and <see cref="TrackChanged"/> (then, once audio runs,
+/// <see cref="TrackStarted"/>) for the incoming one, and <see cref="Position"/>/<see cref="Duration"/> describe it. The
+/// outgoing player keeps fading under it and is then stopped and becomes the spare. A skip to the preloaded item uses
+/// it too (with a 200 ms blend instead of a cut); a skip, seek, pause or stop during a fade ends the fade within 200 ms.
+/// There is no crossfade into or out of live radio, with repeat one, before a sleep-timer "end of track" pause, or for
+/// tracks shorter than twice the crossfade.
+/// </para>
 /// </remarks>
-public sealed class MediaPlayerService : IPlayer, IDisposable
+public sealed partial class MediaPlayerService : IPlayer, IDisposable
 {
     private const string LoadIdKey = "HushMusic.LoadId";
     private const int MaxConsecutiveFailures = 3;
@@ -41,6 +55,9 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     private static readonly TimeSpan DnsWarmUpTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan GainRampTime = TimeSpan.FromMilliseconds(150);
     private static readonly TimeSpan PauseSettleTime = TimeSpan.FromMilliseconds(300);
+
+    // A skip, seek, pause or stop during a crossfade (or a skip to the preloaded item) blends this fast instead of cutting.
+    private static readonly TimeSpan QuickFade = TimeSpan.FromMilliseconds(200);
 
     // A live stream whose connection closes reports Paused, then MediaEnded; only a pause that outlasts this is real.
     private static readonly TimeSpan LivePauseConfirmTime = TimeSpan.FromSeconds(1.5);
@@ -56,20 +73,27 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     private readonly VolumeNormalizer _normalizer;
     private readonly IRadioNowPlaying _radio;
     private readonly ILogger<MediaPlayerService> _logger;
-    private readonly MediaPlayer _player;
+    private readonly Deck[] _decks;
     private readonly VolumeMixer _mixer;
     private readonly SmtcController _smtc;
     private readonly Timer _positionTimer;
     private readonly Timer _volumeSaveTimer;
+    private readonly Timer _transitionTimer;
+    private readonly Timer _fadeTimer;
     private readonly Channel<Action> _events = Channel.CreateUnbounded<Action>(new UnboundedChannelOptions { SingleReader = true });
     private readonly LiveReconnectPolicy _livePolicy = new(TimeProvider.System); // guarded by _gate
 
     // Guarded by _gate.
+    private Deck _active;        // plays the current load
+    private Deck _spare;         // idle, preloading the next item (_preload) or fading out the previous one (_fadeOut)
+    private Preload? _preload;
+    private FadeOut? _fadeOut;
     private PlaybackStatus _status = PlaybackStatus.Idle;
     private QueueItem? _item;
     private MediaSource? _source;
     private ResolvedStream? _stream;
     private CancellationTokenSource? _loadCts;
+    private long _ids;           // last id handed out to a load or a preload; ids tag media sources
     private long _loadId;
     private LoadKind _loadKind;
     private bool _autoplay;      // the user wants this item playing
@@ -86,8 +110,16 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     private bool _muted;
     private bool _volumeDirty;
     private bool _normalize;     // last seen AppSettings.NormalizeVolume
+    private TimeSpan _crossfade; // last seen AppSettings.CrossfadeSeconds
     private bool _pauseAtEnd;    // sleep timer: the next natural track end pauses instead of playing on
     private long _fadeId;
+    private bool _crossfadeStarting; // a crossfade was decided and is moving the queue
+    private bool _soughtIntoFade;    // the user sought into the fade window of the current track: no crossfade from it
+    private bool _notReadyLogged;
+    private string? _loggedPlan;
+    private Guid? _preloadFailedFor;
+    private long _endedAtMs;     // when the previous track ended by itself, to log how long the next one took to start
+    private long _takeoverAtMs;  // when a preloaded item took over
     private bool _disposed;
     private int _tick;
 
@@ -108,21 +140,21 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
         _volume = Math.Clamp(settings.Current.Volume, 0, 1);
         _normalize = settings.Current.NormalizeVolume;
-        _player = new MediaPlayer
-        {
-            AudioCategory = MediaPlayerAudioCategory.Media,
-            AutoPlay = false,
-            Volume = _volume,
-        };
-        _mixer = new VolumeMixer(_volume, ApplyPlayerVolume);
-        _player.MediaOpened += OnMediaOpened;
-        _player.MediaEnded += OnMediaEnded;
-        _player.MediaFailed += OnMediaFailed;
-        _player.PlaybackSession.PlaybackStateChanged += OnPlaybackStateChanged;
-        _smtc = new SmtcController(_player, this, logger);
+        _crossfade = TransitionPlanner.CrossfadeFromSetting(settings.Current.CrossfadeSeconds);
+        _decks = [new Deck(this, 0, _volume), new Deck(this, 1, _volume)];
+        _active = _decks[0];
+        _spare = _decks[1];
+        _mixer = new VolumeMixer(_volume, v => ApplyPlayerVolume(_decks[0], v), v => ApplyPlayerVolume(_decks[1], v));
+
+        // The system media controls stay on the first player's session for the app's lifetime. Both players have their
+        // command manager off, so swapping which one plays never touches the session or makes a second one appear.
+        _decks[1].Player.CommandManager.IsEnabled = false;
+        _smtc = new SmtcController(_decks[0].Player, this, logger);
 
         _positionTimer = new Timer(_ => OnPositionTick());
         _volumeSaveTimer = new Timer(_ => SaveVolume());
+        _transitionTimer = new Timer(_ => EvaluateTransition());
+        _fadeTimer = new Timer(_ => FinishFadeOut(force: false));
         _ = Task.Run(PumpEventsAsync);
 
         _queue.CurrentChanged += OnQueueCurrentChanged;
@@ -258,7 +290,10 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                 }
 
                 _muted = value;
-                _player.IsMuted = value;
+                foreach (var deck in _decks)
+                {
+                    deck.Player.IsMuted = value;
+                }
             }
         }
     }
@@ -382,13 +417,13 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                     RestartNoLock();
                     _started = false;
                     _starting = true;
-                    _player.Play();
+                    _active.Player.Play();
                     return Task.CompletedTask;
                 }
 
                 if (_stream is null || _stream.ExpiresAt - DateTimeOffset.UtcNow > RefreshBeforeExpiry)
                 {
-                    _player.Play();
+                    _active.Player.Play();
                     return Task.CompletedTask;
                 }
 
@@ -434,6 +469,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
             _autoplay = false;
             _starting = false;
+            CutFadeNoLock("paused");
             if (_item?.Track.IsLiveRadio == true)
             {
                 if (_source is not null || _status is PlaybackStatus.Loading or PlaybackStatus.Buffering or PlaybackStatus.Playing)
@@ -446,7 +482,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
             }
             else if (_source is not null && _opened)
             {
-                _player.Pause();
+                _active.Player.Pause();
             }
         }
 
@@ -482,9 +518,13 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
             var duration = DurationNoLock();
             position = position < TimeSpan.Zero ? TimeSpan.Zero : duration > TimeSpan.Zero && position > duration ? duration : position;
             _logger.LogDebug("Seek {VideoId} to {Position} (was {Current})", _item.Track.VideoId, position, _opened ? PositionNoLock() : _startAt);
+            CutFadeNoLock("seek");
+
+            // Jumping to the last seconds means the user wants to hear them: the next track then follows without a fade.
+            _soughtIntoFade = TransitionPlanner.IsInFadeWindow(position, duration, _crossfade);
             if (_source is not null && _opened)
             {
-                _player.PlaybackSession.Position = position;
+                _active.Player.PlaybackSession.Position = position;
                 _ended = false;
             }
             else
@@ -568,6 +608,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     public void Stop()
     {
         CancellationTokenSource? cancel;
+        CancellationTokenSource? dropped;
         lock (_gate)
         {
             if (_disposed)
@@ -575,6 +616,8 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                 return;
             }
 
+            CutFadeNoLock("stopped");
+            dropped = DropPreloadNoLock("stopped");
             cancel = ResetLoadNoLock();
             _startAt = TimeSpan.Zero;
             var duration = DurationNoLock();
@@ -587,11 +630,13 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         }
 
         cancel?.Cancel();
+        dropped?.Cancel();
     }
 
     public void Dispose()
     {
         CancellationTokenSource? cancel;
+        CancellationTokenSource? dropped;
         bool saveVolume;
         lock (_gate)
         {
@@ -600,12 +645,15 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                 return;
             }
 
+            StopFadeOutNoLock();
+            dropped = DropPreloadNoLock("shutting down");
             cancel = ResetLoadNoLock();
             _disposed = true;
             saveVolume = _volumeDirty;
         }
 
         cancel?.Cancel();
+        dropped?.Cancel();
         _queue.CurrentChanged -= OnQueueCurrentChanged;
         _queue.Changed -= OnQueueChanged;
         _settings.Changed -= OnSettingsChanged;
@@ -613,18 +661,20 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         _radio.Unfollow(forget: true);
         _positionTimer.Dispose();
         _volumeSaveTimer.Dispose();
+        _transitionTimer.Dispose();
+        _fadeTimer.Dispose();
         if (saveVolume)
         {
             SaveVolume();
         }
 
-        _player.MediaOpened -= OnMediaOpened;
-        _player.MediaEnded -= OnMediaEnded;
-        _player.MediaFailed -= OnMediaFailed;
-        _player.PlaybackSession.PlaybackStateChanged -= OnPlaybackStateChanged;
         _smtc.Dispose();
         _mixer.Dispose();
-        _player.Dispose();
+        foreach (var deck in _decks)
+        {
+            deck.Dispose();
+        }
+
         _events.Writer.TryComplete();
     }
 
@@ -634,8 +684,10 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         return default;
     }
 
-    /// <summary>Which load a MediaPlayer event belongs to, so late events from a replaced source are ignored.</summary>
-    private bool TryGetLoadId(MediaPlayer sender, out long loadId)
+    private static string Format(double gain) => gain.ToString("0.000", CultureInfo.InvariantCulture);
+
+    /// <summary>Which load (or preload) a MediaPlayer event belongs to, so late events from a replaced source are ignored.</summary>
+    private bool TryGetLoadId(Deck deck, MediaPlayer sender, out long loadId)
     {
         try
         {
@@ -656,11 +708,23 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         {
         }
 
-        // Tag unreadable: attribute the event to the current load rather than drop it and stall playback.
+        // Tag unreadable: attribute the event to what this player is doing rather than drop it and stall playback.
         lock (_gate)
         {
-            loadId = _loadId;
-            return _source is not null;
+            if (deck == _active)
+            {
+                loadId = _loadId;
+                return _source is not null;
+            }
+
+            if (_preload is { } preload && preload.Deck == deck)
+            {
+                loadId = preload.Id;
+                return preload.Source is not null;
+            }
+
+            loadId = 0;
+            return false;
         }
     }
 
@@ -684,14 +748,17 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     }
 
     /// <summary>
-    /// Makes <paramref name="item"/> the loaded item and starts resolving + opening it.
-    /// The returned task completes when the media source is set (or the load failed or was superseded); it never faults.
+    /// Makes <paramref name="item"/> the loaded item and starts resolving + opening it, or, when it is the preloaded
+    /// item, starts that at once. The returned task completes when the media source is set (or the load failed or was
+    /// superseded); it never faults.
     /// </summary>
     private Task LoadAsync(QueueItem item, bool autoplay, TimeSpan startAt, LoadKind kind, CancellationToken waitToken, long? onlyIfLoadId = null)
     {
-        long loadId;
-        CancellationTokenSource cts;
+        var loadId = 0L;
+        CancellationTokenSource? cts = null;
         CancellationTokenSource? previous;
+        CancellationTokenSource? dropped = null;
+        var tookOver = false;
         lock (_gate)
         {
             if (_disposed || (onlyIfLoadId is { } expected && expected != _loadId))
@@ -699,58 +766,88 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                 return Task.CompletedTask;
             }
 
-            previous = ResetLoadNoLock();
-            cts = new CancellationTokenSource();
-            _loadCts = cts;
-            loadId = _loadId;
-
-            var itemChanged = _item?.Id != item.Id;
-            _item = item;
-            _autoplay = autoplay;
-            _startAt = startAt;
-            switch (kind)
+            var newItem = kind is LoadKind.User or LoadKind.AutoAdvance;
+            if (newItem && _preload is { } preload && preload.Item.Id == item.Id && IsReadyNoLock(preload))
             {
-                case LoadKind.Reopen:
-                    _reopened = true;
-                    break;
-                case LoadKind.Retry:
-                    _retried = true;
-                    break;
-                case LoadKind.Refresh:
-                case LoadKind.Reconnect:
-                    break;
-                default:
-                    _loadKind = kind;
-                    _started = false;
-                    _reopened = false;
-                    _retried = false;
-                    _prefetchedFor = null;
-                    _livePolicy.Reset();
-                    if (kind == LoadKind.User)
-                    {
-                        _consecutiveFailures = 0;
-                    }
-
-                    StartLoudnessNoLock(item);
-                    break;
+                previous = TakeOverNoLock(preload, QuickFade, autoplay, startAt, kind);
+                tookOver = true;
+                _logger.LogDebug(
+                    "Started the preloaded {VideoId} on player {Deck} ({Kind}, {Blend})",
+                    item.Track.VideoId,
+                    _active.Name,
+                    kind == LoadKind.User ? "chosen" : "next in the queue",
+                    _fadeOut is null ? "no blend" : $"{QuickFade.TotalMilliseconds:0} ms blend");
             }
-
-            if (itemChanged)
+            else
             {
-                Post(() =>
+                if (newItem)
                 {
-                    _radio.Unfollow(forget: true);
-                    _smtc.SetTrack(item.Track);
-                    TrackChanged?.Invoke(this, new TrackChangedEventArgs(item.Track, item));
-                });
-            }
+                    CutFadeNoLock("another track was chosen");
+                    dropped = DropPreloadNoLock("another track was chosen");
+                }
 
-            SetStatusNoLock(PlaybackStatus.Loading);
+                previous = ResetLoadNoLock();
+                cts = new CancellationTokenSource();
+                _loadCts = cts;
+                loadId = _loadId;
+
+                var itemChanged = _item?.Id != item.Id;
+                _item = item;
+                _autoplay = autoplay;
+                _startAt = startAt;
+                switch (kind)
+                {
+                    case LoadKind.Reopen:
+                        _reopened = true;
+                        break;
+                    case LoadKind.Retry:
+                        _retried = true;
+                        break;
+                    case LoadKind.Refresh:
+                    case LoadKind.Reconnect:
+                        break;
+                    default:
+                        _loadKind = kind;
+                        _started = false;
+                        _reopened = false;
+                        _retried = false;
+                        _prefetchedFor = null;
+                        _livePolicy.Reset();
+                        ResetTransitionNoLock();
+                        if (kind == LoadKind.User)
+                        {
+                            _consecutiveFailures = 0;
+                            _endedAtMs = 0;
+                        }
+
+                        StartLoudnessNoLock(item);
+                        break;
+                }
+
+                if (itemChanged)
+                {
+                    Post(() =>
+                    {
+                        _radio.Unfollow(forget: true);
+                        _smtc.SetTrack(item.Track);
+                        RaiseTrackEvent(TrackChanged, nameof(TrackChanged), item);
+                    });
+                }
+
+                SetStatusNoLock(PlaybackStatus.Loading);
+            }
+        }
+
+        if (tookOver)
+        {
+            previous?.Cancel();
+            return Task.CompletedTask;
         }
 
         // Start (or join) the new resolve before cancelling the old one, so a shared yt-dlp run is not killed in between.
-        var work = ResolveAndOpenAsync(item, loadId, cts.Token);
+        var work = ResolveAndOpenAsync(item, loadId, cts!.Token);
         previous?.Cancel();
+        dropped?.Cancel();
         return waitToken.CanBeCanceled ? work.WaitAsync(waitToken) : work;
     }
 
@@ -793,7 +890,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                 source.CustomProperties[LoadIdKey] = loadId;
                 _stream = stream;
                 _source = source;
-                _player.Source = source;
+                _active.Player.Source = source;
             }
 
             if (stream.IsLive)
@@ -863,16 +960,39 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         }
     }
 
-    private void OnMediaOpened(MediaPlayer sender, object args)
+    private void OnMediaOpened(Deck deck, MediaPlayer sender)
     {
-        if (!TryGetLoadId(sender, out var loadId))
+        if (!TryGetLoadId(deck, sender, out var loadId))
         {
             return;
         }
 
         lock (_gate)
         {
-            if (loadId != _loadId || _opened || _disposed)
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (_preload is { } preload && preload.Deck == deck && preload.Id == loadId)
+            {
+                if (!preload.Opened)
+                {
+                    preload.Opened = true;
+                    _logger.LogDebug(
+                        "Preloaded {VideoId} on player {Deck}: open {Elapsed} ms after the preload started ({Container}/{Codec} {Bitrate} kbps)",
+                        preload.Item.Track.VideoId,
+                        deck.Name,
+                        Environment.TickCount64 - preload.StartedMs,
+                        preload.Stream?.Container,
+                        preload.Stream?.Codec,
+                        preload.Stream?.BitrateKbps);
+                }
+
+                return;
+            }
+
+            if (deck != _active || loadId != _loadId || _opened)
             {
                 return;
             }
@@ -900,7 +1020,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         }
     }
 
-    private void OnPlaybackStateChanged(MediaPlaybackSession session, object args)
+    private void OnPlaybackStateChanged(Deck deck, MediaPlaybackSession session)
     {
         MediaPlaybackState state;
         try
@@ -914,7 +1034,8 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
         lock (_gate)
         {
-            if (_disposed || _source is null || !_opened)
+            // The spare player (preloading, or fading out the previous track) never drives the status.
+            if (_disposed || deck != _active || _source is null || !_opened)
             {
                 return;
             }
@@ -966,15 +1087,31 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
             {
                 _started = true;
                 _consecutiveFailures = 0;
-                Post(() => TrackStarted?.Invoke(this, new TrackChangedEventArgs(item.Track, item)));
+                LogStartNoLock(item);
+                Post(() => RaiseTrackEvent(TrackStarted, nameof(TrackStarted), item));
                 Post(PrefetchNext);
+                if (_testSeekBeforeEnd is { } before && !item.Track.IsLiveRadio)
+                {
+                    var loadId = _loadId;
+                    _ = Task.Run(() => TestSeekBeforeEnd(loadId, before));
+                }
             }
         }
     }
 
-    private void OnMediaEnded(MediaPlayer sender, object args)
+    private void OnMediaEnded(Deck deck, MediaPlayer sender)
     {
-        if (!TryGetLoadId(sender, out var loadId))
+        lock (_gate)
+        {
+            if (_fadeOut is { } fading && fading.Deck == deck)
+            {
+                // The outgoing track ran out before its fade did (its length was slightly off): stop it now.
+                _ = Task.Run(() => FinishFadeOut(force: true));
+                return;
+            }
+        }
+
+        if (!TryGetLoadId(deck, sender, out var loadId))
         {
             return;
         }
@@ -983,7 +1120,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         bool pause;
         lock (_gate)
         {
-            if (loadId != _loadId || _item is null || _disposed)
+            if (deck != _active || loadId != _loadId || _item is null || _disposed)
             {
                 return;
             }
@@ -997,11 +1134,12 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
             }
 
             _ended = true;
+            _endedAtMs = Environment.TickCount64;
 
             // Consumed here, before TrackCompleted is queued: a handler that sees the flag cleared knows it applied to this end.
             pause = _pauseAtEnd;
             _pauseAtEnd = false;
-            Post(() => TrackCompleted?.Invoke(this, new TrackChangedEventArgs(item.Track, item)));
+            Post(() => RaiseTrackEvent(TrackCompleted, nameof(TrackCompleted), item));
         }
 
         // Leave MediaPlayer's callback before touching its source again.
@@ -1054,13 +1192,14 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                     RestartNoLock();
                     _started = false;
                     _starting = true;
-                    _player.Play();
+                    _active.Player.Play();
                 }
             }
 
             return;
         }
 
+        // Gapless when the next item is preloaded (LoadAsync starts it at once), otherwise resolved and opened now.
         _ = LoadAsync(next, autoplay: true, TimeSpan.Zero, LoadKind.AutoAdvance, CancellationToken.None, onlyIfLoadId: loadId);
     }
 
@@ -1094,12 +1233,13 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                 _item = next;
                 _started = false;
                 _startAt = TimeSpan.Zero;
+                ResetTransitionNoLock();
                 var duration = DurationNoLock();
                 Post(() =>
                 {
                     _radio.Unfollow(forget: true);
                     _smtc.SetTrack(next.Track);
-                    TrackChanged?.Invoke(this, new TrackChangedEventArgs(next.Track, next));
+                    RaiseTrackEvent(TrackChanged, nameof(TrackChanged), next);
                     PositionChanged?.Invoke(this, new PositionChangedEventArgs(TimeSpan.Zero, duration));
                 });
                 SetStatusNoLock(PlaybackStatus.Idle);
@@ -1110,9 +1250,19 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         _logger.LogInformation("Paused at the end of {VideoId} (sleep timer)", finished.Track.VideoId);
     }
 
-    private void OnMediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args)
+    private void OnMediaFailed(Deck deck, MediaPlayer sender, MediaPlayerFailedEventArgs args)
     {
-        if (!TryGetLoadId(sender, out var loadId))
+        lock (_gate)
+        {
+            if (_fadeOut is { } fading && fading.Deck == deck)
+            {
+                _logger.LogDebug("The fading-out {VideoId} failed ({Error}); stopping it", fading.Item.Track.VideoId, args.Error);
+                _ = Task.Run(() => FinishFadeOut(force: true));
+                return;
+            }
+        }
+
+        if (!TryGetLoadId(deck, sender, out var loadId))
         {
             return;
         }
@@ -1124,7 +1274,18 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         TimeSpan resumeAt;
         lock (_gate)
         {
-            if (loadId != _loadId || _item is null || _disposed)
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (_preload is { } preload && preload.Deck == deck && preload.Id == loadId)
+            {
+                OnPreloadFailedNoLock(preload, args, hresult);
+                return;
+            }
+
+            if (deck != _active || loadId != _loadId || _item is null)
             {
                 return;
             }
@@ -1235,7 +1396,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
             MediaPlaybackState state;
             try
             {
-                state = _player.PlaybackSession.PlaybackState;
+                state = _active.Player.PlaybackSession.PlaybackState;
             }
             catch (COMException)
             {
@@ -1295,6 +1456,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
         var current = e.Current;
         CancellationTokenSource? cancel = null;
+        CancellationTokenSource? dropped = null;
         bool play;
         lock (_gate)
         {
@@ -1306,23 +1468,32 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
             play = current is not null && _autoplay && _status is PlaybackStatus.Loading or PlaybackStatus.Playing or PlaybackStatus.Buffering;
             if (!play)
             {
-                // Show the new current item (or nothing); it is resolved when the user presses play.
+                // Show the new current item (or nothing); it is resolved when the user presses play. A preload of
+                // exactly that item is kept, so Play starts it at once.
+                CutFadeNoLock("the current item changed");
+                if (_preload is { } preload && preload.Item.Id != current?.Id)
+                {
+                    dropped = DropPreloadNoLock("the current item changed");
+                }
+
                 cancel = ResetLoadNoLock();
                 _item = current;
                 _started = false;
                 _startAt = TimeSpan.Zero;
+                ResetTransitionNoLock();
                 Post(() =>
                 {
                     _radio.Unfollow(forget: true);
                     _smtc.SetTrack(current?.Track);
                     _smtc.SetStatus(PlaybackStatus.Idle, current is not null);
-                    TrackChanged?.Invoke(this, new TrackChangedEventArgs(current?.Track, current));
+                    RaiseTrackEvent(TrackChanged, nameof(TrackChanged), current);
                 });
                 SetStatusNoLock(PlaybackStatus.Idle);
             }
         }
 
         cancel?.Cancel();
+        dropped?.Cancel();
         if (play)
         {
             _ = LoadAsync(current!, autoplay: true, TimeSpan.Zero, LoadKind.User, CancellationToken.None);
@@ -1346,8 +1517,10 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
     private void OnQueueChanged(object? sender, QueueChangedEventArgs e)
     {
-        // The queue may have grown after the track started (e.g. "up next" arrived): prefetch what now comes next.
+        // The queue may have grown after the track started (e.g. "up next" arrived): prefetch what now comes next,
+        // and let go of a preloaded item that no longer comes next.
         Post(PrefetchNext);
+        Post(ReviewPreload);
     }
 
     private void PrefetchNext()
@@ -1376,21 +1549,22 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     // arrives (fetched alongside the stream, so playback never waits for it).
     private void StartLoudnessNoLock(QueueItem item)
     {
+        var output = _active.Index;
         if (!_normalize || item.Track.IsLiveRadio)
         {
-            _mixer.SetLoudnessGain(1, TimeSpan.Zero);
+            _mixer.SetLoudnessGain(output, 1, TimeSpan.Zero);
             return;
         }
 
         if (_normalizer.TryGetLoudness(item.Track.VideoId, out var loudnessDb))
         {
             var gain = PlaybackGain.ForLoudness(loudnessDb);
-            _mixer.SetLoudnessGain(gain, TimeSpan.Zero);
+            _mixer.SetLoudnessGain(output, gain, TimeSpan.Zero);
             LogGain(item, loudnessDb, gain, "cached");
             return;
         }
 
-        _mixer.SetLoudnessGain(1, TimeSpan.Zero);
+        _mixer.SetLoudnessGain(output, 1, TimeSpan.Zero);
         _ = Task.Run(() => ApplyLoudnessWhenKnownAsync(item));
     }
 
@@ -1401,13 +1575,25 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         bool audible;
         lock (_gate)
         {
-            if (_disposed || !_normalize || _item?.Id != item.Id)
+            if (_disposed || !_normalize)
             {
                 return;
             }
 
-            audible = _opened && _status is PlaybackStatus.Playing or PlaybackStatus.Buffering;
-            _mixer.SetLoudnessGain(gain, audible ? GainRampTime : TimeSpan.Zero);
+            if (_item?.Id == item.Id)
+            {
+                audible = _opened && _status is PlaybackStatus.Playing or PlaybackStatus.Buffering;
+                _mixer.SetLoudnessGain(_active.Index, gain, audible ? GainRampTime : TimeSpan.Zero);
+            }
+            else if (_preload is { } preload && preload.Item.Id == item.Id)
+            {
+                audible = false;
+                _mixer.SetLoudnessGain(preload.Deck.Index, gain, TimeSpan.Zero);
+            }
+            else
+            {
+                return;
+            }
         }
 
         LogGain(item, loudnessDb, gain, audible ? "ramped, audio had started" : "before audio");
@@ -1417,44 +1603,84 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         _logger.LogDebug(
             "Normalization gain for {VideoId}: {Gain} (loudness {LoudnessDb} dB, {How})",
             item.Track.VideoId,
-            gain.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture),
-            loudnessDb?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) ?? "unknown",
+            Format(gain),
+            loudnessDb?.ToString("0.00", CultureInfo.InvariantCulture) ?? "unknown",
             how);
 
     private void OnSettingsChanged(object? sender, EventArgs e)
     {
+        bool normalizeChanged;
         bool enabled;
-        QueueItem? fetchFor = null;
+        TimeSpan crossfade;
+        bool crossfadeChanged;
+        var fetchFor = new List<QueueItem>(2);
         lock (_gate)
         {
-            enabled = _settings.Current.NormalizeVolume;
-            if (_disposed || enabled == _normalize)
+            if (_disposed)
             {
                 return;
             }
 
-            _normalize = enabled;
-            if (!enabled)
+            crossfade = TransitionPlanner.CrossfadeFromSetting(_settings.Current.CrossfadeSeconds);
+            crossfadeChanged = crossfade != _crossfade;
+            _crossfade = crossfade;
+
+            enabled = _settings.Current.NormalizeVolume;
+            normalizeChanged = enabled != _normalize;
+            if (normalizeChanged)
             {
-                _mixer.SetLoudnessGain(1, GainRampTime);
-            }
-            else if (_item is { } item)
-            {
-                if (_normalizer.TryGetLoudness(item.Track.VideoId, out var loudnessDb))
+                _normalize = enabled;
+                if (!enabled)
                 {
-                    _mixer.SetLoudnessGain(PlaybackGain.ForLoudness(loudnessDb), GainRampTime);
+                    _mixer.SetLoudnessGain(_active.Index, 1, GainRampTime);
+                    if (_preload is { } preload)
+                    {
+                        _mixer.SetLoudnessGain(preload.Deck.Index, 1, TimeSpan.Zero);
+                    }
                 }
                 else
                 {
-                    fetchFor = item;
+                    if (_item is { } item)
+                    {
+                        if (_normalizer.TryGetLoudness(item.Track.VideoId, out var loudnessDb))
+                        {
+                            _mixer.SetLoudnessGain(_active.Index, PlaybackGain.ForLoudness(loudnessDb), GainRampTime);
+                        }
+                        else
+                        {
+                            fetchFor.Add(item);
+                        }
+                    }
+
+                    if (_preload is { } preload)
+                    {
+                        if (_normalizer.TryGetLoudness(preload.Item.Track.VideoId, out var loudnessDb))
+                        {
+                            _mixer.SetLoudnessGain(preload.Deck.Index, PlaybackGain.ForLoudness(loudnessDb), TimeSpan.Zero);
+                        }
+                        else
+                        {
+                            fetchFor.Add(preload.Item);
+                        }
+                    }
                 }
             }
         }
 
-        _logger.LogInformation("Volume normalization turned {State}", enabled ? "on" : "off");
-        if (fetchFor is not null)
+        if (crossfadeChanged)
         {
-            _ = Task.Run(() => ApplyLoudnessWhenKnownAsync(fetchFor));
+            _logger.LogInformation("Crossfade set to {Seconds} s{Off}", crossfade.TotalSeconds, crossfade == TimeSpan.Zero ? " (off: gapless)" : string.Empty);
+        }
+
+        if (!normalizeChanged)
+        {
+            return;
+        }
+
+        _logger.LogInformation("Volume normalization turned {State}", enabled ? "on" : "off");
+        foreach (var item in fetchFor)
+        {
+            _ = Task.Run(() => ApplyLoudnessWhenKnownAsync(item));
         }
     }
 
@@ -1470,15 +1696,15 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         }
     }
 
-    private void ApplyPlayerVolume(double volume)
+    private void ApplyPlayerVolume(Deck deck, double volume)
     {
         try
         {
-            _player.Volume = volume;
+            deck.Player.Volume = volume;
         }
         catch (Exception ex) when (ex is COMException or ObjectDisposedException)
         {
-            _logger.LogDebug(ex, "Could not set the MediaPlayer volume");
+            _logger.LogDebug(ex, "Could not set the volume of player {Deck}", deck.Name);
         }
     }
 
@@ -1486,6 +1712,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     {
         TimeSpan position;
         TimeSpan duration;
+        var tick = Interlocked.Increment(ref _tick);
         lock (_gate)
         {
             if (_disposed || _status != PlaybackStatus.Playing)
@@ -1495,9 +1722,26 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
             position = PositionNoLock();
             duration = DurationNoLock();
+            if (_fadeOut is { } fading && tick % 4 == 0)
+            {
+                var outgoing = _mixer.Levels(fading.Deck.Index);
+                var incoming = _mixer.Levels(_active.Index);
+                _logger.LogDebug(
+                    "Crossfade +{Elapsed} ms: out {Out} on {OutDeck} mix {OutMix} vol {OutVolume} | in {In} on {InDeck} mix {InMix} vol {InVolume} at {Position}",
+                    Environment.TickCount64 - fading.StartedMs,
+                    fading.Item.Track.VideoId,
+                    fading.Deck.Name,
+                    Format(outgoing.Mix),
+                    Format(outgoing.Applied),
+                    _item?.Track.VideoId,
+                    _active.Name,
+                    Format(incoming.Mix),
+                    Format(incoming.Applied),
+                    position);
+            }
         }
 
-        var updateTimeline = Interlocked.Increment(ref _tick) % 4 == 0;
+        var updateTimeline = tick % 4 == 0;
         Post(() =>
         {
             PositionChanged?.Invoke(this, new PositionChangedEventArgs(position, duration));
@@ -1506,6 +1750,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
                 _smtc.SetTimeline(position, duration);
             }
         });
+        EvaluateTransition();
     }
 
     private void SaveVolume()
@@ -1555,6 +1800,13 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     // Called under _gate so events keep the order of the state changes that caused them.
     private void Post(Action action) => _events.Writer.TryWrite(action);
 
+    // On the event pump. Logged so the order of track events (crossfades in particular) can be followed in a debug log.
+    private void RaiseTrackEvent(EventHandler<TrackChangedEventArgs>? handler, string name, QueueItem? item)
+    {
+        _logger.LogDebug("{Event} {VideoId}", name, item?.Track.VideoId);
+        handler?.Invoke(this, new TrackChangedEventArgs(item?.Track, item));
+    }
+
     private void SetStatusNoLock(PlaybackStatus status)
     {
         if (_status == status)
@@ -1573,6 +1825,10 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         if (!_disposed)
         {
             _positionTimer.Change(status == PlaybackStatus.Playing ? PositionInterval : Timeout.InfiniteTimeSpan, PositionInterval);
+            if (status != PlaybackStatus.Playing)
+            {
+                _transitionTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            }
         }
     }
 
@@ -1581,7 +1837,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
     {
         var previous = _loadCts;
         _loadCts = null;
-        _loadId++;
+        _loadId = ++_ids;
         _opened = false;
         _starting = false;
         _ended = false;
@@ -1595,19 +1851,9 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         _source = null;
         _stream = null;
         _opened = false;
-        if (source is null)
+        if (source is not null)
         {
-            return;
-        }
-
-        try
-        {
-            _player.Source = null;
-            source.Dispose();
-        }
-        catch (Exception ex) when (ex is COMException or ObjectDisposedException)
-        {
-            _logger.LogDebug(ex, "Closing the previous media source failed");
+            StopDeckNoLock(_active, source);
         }
     }
 
@@ -1624,8 +1870,10 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
     private void RestartNoLock()
     {
+        CutFadeNoLock("restart");
         _ended = false;
-        _player.PlaybackSession.Position = TimeSpan.Zero;
+        _soughtIntoFade = false;
+        _active.Player.PlaybackSession.Position = TimeSpan.Zero;
         var duration = DurationNoLock();
         Post(() =>
         {
@@ -1650,7 +1898,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
 
         try
         {
-            return _player.PlaybackSession.Position;
+            return _active.Player.PlaybackSession.Position;
         }
         catch (COMException)
         {
@@ -1669,7 +1917,7 @@ public sealed class MediaPlayerService : IPlayer, IDisposable
         {
             try
             {
-                var natural = _player.PlaybackSession.NaturalDuration;
+                var natural = _active.Player.PlaybackSession.NaturalDuration;
                 if (natural > TimeSpan.Zero)
                 {
                     return natural;

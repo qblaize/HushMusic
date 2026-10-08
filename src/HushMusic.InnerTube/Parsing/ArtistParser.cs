@@ -95,7 +95,7 @@ internal static class ArtistParser
     /// <summary>
     /// The artist's full discography grid, <c>browse {"browseId": "MPAD...", "params"}</c> taken from a section's
     /// <see cref="Shelf.MoreBrowseId"/>/<see cref="Shelf.MoreParams"/> (ytmusicapi get_artist_albums / parse_albums).
-    /// Continuation responses use <c>continuationContents.gridContinuation</c>, see <see cref="LibraryParser.ParseAlbumsContinuation"/>.
+    /// Long discographies continue in <see cref="ParseDiscographyContinuation"/>.
     /// </summary>
     public static Paged<Album> ParseDiscography(JsonNode response, ILogger logger)
     {
@@ -112,5 +112,20 @@ internal static class ArtistParser
         }
 
         return new Paged<Album>(LibraryParser.ParseAlbumCards(items, scope), Continuations.Classic(grid));
+    }
+
+    /// <summary>Next page of a discography grid: <c>continuationContents.gridContinuation</c> (ytmusicapi get_continuations).</summary>
+    public static Paged<Album> ParseDiscographyContinuation(JsonNode response, ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        var scope = new ParseScope(logger, "ArtistDiscography");
+
+        if (response.Obj("continuationContents", "gridContinuation") is not { } grid)
+        {
+            scope.MissingStructure("continuationContents.gridContinuation");
+            return Paged<Album>.Empty;
+        }
+
+        return new Paged<Album>(LibraryParser.ParseAlbumCards(grid.Arr("items"), scope), Continuations.Classic(grid));
     }
 }

@@ -20,6 +20,7 @@ internal static class PageServiceRegistration
         services.AddSingleton<IRecentSearches, RecentSearches>();
         services.AddSingleton<IPlaylistDropTarget, PlaylistDropTarget>();
         services.AddSingleton<IStationLogos, StationLogos>();
+        services.AddSingleton<IConfirmDialogService, ConfirmDialogService>();
         services.AddSingleton<PageServices>();
 
         Register<HomePage, HomeViewModel>(PageKey.Home);
@@ -32,6 +33,10 @@ internal static class PageServiceRegistration
         Register<ArtistDetailPage, ArtistViewModel>(PageKey.Artist);
         Register<PlaylistDetailPage, PlaylistViewModel>(PageKey.Playlist);
         Register<RadioPage, RadioViewModel>(PageKey.Radio);
+        Register<ExplorePage, ExploreViewModel>(PageKey.Explore);
+        Register<ExploreCategoryPage, ExploreCategoryViewModel>(PageKey.ExploreCategory);
+        Register<ArtistDiscographyPage, ArtistDiscographyViewModel>(PageKey.ArtistDiscography);
+        Register<StatsPage, StatsViewModel>(PageKey.Stats);
 
         return services;
 

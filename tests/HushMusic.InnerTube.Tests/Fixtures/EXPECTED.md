@@ -33,6 +33,15 @@ Conventions: `null` = ytmusicapi returned `None`. Paths like `tracks[0].title` r
 | `player.json` | 2,749 | `get_song('hpSrLjc5SMs')` (response trimmed, see below) |
 | `player_error.json` | 337 | `get_song('xxxxxxxxxxx')` (no such video; trimmed) |
 | `player_login_required.json` | 1,760 | `get_song('6kLq3WMV1nU')` (age-restricted; trimmed) |
+| `explore.json` | 599,128 | `get_explore()` (captured 2026-10-08, like every row below) |
+| `mood_categories.json` | 14,852 | `get_mood_categories()` |
+| `mood_playlists.json` | 213,441 | `get_mood_playlists('ggMPOg1uX3NmUVV4Vzl3WGQ0')` ("Gaming") |
+| `genre_playlists.json` | 262,402 | `get_mood_playlists('ggMPOg1uX2NXUkgxdW0zUHJp')` ("Blues"; trimmed; ytmusicapi raises, see below) |
+| `charts_us.json` | 624,529 | `get_charts('US')` |
+| `artist_albums_paged.json` | 115,538 | `get_artist_albums('MPADUCuA3IbLtd-mMVPH5gm16tWQ', 'ggMIegYIARoCAQI%3D', limit=None)` (first page; trimmed) |
+| `artist_albums_continuation.json` | 83,468 | same call -> 1st `get_continuations(..., 'gridContinuation')` (trimmed) |
+| `new_releases_albums.json` | 106,015 | no ytmusicapi call: `browse {"browseId": "FEmusic_new_releases_albums"}` (trimmed) |
+| `new_releases_videos.json` | 93,711 | no ytmusicapi call: `browse {"browseId": "FEmusic_new_releases_videos"}` (trimmed) |
 
 ## home.json
 
@@ -276,6 +285,74 @@ Conventions: `null` = ytmusicapi returned `None`. Paths like `tracks[0].title` r
   1. player.json: playabilityStatus `OK`; `playerConfig.audioConfig` = {loudnessDb -1.0799999, perceptualLoudnessDb -8.08, trackAbsoluteLoudnessLkfs -8.08, loudnessTargetLkfs -7, ...}. In all 6 playable tracks probed, loudnessDb == perceptualLoudnessDb - loudnessTargetLkfs.
   2. player_error.json: playabilityStatus `ERROR` "Video unavailable", no `playerConfig`.
   3. player_login_required.json: playabilityStatus `LOGIN_REQUIRED` "Sign in to confirm your age", no `playerConfig` (anonymous requests get no loudness for age-restricted tracks).
+
+## explore.json
+
+- Request: `POST browse` body `{"browseId": "FEmusic_explore"}` — client `WEB_REMIX` `1.20261008.01.00` hl=`en` gl=`US`
+- Parser: `get_explore` (each `musicCarouselShelfRenderer` is matched by its title's `browseEndpoint.browseId`).
+- Assertions:
+  1. Output keys: ["new_releases", "moods_and_genres", "trending", "new_videos"]. No `top_songs` (Premium accounts only) and no `top_episodes`. The first section is a `gridRenderer` of three `musicNavigationButtonRenderer` buttons (New releases, Charts, Moods & genres) without a title link; it is skipped.
+  2. new_releases: 24; [0] {"title": "Baiat de calitate", "browseId": "MPREb_5wKw5tSD0b4", "audioPlaylistId": "OLAK5uy_nso38RBAF9tirX0yMD7gWbA8ROpAb4bUM", "type": "Single", "artists": [{"id": "UCAkTuOHJleyE4lk-n_taf9A", "name": "Nicolae Guta"}], "isExplicit": false}, no `year`; [-1] "Copilărie plecată" MPREb_WKzMzIXY2Bb. type histogram {"Single": 17, "Album": 3, "EP": 4}; 2 explicit.
+  3. moods_and_genres: 36; [0] {"title": "Chill", "params": "ggMPOg1uX1JOQWZFeDByc2Jm"}, [-1] {"title": "Soundtracks & musicals", "params": "ggMPOg1uX2tWZXBsRm05cHNR"}. Not read by ytmusicapi: every button has `solid.leftStripeColor` (Chill `4288988671` = `0xFFA4C5FF`).
+  4. trending: playlist `VLOLAK5uy_lcrATJDe23r1ypBltst3R6P7UTJSPdNas`, 20 items; [0] {"title": "Luis Gabriel & @Haziran - Inimă fără noroc ❤️‍🩹 Official Video", "videoId": "Mts930Jx-3M", "videoType": "MUSIC_VIDEO_TYPE_OMV", "playlistId": "OLAK5uy_lcrATJDe23r1ypBltst3R6P7UTJSPdNas", "artists": [{"name": "Luis Gabriel", "id": "UCW_mfs0btK6pzgvo9XBlunA"}], "album": null, "views": "4.4M", "isExplicit": false}. videoType histogram {"MUSIC_VIDEO_TYPE_OMV": 16, "MUSIC_VIDEO_TYPE_UGC": 2, "MUSIC_VIDEO_TYPE_ATV": 2}. ytmusicapi doesn't read the ranking here, but every row has `customIndexColumn.musicCustomIndexColumnRenderer.text` "1".."20" and no trend icon.
+  5. new_videos: 24; [0] {"title": "No Era Para Mí | FireVolk", "videoId": "0lXbg9H42jc", "artists": [{"name": "FireVolk", "id": "UCCTAmJyy3lwopWTqkZGNXXw"}], "playlistId": null, "views": "23K"}; [-1] "Vulnerability (Therapy Session)" 1dG0ZrccYSI. One card is a video uploaded as an episode: its title links to `MPED...` (`MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE`) and its videoId comes from the menu's `queueAddEndpoint`.
+
+## mood_categories.json
+
+- Request: `POST browse` body `{"browseId": "FEmusic_moods_and_genres"}`
+- Parser: `get_mood_categories` (`gridRenderer.header.gridHeaderRenderer.title` + `gridRenderer.items[*].musicNavigationButtonRenderer`).
+- Assertions:
+  1. {"Moods & moments": 12, "Genres": 24}; "Moods & moments"[0] {"title": "Chill", "params": "ggMPOg1uX1JOQWZFeDByc2Jm"}; "Genres"[-1] {"title": "Soundtracks & musicals", "params": "ggMPOg1uX2tWZXBsRm05cHNR"}.
+  2. Gaming = `ggMPOg1uX3NmUVV4Vzl3WGQ0` (mood_playlists.json), Blues = `ggMPOg1uX2NXUkgxdW0zUHJp` (genre_playlists.json).
+
+## mood_playlists.json
+
+- Request: `POST browse` body `{"browseId": "FEmusic_moods_and_genres_category", "params": "ggMPOg1uX3NmUVV4Vzl3WGQ0"}`
+- Parser: `get_mood_playlists` (every `gridRenderer` / `musicCarouselShelfRenderer` / `musicImmersiveCarouselShelfRenderer` section, `parse_content_list(..., parse_playlist)`).
+- Assertions:
+  1. 27 playlists; [0] {"title": "Gaming Hits", "playlistId": "RDCLAK5uy_n9PTezEY6LrODsz6rl2KDtFzC9e5Qzz9Y", "description": "Playlist • YouTube Music"}; [-1] {"title": "Chrono Series", "playlistId": "RDCLAK5uy_nShleEbyK-5JU7DmyatrGQZMpvEDT6kEA"}.
+  2. Three carousels: "Popular gaming playlists", "Gaming moods", "Gaming soundtracks". Not read by ytmusicapi: each title links to a narrower category, `FEmusic_moods_and_genres_category` with params `ggMPOg1uX0p6MXdTVWFSTDF2`, `ggMPOg1uX3ZkSWhLVWtNazhY`, `ggMPOg1uX0xxQVJ1Q0sxa2Za`. `header.musicHeaderRenderer.title` is "Gaming".
+
+## genre_playlists.json
+
+- Request: `POST browse` body `{"browseId": "FEmusic_moods_and_genres_category", "params": "ggMPOg1uX2NXUkgxdW0zUHJp"}`
+- Saved trimmed: every carousel cut to its first 6 items (the response was 1.9 MB); nothing else changed.
+- Parser: `get_mood_playlists` **raises** `KeyError: Unable to find 'navigationEndpoint' ...` on the first "Music videos" card: video cards have no title link, and `parse_playlist` reads `title.runs[0].navigationEndpoint.browseEndpoint.browseId` unconditionally. Every genre page captured on 2026-10-08 fails the same way; mood pages work.
+- Values from ytmusicapi's parsers run per carousel:
+  1. Carousels: "Songs" (musicResponsiveListItemRenderer), "Featured playlists", "Community playlists", "Music videos", "Albums" (musicTwoRowItemRenderer); `header.musicHeaderRenderer.title` "Blues"; no carousel has a title link.
+  2. `parse_playlist`: "Featured playlists"[0] {"title": "Blues Instrumentals", "playlistId": "RDCLAK5uy_m-qCrzwr92eguM1Hqshp9oBI1Uf4u7SxE"}; "Community playlists"[0] {"title": "Heavy Blues", "playlistId": "PLcqbs9CFq_XR8oTqZeBF4hycFv5Fbr65t", "description": "Playlist • Yuan Pétermann • 1.9K views"}.
+  3. `parse_playlist` on "Albums"[0] returns playlistId `REb_8O9DKJkYQOs`: it strips two characters off the album browseId `MPREb_8O9DKJkYQOs` ("Blondu De La Timisoara Best Of").
+  4. "Songs"[0]: "Am Facut De Toate In Viata", videoId `TJ8cLT7HRaw`, artist "Octavian Nelutu". "Music videos"[0]: videoId `KB_VN04LAvA`, subtitle "Eric Clapton's Crossroads Guitar Festival • 3.1M views".
+
+## charts_us.json
+
+- Request: `POST browse` body `{"browseId": "FEmusic_charts", "formData": {"selectedValues": ["US"]}}`
+- Parser: `get_charts` (country menu in `sectionListRenderer.contents[0].musicShelfRenderer.subheaders[0]`, codes in `frameworkUpdates.entityBatchUpdate.mutations[*].payload.musicFormBooleanChoice.opaqueToken`, carousels recognised by their first item).
+- Assertions:
+  1. countries.selected {"text": "United States"}; 69 options, ["RO", "ZZ", "AR", ...], last "ZW".
+  2. Output keys ["countries", "videos", "genres", "artists"]. Carousel titles on the page: "Video charts", "Genres", "Top artists", "Weekly top podcast shows" (also list rows; only the first list carousel is the artist chart).
+  3. videos: 4; [0] {"title": "Top 100 Live Performances - United States", "playlistId": "PL4fGSI1pDJn4yCNzulPkUbxgr4pl0gmI-"}; [-1] {"title": "Top 100 Music Videos United States", "playlistId": "PL4fGSI1pDJn69On1f-8NAvX_CYlx7QyZc"}.
+  4. genres: 8; [0] {"title": "Top 50 Jazz Music Videos United States", "playlistId": "PL4fGSI1pDJn7Wkr6Ll6ds1AhA42rT8uaU"}; [-1] {"title": "Top 50 Dance & Electronic Music Videos United States", "playlistId": "PL4fGSI1pDJn4rBU0RHnR6-b1_uE20CzRH"}.
+  5. artists: 40, ranked although anonymous (ytmusicapi's docstring says signed-out artists are unranked); [0] {"title": "Drake", "browseId": "UCU6cE7pdJPc6DU2jSrKEsdQ", "subscribers": "33.2M", "rank": "1", "trend": "neutral"}; [-1] {"title": "2Pac", "browseId": "UC5RrGzC-JXglhFW5NhT4r6w", "subscribers": "9.68M", "rank": "40"}. Trend histogram {neutral: 15, down: 15, up: 10}.
+
+## artist_albums_paged.json, artist_albums_continuation.json
+
+- Requests: `POST browse` body `{"browseId": "MPADUCuA3IbLtd-mMVPH5gm16tWQ", "params": "ggMIegYIARoCAQI%3D"}` (Buckethead's "Albums" link), then the same body with `&ctoken=<T>&continuation=<T>`, T = the first page's `gridRenderer.continuations[0].nextContinuationData.continuation` (510 characters).
+- Saved trimmed: the first page's grid cut from 100 to 12 items and the continuation's from 83 to 10; the tokens are untouched.
+- Parser: `get_artist_albums(..., limit=None)` -> `parse_albums` on `gridRenderer.items`, then on `continuationContents.gridContinuation.items`.
+- Assertions (on the trimmed files: 22 albums):
+  1. [0] {"browseId": "MPREb_6bPc0A9DwcT", "playlistId": "OLAK5uy_mxtestrrBFzzC7aHEAhgbNy9M-xLkhALM", "title": "Metal Health", "type": "Album", "year": "2026"}.
+  2. [12] (first of the continuation) {"browseId": "MPREb_p2YqUdkViLz", "playlistId": "OLAK5uy_mR0m7KbScz1IehzCtElXryO-KqrxBD7p4", "title": "Pilot", "type": "Album", "year": "2014"}.
+  3. [-1] {"browseId": "MPREb_iSC6YwnELmA", "playlistId": "OLAK5uy_l7e-juyk5T6FgN4-diEj2YkCo0L8axmUg", "title": "Infinity Hill", "type": "Album", "year": "2014"}.
+  4. All 22 are type "Album". The continuation has no `continuations` (last page).
+
+## new_releases_albums.json, new_releases_videos.json
+
+- Requests: `POST browse` body `{"browseId": "FEmusic_new_releases_albums"}` and `{"browseId": "FEmusic_new_releases_videos"}`: the browse ids behind the "More" buttons of explore.json's "New albums & singles" and "New music videos". ytmusicapi has no function for them.
+- Saved trimmed: the single `gridRenderer` cut from 95 (albums) and 100 (videos) items to 12.
+- Values from ytmusicapi's parsers on `contents...sectionListRenderer.contents[0].gridRenderer.items`; `header.musicHeaderRenderer.title` is "Albums & singles" and "Music videos":
+  1. `parse_albums`: [0] {"browseId": "MPREb_s0eoZK0Jo7o", "playlistId": "OLAK5uy_movCFF1W7iA0Sj3-si3Q9tCuCCU9x8K2E", "title": "BAIXO SONICO", "type": "EP", "artists": [{"name": "SEKIMANE", "id": "UCiPh9nI38w1389qtuOG76SA"}, {"name": "ZMAJOR", "id": "UC2BbaDDLKosyVhEvKsqwwZA"}, {"name": "Prey", "id": "UC8sYELn38asKLH68WXWDuTg"}]}; [-1] {"browseId": "MPREb_F37zRNywFdE", "title": "Umbrella", "type": "Album"}.
+  2. `parse_content_list(..., parse_video)`: [0] {"title": "No Era Para Mí | FireVolk", "videoId": "0lXbg9H42jc", "artists": [{"name": "FireVolk", "id": "UCCTAmJyy3lwopWTqkZGNXXw"}], "views": "23K"}; [-1] {"title": "Estoy Mejor Sin Ti", "videoId": "kinvmwNfAt0", "artists": [{"name": "FireVolk", "id": "UCweU4ua1zvliFuBO9gdPnbw"}], "views": "26K"}. [7] is the episode-style video (title link `MPEDYfjXn0Q2PhY`, videoId `YfjXn0Q2PhY` from the menu).
 
 ## Not captured (auth required)
 

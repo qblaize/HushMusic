@@ -13,15 +13,60 @@
     Unloaded="OnUnloaded">
 
     <Grid Height="{StaticResource RowHeight}" Background="Transparent">
-        <!-- Flat rounded hover fill; the row pads its content by 8 so the fill reaches past the text. -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Flat rounded selection wash and hover fill; the row pads its content by 8 so they reach past the text. -->
+        <Border
+            x:Name="SelectedFill"
+            Grid.ColumnSpan="2"
+            Background="{ThemeResource AccentTintBrush}"
+            CornerRadius="{StaticResource RadiusSmall}"
+            IsHitTestVisible="False"
+            Visibility="Collapsed" />
         <Border
             x:Name="HoverFill"
+            Grid.ColumnSpan="2"
             Background="{ThemeResource HoverFillBrush}"
             CornerRadius="{StaticResource RadiusSmall}"
             IsHitTestVisible="False"
             Opacity="0" />
 
+        <!-- Select mode: a check mark before the row (created the first time a list enters select mode). -->
+        <Button
+            x:Name="SelectCheck"
+            Margin="8,0,0,0"
+            VerticalAlignment="Center"
+            x:Load="False"
+            AutomationProperties.Name="Select"
+            Click="OnSelectCheckClick"
+            IsTabStop="False"
+            Style="{StaticResource RowIconButtonStyle}"
+            Visibility="Collapsed">
+            <Grid Width="20" Height="20">
+                <Border
+                    x:Name="CheckRing"
+                    BorderBrush="{ThemeResource TextTertiaryBrush}"
+                    BorderThickness="1.5"
+                    CornerRadius="{StaticResource RadiusPill}" />
+                <Border
+                    x:Name="CheckFill"
+                    Background="{StaticResource AccentBrush}"
+                    CornerRadius="{StaticResource RadiusPill}"
+                    Visibility="Collapsed">
+                    <FontIcon
+                        FontSize="11"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource AccentForegroundBrush}"
+                        Glyph="&#xE73E;" />
+                </Border>
+            </Grid>
+        </Button>
+
         <Grid
+            Grid.Column="1"
             Padding="8,0"
             ColumnSpacing="12"
             Opacity="{x:Bind items:ItemFormat.AvailabilityOpacity(CurrentTrack), Mode=OneWay}">
@@ -111,9 +156,10 @@
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 Style="{StaticResource SubheadStyle}">
+                <!--  A Hyperlink resolves theme brushes against the app's start-up theme, not the window's: take the TextBlock's.  -->
                 <Hyperlink
                     Click="OnAlbumClick"
-                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    Foreground="{x:Bind AlbumText.Foreground, Mode=OneWay}"
                     IsTabStop="False"
                     UnderlineStyle="None">
                     <Run Text="{x:Bind items:ItemFormat.AlbumName(CurrentTrack), Mode=OneWay}" />
@@ -180,6 +226,23 @@
                     <VisualState.Setters>
                         <Setter Target="LikeGlyph.Glyph" Value="&#xEB52;" />
                         <Setter Target="LikeGlyph.Foreground" Value="{ThemeResource AccentTextBrush}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+            <!-- Select mode (SelectCheck is loaded before these apply). -->
+            <VisualStateGroup x:Name="SelectionStates">
+                <VisualState x:Name="NotSelectable" />
+                <VisualState x:Name="Selectable">
+                    <VisualState.Setters>
+                        <Setter Target="SelectCheck.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Selected">
+                    <VisualState.Setters>
+                        <Setter Target="SelectCheck.Visibility" Value="Visible" />
+                        <Setter Target="CheckRing.Visibility" Value="Collapsed" />
+                        <Setter Target="CheckFill.Visibility" Value="Visible" />
+                        <Setter Target="SelectedFill.Visibility" Value="Visible" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>

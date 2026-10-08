@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.Pages.ArtistDiscographyPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- The artist's name over the section's title ("Singles & EPs"). -->
+        <StackPanel Padding="40,28,40,12" Spacing="2">
+            <TextBlock
+                Style="{StaticResource EyebrowStyle}"
+                Text="{x:Bind items:ItemFormat.Upper(ViewModel.ArtistName), Mode=OneWay}"
+                Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.ArtistName), Mode=OneWay}" />
+            <TextBlock
+                AutomationProperties.HeadingLevel="Level1"
+                Style="{StaticResource PageTitleStyle}"
+                Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+        </StackPanel>
+
+        <GridView
+            Grid.Row="1"
+            Padding="{StaticResource GridPagePadding}"
+            IsItemClickEnabled="True"
+            ItemClick="OnItemClick"
+            ItemContainerStyle="{StaticResource CardGridItemContainerStyle}"
+            ItemTemplate="{StaticResource SquareCardTemplate}"
+            ItemsSource="{x:Bind ViewModel.Albums}"
+            SelectionMode="None"
+            items:Reveal.IsShown="{x:Bind ViewModel.HasContent, Mode=OneWay}">
+            <GridView.Footer>
+                <!-- The next page of a long discography is on its way. -->
+                <items:Skeleton Padding="0,0,20,0" Visibility="{x:Bind ViewModel.Albums.IsLoading, Mode=OneWay}">
+                    <items:SkeletonCards Count="6" />
+                </items:Skeleton>
+            </GridView.Footer>
+        </GridView>
+
+        <items:Skeleton
+            Grid.Row="1"
+            Padding="40,12,20,0"
+            Visibility="{x:Bind ViewModel.ShowLoading, Mode=OneWay}">
+            <items:SkeletonCards Count="12" IsGrid="True" />
+        </items:Skeleton>
+
+        <ProgressBar
+            Grid.Row="1"
+            Style="{StaticResource BusyBarStyle}"
+            Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            Glyph="&#xE93C;"
+            Heading="Nothing here yet"
+            Message="YouTube Music didn't return any releases for this artist."
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            ActionText="Try again"
+            Command="{x:Bind ViewModel.RetryCommand}"
+            Glyph="&#xE783;"
+            Heading="Couldn't load this discography"
+            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.ShowError, Mode=OneWay}" />
+    </Grid>
+</Page>

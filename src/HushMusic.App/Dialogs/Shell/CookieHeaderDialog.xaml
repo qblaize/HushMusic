@@ -39,22 +39,22 @@
             <Border Padding="14,12" Background="{ThemeResource Surface2Brush}" CornerRadius="{StaticResource RadiusMedium}">
                 <StackPanel Spacing="8">
                     <TextBlock Style="{StaticResource BodyTextBlockStyle}">
-                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="1" />
+                        <Run FontWeight="SemiBold" Text="1" />
                         <Run Text="  Open music.youtube.com in your browser and make sure you're signed in." />
                     </TextBlock>
                     <TextBlock Style="{StaticResource BodyTextBlockStyle}">
-                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="2" />
+                        <Run FontWeight="SemiBold" Text="2" />
                         <Run Text="  Press F12, open the Network tab and reload the page." />
                     </TextBlock>
                     <TextBlock Style="{StaticResource BodyTextBlockStyle}">
-                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="3" />
+                        <Run FontWeight="SemiBold" Text="3" />
                         <Run Text="  Select a request to music.youtube.com (for example" />
                         <Run FontFamily="Consolas" Text="browse" /><Run Text="), find" />
                         <Run FontFamily="Consolas" Text="cookie" />
                         <Run Text="under Request Headers and copy its whole value." />
                     </TextBlock>
                     <TextBlock Style="{StaticResource BodyTextBlockStyle}">
-                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="4" />
+                        <Run FontWeight="SemiBold" Text="4" />
                         <Run Text="  Paste it below." />
                     </TextBlock>
                 </StackPanel>

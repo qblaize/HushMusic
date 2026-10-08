@@ -64,6 +64,9 @@ internal sealed class FakePlayer : IPlayer
 
     public void RaiseTrackStarted(Track track) => TrackStarted?.Invoke(this, new TrackChangedEventArgs(track, QueueItem.Create(track)));
 
+    /// <summary>Audio started for this exact queue item (features that compare item ids).</summary>
+    public void RaiseTrackStarted(QueueItem item) => TrackStarted?.Invoke(this, new TrackChangedEventArgs(item.Track, item));
+
     public void RaiseTrackChanged(Track? track) => TrackChanged?.Invoke(this, new TrackChangedEventArgs(track, track is null ? null : QueueItem.Create(track)));
 
     /// <summary>Like the real player: a pending <see cref="PauseAtEndOfTrack"/> is consumed before TrackCompleted is raised.</summary>
@@ -220,6 +223,9 @@ internal sealed class FakeBrowseApi : IBrowseApi
 
     public Task<ArtistPage> GetArtistAsync(string channelId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+    public Task<Paged<Album>> GetArtistAlbumsAsync(string browseId, string? browseParams, string? continuation = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public Task<PlaylistPage> GetPlaylistAsync(string playlistId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task<Paged<Track>> GetPlaylistTracksAsync(string continuation, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -298,9 +304,11 @@ internal sealed class FakeAccountApi : IAccountApi
 
     public Task<string> CreatePlaylistAsync(string title, string? description, PrivacyStatus privacy, IReadOnlyList<string>? videoIds = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task AddPlaylistItemsAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<PlaylistEntryRef>> AddPlaylistItemsAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task RemovePlaylistItemsAsync(string playlistId, IReadOnlyList<Track> tracks, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task MovePlaylistItemAsync(string playlistId, string setVideoId, string? successorSetVideoId = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task EditPlaylistAsync(string playlistId, string? title = null, string? description = null, PrivacyStatus? privacy = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 

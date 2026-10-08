@@ -1,12 +1,14 @@
 using System.ComponentModel;
 using System.Numerics;
 using Microsoft.UI.Composition;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.UI.ViewManagement;
 using HushMusic.App.Controls.Items;
+using HushMusic.App.Controls.RadioMatch;
 using HushMusic.App.ViewModels.NowPlaying;
 
 namespace HushMusic.App.Controls.NowPlaying;
@@ -384,6 +386,14 @@ public sealed partial class NowPlayingView : UserControl
         var overhang = Math.Max(0, Math.Floor((area.Width - PlayerStack.Width) / 2));
         Covers.Height = art;
         Covers.Margin = new Thickness(-overhang, 0, -overhang, 0);
+    }
+
+    private void OnTitleClick(object sender, RoutedEventArgs e)
+    {
+        if (!RadioMatchFlyout.TryShowOnAir(TitleButton, ViewModel.Player, FlyoutPlacementMode.TopEdgeAlignedLeft))
+        {
+            ViewModel.Close();
+        }
     }
 
     private void OnMoreClick(object sender, RoutedEventArgs e)

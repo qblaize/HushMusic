@@ -25,6 +25,18 @@ public enum PageKey
 
     /// <summary>Live internet radio: genres, favourites, directory search.</summary>
     Radio,
+
+    /// <summary>Moods &amp; genres, charts and new releases.</summary>
+    Explore,
+
+    /// <summary>Parameter: the category to show (moods/genres playlists, a chart, new releases).</summary>
+    ExploreCategory,
+
+    /// <summary>Parameter: the artist's albums / singles / videos "See all" request.</summary>
+    ArtistDiscography,
+
+    /// <summary>Local listening statistics.</summary>
+    Stats,
 }
 
 /// <summary>Maps <see cref="PageKey"/> to page types. Filled by the Shell/Page service registrations.</summary>

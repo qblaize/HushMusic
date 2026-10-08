@@ -57,4 +57,7 @@ internal interface ITaskbarWidgetSink
 
     /// <summary>The cover is drawn at this many pixels now (DPI change); the art should be decoded at that size.</summary>
     void OnCoverSizeChanged(int pixels);
+
+    /// <summary>Displays were added, removed or rearranged (WM_DISPLAYCHANGE).</summary>
+    void OnDisplaysChanged();
 }

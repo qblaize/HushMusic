@@ -10,15 +10,19 @@ using HushMusic.Core.Services;
 namespace HushMusic.App.Services.Windowing.TaskbarWidget;
 
 /// <summary>
-/// The taskbar player (Settings → Window → "Show player on the taskbar"): runs <see cref="TaskbarWidgetWindow"/> while
-/// the setting is on, feeds it snapshots of <see cref="PlayerViewModel"/> (the player bar's state, so volume changes are
-/// saved and shown everywhere), carries out its commands and owns its flyout. UI thread, except the
-/// <see cref="ITaskbarWidgetSink"/> callbacks, which only queue work for it.
+/// The taskbar player (Settings → Window → "Show player on the taskbar"): runs a <see cref="TaskbarWidgetWindow"/> on
+/// each taskbar the "Taskbar player on" setting picks (the main one, all, or one display's) while the setting is on,
+/// feeds them snapshots of <see cref="PlayerViewModel"/> (the player bar's state, so volume changes are saved and shown
+/// everywhere), carries out their commands and owns the flyout. UI thread, except the <see cref="ITaskbarWidgetSink"/>
+/// callbacks, which only queue work for it.
 /// </summary>
-public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
+public sealed class TaskbarPlayerService : IDisposable
 {
     private const int ArtThumbnailWidth = 120;
     private static readonly long ProgressIntervalTicks = TimeSpan.FromSeconds(1).Ticks;
+
+    // Displays settle (and their taskbars appear) a moment after WM_DISPLAYCHANGE.
+    private static readonly TimeSpan DisplaySettleDelay = TimeSpan.FromSeconds(1.5);
 
     private readonly PlayerViewModel _player;
     private readonly ISettingsService _settings;
@@ -29,14 +33,20 @@ public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
     private readonly ILogger<TaskbarPlayerService> _logger;
     private readonly bool _testInstance = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_BACKGROUND") == "1";
 
-    private TaskbarWidgetWindow? _widget;
+    // One per taskbar, keyed by display device name ("" for the main taskbar).
+    private readonly Dictionary<string, Widget> _widgets = new(StringComparer.OrdinalIgnoreCase);
+
+    // The cover decoded at each size a widget draws it (taskbars on displays with different scaling differ).
+    private readonly Dictionary<int, WidgetArt> _art = [];
+    private readonly HashSet<int> _artLoading = [];
     private TaskbarFlyoutWindow? _flyout;
+    private TaskbarWidgetAnchor? _flyoutAnchor;
     private Action? _showMainWindow;
-    private WidgetArt? _art;
+    private string? _artUrl;
     private CancellationTokenSource? _artCts;
-    private int _coverSize = 32;
     private long _lastProgressTicks;
     private double? _sentProgress;
+    private int _displayCheckPending;
     private bool _attached;
     private bool _disposed;
 
@@ -129,37 +139,74 @@ public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
 
         _artCts?.Cancel();
 
-        // Waits briefly so the player is off the taskbar before the process ends.
-        _widget?.Dispose(TimeSpan.FromMilliseconds(500));
-        _widget = null;
+        // Asks every widget to go first, then waits briefly so they are all off the taskbars before the process ends.
+        foreach (var widget in _widgets.Values)
+        {
+            widget.Window.Dispose();
+        }
+
+        foreach (var widget in _widgets.Values)
+        {
+            widget.Window.Dispose(TimeSpan.FromMilliseconds(500));
+        }
+
+        _widgets.Clear();
 
         // A hidden window still counts as open and would keep the app running.
         _flyout?.CloseForGood();
         _flyout = null;
     }
 
-    // ===== ITaskbarWidgetSink (widget thread: queue and return) =====
+    /// <summary>The connected displays, for the "Taskbar player on" choice.</summary>
+    public static IReadOnlyList<DisplayInfo> Displays() => TaskbarWindows.Displays();
 
-    void ITaskbarWidgetSink.OnCommand(TaskbarWidgetCommand command) => _dispatcher.Run(() => Execute(command));
+    // ===== Widget callbacks, on the UI thread =====
 
-    void ITaskbarWidgetSink.OnVolumeNotches(int notches) => _dispatcher.Run(() =>
+    private void OnToggleFlyout(TaskbarWidgetAnchor anchor)
     {
-        _player.Volume = TaskbarWidgetLayout.StepVolume(_player.Volume, notches);
-    });
+        if (_disposed || _widgets.Count == 0)
+        {
+            return;
+        }
 
-    void ITaskbarWidgetSink.OnToggleFlyout(TaskbarWidgetAnchor anchor) => _dispatcher.Run(() =>
-    {
-        if (!_disposed && _widget is not null)
+        // A click on another taskbar's player opens the flyout there at once (the click itself just closed it).
+        var sameTaskbar = _flyoutAnchor is { } last && last.Taskbar == anchor.Taskbar;
+        _flyoutAnchor = anchor;
+        if (sameTaskbar)
         {
             Flyout.Toggle(anchor, activate: !_testInstance);
         }
-    });
+        else
+        {
+            Flyout.ShowAt(anchor, activate: !_testInstance);
+        }
+    }
 
-    void ITaskbarWidgetSink.OnCoverSizeChanged(int pixels) => _dispatcher.Run(() =>
+    private void OnCoverSizeChanged(Widget widget, int pixels)
     {
-        _coverSize = Math.Max(1, pixels);
-        LoadArt();
-    });
+        if (!_disposed && _widgets.ContainsValue(widget))
+        {
+            widget.CoverSize = Math.Max(1, pixels);
+            LoadArt();
+        }
+    }
+
+    // Any thread (every widget hears WM_DISPLAYCHANGE): one check, once the displays have settled.
+    private void OnDisplaysChanged()
+    {
+        if (Interlocked.Exchange(ref _displayCheckPending, 1) == 1)
+        {
+            return;
+        }
+
+        _ = Task.Delay(DisplaySettleDelay).ContinueWith(
+            _ => _dispatcher.Run(() =>
+            {
+                Volatile.Write(ref _displayCheckPending, 0);
+                Apply();
+            }),
+            TaskScheduler.Default);
+    }
 
     private TaskbarFlyoutWindow Flyout => _flyout ??= new TaskbarFlyoutWindow(_theme, _testInstance);
 
@@ -205,7 +252,7 @@ public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
 
     private void OnSettingsChanged(object? sender, EventArgs e) => _dispatcher.Run(Apply);
 
-    // Starts or stops the widget to match the setting (live, no restart).
+    // Starts and stops widgets to match the settings (live, no restart): one per chosen taskbar.
     private void Apply()
     {
         if (_disposed)
@@ -213,26 +260,53 @@ public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
             return;
         }
 
-        var wanted = _settings.Current.ShowTaskbarWidget && Allowed;
-        if (wanted && _widget is null)
+        var current = _settings.Current;
+        IReadOnlyList<string?> targets = [];
+        if (current.ShowTaskbarWidget && Allowed)
         {
-            _logger.LogInformation("Taskbar player on");
-            _sentProgress = null;
-            _widget = TaskbarWidgetWindow.Start(BuildState(), this, _logger);
-            LoadArt();
+            var choice = TaskbarDisplayChoice.Normalize(current.TaskbarWidgetDisplays);
+            targets = choice == TaskbarDisplayChoice.Primary ? [null] : TaskbarDisplayChoice.Targets(choice, Displays());
         }
-        else if (!wanted && _widget is not null)
+
+        var wanted = targets.ToDictionary(t => t ?? string.Empty, t => t, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, widget) in _widgets.ToList())
         {
-            _logger.LogInformation("Taskbar player off");
-            _widget.Dispose();
-            _widget = null;
+            if (!wanted.ContainsKey(key))
+            {
+                _logger.LogInformation("Taskbar player off ({Taskbar})", Describe(widget.Display));
+                widget.Window.Dispose();
+                _widgets.Remove(key);
+            }
+        }
+
+        foreach (var (key, display) in wanted)
+        {
+            if (!_widgets.ContainsKey(key))
+            {
+                _logger.LogInformation("Taskbar player on ({Taskbar})", Describe(display));
+                var widget = new Widget(this, display);
+                _widgets[key] = widget;
+                widget.Window = TaskbarWidgetWindow.Start(display, BuildState(widget.CoverSize), widget, _logger);
+                _sentProgress = null;
+            }
+        }
+
+        if (_widgets.Count == 0)
+        {
             _flyout?.Hide();
+            _flyoutAnchor = null;
+        }
+        else
+        {
+            LoadArt();
         }
     }
 
+    private static string Describe(string? display) => display is null ? "main taskbar" : TaskbarDisplayChoice.ShortName(display);
+
     private void OnPlayerPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (_widget is null)
+        if (_widgets.Count == 0)
         {
             return;
         }
@@ -264,18 +338,20 @@ public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
 
     private void Push()
     {
-        if (_widget is null)
+        if (_widgets.Count == 0)
         {
             return;
         }
 
-        var state = BuildState();
         _lastProgressTicks = DateTime.UtcNow.Ticks;
-        _sentProgress = state.Progress;
-        _widget.Update(state);
+        _sentProgress = Progress();
+        foreach (var widget in _widgets.Values)
+        {
+            widget.Window.Update(BuildState(widget.CoverSize));
+        }
     }
 
-    private TaskbarWidgetState BuildState()
+    private TaskbarWidgetState BuildState(int coverSize)
     {
         var track = _player.Track;
         if (track is null)
@@ -283,7 +359,7 @@ public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
             return TaskbarWidgetState.Empty with { Accent = ToArgb(_accent.Current), Volume = _player.Volume };
         }
 
-        var art = _art is { } loaded && loaded.Url == ArtUrl && loaded.Size == _coverSize ? loaded : null;
+        var art = _art.TryGetValue(coverSize, out var loaded) && loaded.Url == ArtUrl ? loaded : null;
         return new TaskbarWidgetState(
             HasTrack: true,
             Title: track.Title,
@@ -302,45 +378,80 @@ public sealed class TaskbarPlayerService : ITaskbarWidgetSink, IDisposable
 
     private static uint ToArgb(Color color) => ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
 
-    // Decodes the cover at the size the widget draws it (again after a DPI change), off the UI thread.
+    // Decodes the cover at each size a widget draws it (again after a DPI change), off the UI thread.
     private void LoadArt()
     {
-        if (_widget is null)
-        {
-            return;
-        }
-
         var url = ArtUrl;
-        var size = _coverSize;
-        if (url is null || (_art is { } current && current.Url == url && current.Size == size))
+        if (_widgets.Count == 0 || url is null)
         {
             return;
         }
 
-        _artCts?.Cancel();
-        var cts = new CancellationTokenSource();
-        _artCts = cts;
-        _ = Task.Run(async () =>
+        if (url != _artUrl || _artCts is null)
         {
-            try
+            _artCts?.Cancel();
+            _artCts = new CancellationTokenSource();
+            _artUrl = url;
+            _artLoading.Clear();
+        }
+
+        var cts = _artCts;
+        foreach (var size in _widgets.Values.Select(w => w.CoverSize).Distinct().ToList())
+        {
+            if ((_art.TryGetValue(size, out var current) && current.Url == url) || !_artLoading.Add(size))
             {
-                var art = await WidgetArtLoader.LoadAsync(_images, url, size, Math.Round(size / 8.0), cts.Token).ConfigureAwait(false);
-                _dispatcher.Run(() =>
+                continue;
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
                 {
-                    if (!cts.IsCancellationRequested)
+                    var art = await WidgetArtLoader.LoadAsync(_images, url, size, Math.Round(size / 8.0), cts.Token).ConfigureAwait(false);
+                    _dispatcher.Run(() =>
                     {
-                        _art = art;
-                        Push();
-                    }
-                });
-            }
-            catch (OperationCanceledException) when (cts.IsCancellationRequested)
-            {
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Could not load the taskbar player's cover from {Url}", url);
-            }
-        });
+                        if (!cts.IsCancellationRequested)
+                        {
+                            _artLoading.Remove(size);
+                            if (art is not null)
+                            {
+                                _art[size] = art;
+                            }
+
+                            Push();
+                        }
+                    });
+                }
+                catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                {
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Could not load the taskbar player's cover from {Url}", url);
+                }
+            });
+        }
+    }
+
+    /// <summary>One taskbar's player and its callbacks, which arrive on its widget thread: they queue the work and return.</summary>
+    private sealed class Widget(TaskbarPlayerService owner, string? display) : ITaskbarWidgetSink
+    {
+        /// <summary>Its display's device name, or null for the main taskbar.</summary>
+        public string? Display { get; } = display;
+
+        public TaskbarWidgetWindow Window { get; set; } = null!;
+
+        public int CoverSize { get; set; } = 32;
+
+        public void OnCommand(TaskbarWidgetCommand command) => owner._dispatcher.Run(() => owner.Execute(command));
+
+        public void OnVolumeNotches(int notches) => owner._dispatcher.Run(() =>
+            owner._player.Volume = TaskbarWidgetLayout.StepVolume(owner._player.Volume, notches));
+
+        public void OnToggleFlyout(TaskbarWidgetAnchor anchor) => owner._dispatcher.Run(() => owner.OnToggleFlyout(anchor));
+
+        public void OnCoverSizeChanged(int pixels) => owner._dispatcher.Run(() => owner.OnCoverSizeChanged(this, pixels));
+
+        public void OnDisplaysChanged() => owner.OnDisplaysChanged();
     }
 }

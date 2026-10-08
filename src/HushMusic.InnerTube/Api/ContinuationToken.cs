@@ -16,6 +16,7 @@ internal static class ContinuationScope
     public const string LibrarySongs = "library.songs";
     public const string LibraryAlbums = "library.albums";
     public const string LibraryArtists = "library.artists";
+    public const string ArtistAlbums = "artist.albums";
 }
 
 /// <summary>Decoded opaque continuation.</summary>

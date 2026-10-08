@@ -636,6 +636,22 @@ Several actions can be sent in one request; `edit_playlist` batches them.
 - `feedback`: library add/remove and history removal (`remove_history_items`, body `{"feedbackTokens": [...]}`).
 - `subscription/subscribe`: body `{"channelIds": ["<id>"]}`. `subscription/unsubscribe` takes the same body.
 
+### 6.9a Explore, moods & genres, charts, artist "See all"
+
+All `browse` requests, as in ytmusicapi:
+
+- `get_explore()`: `{"browseId": "FEmusic_explore"}`. New releases, trending (or "Top songs" for Premium), the mood tiles, top music videos and new videos.
+- `get_mood_categories()`: `{"browseId": "FEmusic_moods_and_genres"}`. Tile titles, their `params` and tint colours.
+- `get_mood_playlists(params)`: `{"browseId": "FEmusic_moods_and_genres_category", "params": <params>}`.
+- `get_charts(country)`: `{"browseId": "FEmusic_charts", "formData": {"selectedValues": [<country>]}}`. The country comes from Settings → Content country, else "ZZ" (global).
+- `get_artist_albums(channelId, params)`: browse with the shelf's "More" `browseId` and `params`, plus its continuation.
+
+Where the app goes further than ytmusicapi:
+
+- The two full new-release lists have no ytmusicapi call. The app follows the Explore page's own "More" links (`FEmusic_new_releases_albums`, `FEmusic_new_releases_videos`).
+- ytmusicapi's `get_mood_playlists` fails on genre pages that mix shelf types. The app keeps each section as a shelf and parses every card by its own type.
+- It also reads the trending rank and the tile colours.
+
 ### 6.10 `add_history_item`: the full flow
 
 **[ytm]** `mixins/library.py:add_history_item(song)` + `mixins/browsing.py:get_song(videoId, signatureTimestamp=None)`.

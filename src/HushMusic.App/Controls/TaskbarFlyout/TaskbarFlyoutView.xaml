@@ -312,10 +312,10 @@
                     Width="6"
                     Height="6"
                     VerticalAlignment="Center"
-                    Fill="{StaticResource AccentBrush}" />
+                    Fill="{ThemeResource AccentTextBrush}" />
                 <TextBlock
                     VerticalAlignment="Center"
-                    Foreground="{StaticResource AccentBrush}"
+                    Foreground="{ThemeResource AccentTextBrush}"
                     Style="{StaticResource EyebrowStyle}"
                     Text="LIVE" />
             </StackPanel>

@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Windows design: the ShellResources.xaml metrics and styles with the stock Windows 11 look. Merged right after
+    ShellResources.xaml (see DesignSystems). The rail reads as a compact NavigationView, the settings as Windows Settings
+    cards, the segmented controls as the Windows 11 segmented control.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:shell="using:HushMusic.App.Controls.Shell">
+
+    <!-- ===== Shell layout tokens ===== -->
+    <Thickness x:Key="PlayerBarMargin">8,0,8,8</Thickness>
+
+    <!-- ===== Sidebar rail: compact NavigationView items ===== -->
+    <!-- Selected: a subtle fill and the accent pill on the left edge; the icon keeps the text colour. -->
+    <Style x:Key="RailButtonStyle" TargetType="shell:RailButton">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="shell:RailButton">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <Border x:Name="SelectionFill" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Opacity="0" />
+                        <Grid x:Name="IconHost">
+                            <TextBlock
+                                x:Name="Icon"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AccessibilityView="Raw"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Foreground="{TemplateBinding Foreground}"
+                                Text="{TemplateBinding Glyph}" />
+                            <ContentPresenter
+                                x:Name="ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                AutomationProperties.AccessibilityView="Raw"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}" />
+                        </Grid>
+                        <Rectangle
+                            x:Name="SelectionPill"
+                            Width="3"
+                            Height="16"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Fill="{ThemeResource AccentFillColorDefaultBrush}"
+                            Opacity="0"
+                            RadiusX="1.5"
+                            RadiusY="1.5" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
+                                        <Setter Target="Icon.Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Icon.Foreground" Value="{ThemeResource TextFillColorDisabledBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="SelectionStates">
+                                <VisualState x:Name="Unselected" />
+                                <VisualState x:Name="Selected">
+                                    <VisualState.Setters>
+                                        <Setter Target="SelectionFill.Opacity" Value="1" />
+                                        <Setter Target="SelectionPill.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The rail's instant label, in the tooltip's type size. -->
+    <Style x:Key="RailTipTextStyle" BasedOn="{StaticResource AppTextBlockBaseStyle}" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- ===== Player bar ===== -->
+
+    <!-- Round play/pause: an accent button. -->
+    <Style x:Key="PlayButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AccentControlElevationBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="FontFamily" Value="{StaticResource SymbolThemeFontFamily}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="-3" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Padding="{TemplateBinding Padding}"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource AccentFillColorSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource AccentFillColorTertiaryBrush}" />
+                                        <Setter Target="Root.BorderBrush" Value="{ThemeResource ControlFillColorTransparentBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextOnAccentFillColorSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource AccentFillColorDisabledBrush}" />
+                                        <Setter Target="Root.BorderBrush" Value="{ThemeResource ControlFillColorTransparentBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextOnAccentFillColorDisabledBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Elapsed / remaining time: Caption, tabular figures so the digits don't jitter. -->
+    <Style x:Key="PlayerTimeTextStyle" BasedOn="{StaticResource FootnoteStyle}" TargetType="TextBlock">
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
+        <Setter Property="MinWidth" Value="36" />
+    </Style>
+
+    <!-- ===== Settings: one card per group, as in Windows Settings ===== -->
+    <Style x:Key="SettingsGroupStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusMedium}" />
+    </Style>
+
+    <Style x:Key="SettingsRowStyle" TargetType="Grid">
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="MinHeight" Value="64" />
+        <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+
+    <!-- Full-width dividers between the rows of a card. -->
+    <Style x:Key="SettingsSeparatorStyle" TargetType="Rectangle">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Fill" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+    </Style>
+
+    <Style x:Key="SettingsFooterStyle" BasedOn="{StaticResource FootnoteStyle}" TargetType="TextBlock">
+        <Setter Property="Margin" Value="2,8,2,0" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="TextTrimming" Value="None" />
+    </Style>
+
+    <Style x:Key="SettingsTextBoxStyle" BasedOn="{StaticResource DefaultTextBoxStyle}" TargetType="TextBox">
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="SettingsPasswordBoxStyle" BasedOn="{StaticResource DefaultPasswordBoxStyle}" TargetType="PasswordBox">
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        Settings segmented control (Theme: Light | Dark | Auto), as the Windows 11 segmented control: a recessed track with a
+        hairline, the selected segment raised on the control fill with the accent pill under its label. ToggleButtons kept
+        exclusive by SegmentedPicker; no implicit transitions (they crash during layout).
+    -->
+    <Style x:Key="SettingsSegmentedTrackStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource ControlAltFillColorSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="Padding" Value="2" />
+    </Style>
+
+    <Style x:Key="SettingsSegmentButtonStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource ControlFillColorTransparentBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="MinWidth" Value="64" />
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="-1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Margin="{TemplateBinding Padding}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <Rectangle
+                            x:Name="Pill"
+                            Width="16"
+                            Height="3"
+                            Margin="0,0,0,1"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Fill="{ThemeResource AccentFillColorDefaultBrush}"
+                            Opacity="0"
+                            RadiusX="1.5"
+                            RadiusY="1.5" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextFillColorDisabledBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+                                        <Setter Target="Root.BorderBrush" Value="{ThemeResource ControlElevationBorderBrush}" />
+                                        <Setter Target="Pill.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource ControlFillColorSecondaryBrush}" />
+                                        <Setter Target="Root.BorderBrush" Value="{ThemeResource ControlElevationBorderBrush}" />
+                                        <Setter Target="Pill.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource ControlFillColorTertiaryBrush}" />
+                                        <Setter Target="Root.BorderBrush" Value="{ThemeResource ControlElevationBorderBrush}" />
+                                        <Setter Target="Pill.Opacity" Value="1" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedDisabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource ControlFillColorDisabledBrush}" />
+                                        <Setter Target="Pill.Opacity" Value="1" />
+                                        <Setter Target="Pill.Fill" Value="{ThemeResource AccentFillColorDisabledBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextFillColorDisabledBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Indeterminate" />
+                                <VisualState x:Name="IndeterminatePointerOver" />
+                                <VisualState x:Name="IndeterminatePressed" />
+                                <VisualState x:Name="IndeterminateDisabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Side panel tabs (Up next | Lyrics | Related): the same segmented control, rounded to fit their pill track. -->
+    <Style x:Key="SegmentButtonStyle" BasedOn="{StaticResource SettingsSegmentButtonStyle}" TargetType="ToggleButton">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="CornerRadius" Value="14" />
+    </Style>
+</ResourceDictionary>

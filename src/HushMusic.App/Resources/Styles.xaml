@@ -76,7 +76,7 @@
         </Setter>
     </Style>
 
-    <!-- Icon toggle (shuffle, repeat, queue, lyrics): checked = accent colored with a soft accent fill. -->
+    <!-- Icon toggle (shuffle, repeat, queue, lyrics): checked = accent glyph (AccentTextBrush, so it also reads in Now Playing). -->
     <Style x:Key="IconToggleButtonStyle" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
@@ -128,25 +128,25 @@
                                 </VisualState>
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AccentTextBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPointerOver">
                                     <VisualState.Setters>
                                         <Setter Target="Root.Background" Value="{ThemeResource HoverFillBrush}" />
-                                        <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AccentTextBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPressed">
                                     <VisualState.Setters>
                                         <Setter Target="Root.Background" Value="{ThemeResource PressedFillBrush}" />
-                                        <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AccentTextBrush}" />
                                         <Setter Target="ContentPresenter.Opacity" Value="0.75" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedDisabled">
                                     <VisualState.Setters>
-                                        <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AccentTextBrush}" />
                                         <Setter Target="ContentPresenter.Opacity" Value="0.3" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -224,7 +224,7 @@
     <!-- Text-only action in accent color ("See all", "Show more"). -->
     <Style x:Key="TextActionButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource AccentTextBrush}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Padding" Value="6,4" />
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
@@ -287,7 +287,7 @@
 
     <!-- ===== Toggle switch: iOS / macOS ===== -->
     <!--
-        A 44 x 26 pill with a white 22 px knob: ON fills with AccentBrush (album art or preset), OFF with
+        A 44 x 26 pill with a white 22 px knob: ON fills with AccentBrush (album art, a preset or Windows), OFF with
         ToggleOffFillBrush. No On/Off text and no content column, so the control is exactly the switch (MinWidth 0) and
         right-aligns cleanly in settings rows. The knob slides with a slight spring and stretches toward its travel
         direction while pressed. Keeps the stock part names (SwitchKnobBounds, SwitchKnob, KnobTranslateTransform,

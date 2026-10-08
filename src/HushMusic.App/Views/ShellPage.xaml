@@ -8,7 +8,7 @@
     xmlns:np="using:HushMusic.App.Controls.NowPlaying"
     xmlns:shell="using:HushMusic.App.Controls.Shell"
     xmlns:vm="using:HushMusic.App.ViewModels"
-    Background="{ThemeResource AppBackgroundBrush}"
+    Background="{ThemeResource WindowBackgroundBrush}"
     FontFamily="{StaticResource AppFontFamily}"
     PreviewKeyDown="OnPreviewKeyDown"
     PreviewKeyUp="OnPreviewKeyUp">
@@ -28,13 +28,14 @@
             x:Name="BackgroundLayer"
             Grid.RowSpan="2"
             Grid.ColumnSpan="2"
-            Background="{ThemeResource AppBackgroundBrush}" />
+            Background="{ThemeResource WindowBackgroundBrush}" />
 
-        <!--  Ambient glow in the accent colour (see AmbientGlow).  -->
+        <!--  Ambient glow in the accent colour (see AmbientGlow); off in the Minimal player layout.  -->
         <shell:AmbientGlow
             x:Name="Glow"
             Grid.RowSpan="2"
-            Grid.ColumnSpan="2" />
+            Grid.ColumnSpan="2"
+            IsActive="{x:Bind ViewModel.Player.IsStandardLayout, Mode=OneWay}" />
 
         <!--  Draggable title band across the whole top edge (passed to Window.SetTitleBar).  -->
         <Grid
@@ -65,9 +66,24 @@
             x:Name="ContentArea"
             Grid.Row="1"
             Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
             <Frame x:Name="ContentFrame" Margin="{StaticResource ContentFrameMargin}" />
 
-            <controls:PlayerBar Margin="{StaticResource PlayerBarMargin}" VerticalAlignment="Bottom" />
+            <!--  Standard layout: the floating glass bar, over the pages (they scroll under it).  -->
+            <controls:PlayerBar
+                Margin="{StaticResource PlayerBarMargin}"
+                VerticalAlignment="Bottom"
+                Visibility="{x:Bind ViewModel.Player.IsStandardLayout, Mode=OneWay}" />
+
+            <!--  Minimal layout: docked in a row of its own, so the pages end above it. Created the first time it's needed.  -->
+            <controls:MinimalPlayerBar
+                x:Name="MinimalBar"
+                Grid.Row="1"
+                x:Load="False" />
         </Grid>
 
         <!--  Now Playing: a sheet over the pages and the player bar; the rail stays visible and usable.  -->

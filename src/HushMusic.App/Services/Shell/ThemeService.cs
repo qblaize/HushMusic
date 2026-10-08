@@ -123,7 +123,8 @@ public sealed class ThemeService(ISettingsService settings, IUiDispatcher dispat
         }
     }
 
-    // Caption buttons blend into the chrome: no fill, secondary glyphs, a faint hover fill.
+    // Hush: caption buttons blend into the chrome (no fill, secondary glyphs, a faint hover fill).
+    // Windows: the stock buttons for the theme, transparent over the Mica.
     private static void StyleCaptionButtons(AppWindowTitleBar titleBar, ElementTheme theme)
     {
         Color Get(string key, Color fallback) => ThemeResources.GetColor(key, theme, fallback);
@@ -133,6 +134,17 @@ public sealed class ThemeService(ISettingsService settings, IUiDispatcher dispat
         titleBar.PreferredTheme = light ? TitleBarTheme.Light : TitleBarTheme.Dark;
         titleBar.ButtonBackgroundColor = Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+        if (DesignSystems.IsWindowsActive)
+        {
+            titleBar.ButtonForegroundColor = null;
+            titleBar.ButtonInactiveForegroundColor = null;
+            titleBar.ButtonHoverBackgroundColor = null;
+            titleBar.ButtonHoverForegroundColor = null;
+            titleBar.ButtonPressedBackgroundColor = null;
+            titleBar.ButtonPressedForegroundColor = null;
+            return;
+        }
+
         titleBar.ButtonForegroundColor = Get("TextSecondaryColor", ColorHelper.FromArgb(0xFF, 0xA1, 0xA1, 0xA6));
         titleBar.ButtonInactiveForegroundColor = Get("TextTertiaryColor", ColorHelper.FromArgb(0xFF, 0x6E, 0x6E, 0x73));
 

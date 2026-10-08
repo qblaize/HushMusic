@@ -14,6 +14,9 @@ public static class AccentPresets
     /// <summary><see cref="Core.Abstractions.AppSettings.AccentStyle"/> value for "follow the album art".</summary>
     public const string Artwork = "Artwork";
 
+    /// <summary><see cref="Core.Abstractions.AppSettings.AccentStyle"/> value for "the Windows accent colour".</summary>
+    public const string System = "System";
+
     // Contrast as accent text: dark variants >= 5:1 on #0B0B0C, light variants >= 4.3:1 on #FFFFFF (and white text on them).
     public static IReadOnlyList<AccentPreset> All { get; } =
     [
@@ -24,9 +27,14 @@ public static class AccentPresets
         new("Iris", "Soft violet", Rgb(0x9D, 0x7B, 0xFA), Rgb(0x6D, 0x3F, 0xE0)),
     ];
 
-    /// <summary>Null for <see cref="Artwork"/> or an unknown name.</summary>
+    /// <summary>Null for <see cref="Artwork"/>, <see cref="System"/> or an unknown name.</summary>
     public static AccentPreset? Find(string? name) =>
         All.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    public static bool IsSystem(string? name) => string.Equals(name, System, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The stored value in its canonical spelling; anything unknown means <see cref="Artwork"/>.</summary>
+    public static string Normalize(string? name) => IsSystem(name) ? System : Find(name)?.Name ?? Artwork;
 
     private static Color Rgb(byte r, byte g, byte b) => ColorHelper.FromArgb(0xFF, r, g, b);
 }

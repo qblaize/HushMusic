@@ -12,6 +12,7 @@
         x:Name="Pill"
         Height="16"
         Padding="6,0,7,0"
+        Background="{ThemeResource AccentTintBrush}"
         CornerRadius="8">
         <StackPanel
             VerticalAlignment="Center"
@@ -21,7 +22,8 @@
                 x:Name="Dot"
                 Width="5"
                 Height="5"
-                VerticalAlignment="Center" />
+                VerticalAlignment="Center"
+                Fill="{ThemeResource AccentTextBrush}" />
             <TextBlock
                 x:Name="Label"
                 VerticalAlignment="Center"
@@ -30,6 +32,7 @@
                 FontFamily="{StaticResource AppFontFamily}"
                 FontSize="10"
                 FontWeight="SemiBold"
+                Foreground="{ThemeResource AccentTextBrush}"
                 Text="LIVE"
                 TextLineBounds="Tight" />
         </StackPanel>

@@ -71,7 +71,9 @@ Windows taskbar.
 
 **Windows**
 
-- Light, Dark or Auto theme. The accent colour follows the album art, or pick one of five presets.
+- Two designs: Hush's own, or the standard Windows 11 look (Mica, Segoe UI, stock controls). Settings → Appearance → Design.
+- Light, Dark or Auto theme. The accent colour follows the album art, or pick one of five presets or your Windows accent colour.
+- Standard or Minimal player layout. Minimal docks a simple player bar (cover, title, previous / play / next, volume) and keeps Now Playing to the cover and controls.
 - Media keys and the Windows media flyout, taskbar thumbnail buttons and progress.
 - Mini player: a small always-on-top window.
 - Keep playing from the notification area when the window is closed, and start with Windows.

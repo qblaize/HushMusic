@@ -1,3 +1,4 @@
+using HushMusic.App.Services.Shell;
 using HushMusic.Core.Models;
 
 namespace HushMusic.App.Helpers;
@@ -5,6 +6,10 @@ namespace HushMusic.App.Helpers;
 /// <summary>Formatting helpers for x:Bind function bindings, e.g. <c>{x:Bind helpers:Format.Duration(Track.Duration)}</c>.</summary>
 public static class Format
 {
+    /// <summary>Settings section header: uppercase eyebrow in the Hush design, sentence case in the Windows one.</summary>
+    public static string SectionHeader(string title) =>
+        DesignSystems.IsWindowsActive ? title : title.ToUpperInvariant();
+
     public static string Duration(TimeSpan? value)
     {
         if (value is not { } time)

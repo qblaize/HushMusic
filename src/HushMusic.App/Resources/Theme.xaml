@@ -9,9 +9,13 @@
     Application.Current.Resources[key] always returns the DARK value: code must use ThemeResources (Services/Shell/Theme).
     A subtree that must stay dark (content over album art) sets RequestedTheme="Dark" on its root.
 
-    Accent: AccentBrush / AccentSoftBrush / AccentForegroundBrush are single shared instances whose Color is changed at
-    runtime (album art or a preset, tuned per theme). Reference them with {StaticResource ...} so every user sees the
-    same instance.
+    Accent (album art, a preset or the Windows accent; recoloured at runtime by AccentColorService, tuned per theme):
+    - Text, glyphs, thin strokes and selection washes: AccentTextBrush and AccentTintBrush, with {ThemeResource ...}.
+      They live in the theme dictionaries, so they take the tuning of the theme the element shows: the dark one inside a
+      RequestedTheme="Dark" subtree of the light app (Now Playing, mini player), where the light tuning is too dark to read.
+    - Fills: AccentBrush with AccentForegroundBrush for the text on it (and AccentSoftBrush), with {StaticResource ...}.
+      Single shared instances tuned for the theme the window shows. AccentForegroundBrush only goes on an AccentBrush fill.
+    - AccentOnDarkBrush: the dark tuning in either theme, for code that needs one fixed brush.
 -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -21,6 +25,8 @@
     <ResourceDictionary.ThemeDictionaries>
         <!-- Default = Dark (also the fallback for high contrast). Keep it identical to "Dark". -->
         <ResourceDictionary x:Key="Default">
+            <!-- The window surface behind the shell (the Windows design makes it transparent for Mica). -->
+            <StaticResource x:Key="WindowBackgroundBrush" ResourceKey="AppBackgroundBrush" />
             <!-- App mark in the sidebar: the light plate stands out on the dark chrome. -->
             <BitmapImage x:Key="AppMarkImage" DecodePixelWidth="64" UriSource="ms-appx:///Assets/Brand/HushMark.png" />
             <Color x:Key="AppBackgroundColor">#0B0B0C</Color>
@@ -73,6 +79,11 @@
             <SolidColorBrush x:Key="SliderRailBrush" Color="#2EFFFFFF" />
             <!-- Highlighted row in the search modal (keyboard selection). -->
             <SolidColorBrush x:Key="HighlightFillBrush" Color="#1AFFFFFF" />
+            <!-- Accent text and selection wash for this theme (see the header). Recoloured at runtime. -->
+            <SolidColorBrush x:Key="AccentTextBrush" Color="#9D7BFA" />
+            <SolidColorBrush x:Key="AccentTintBrush" Color="#339D7BFA" />
+            <!-- Blurred artwork behind detail-page headers. -->
+            <x:Double x:Key="ArtworkWashOpacity">0.55</x:Double>
             <!--
                 Artist hero: darkens the middle of the image behind the name, then clears again at the bottom, where the
                 image itself has faded to transparent (FadingArtwork) so the hero melts into the page and the glow behind it.
@@ -139,6 +150,8 @@
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Dark">
+            <!-- The window surface behind the shell (the Windows design makes it transparent for Mica). -->
+            <StaticResource x:Key="WindowBackgroundBrush" ResourceKey="AppBackgroundBrush" />
             <!-- App mark in the sidebar: the light plate stands out on the dark chrome. -->
             <BitmapImage x:Key="AppMarkImage" DecodePixelWidth="64" UriSource="ms-appx:///Assets/Brand/HushMark.png" />
             <Color x:Key="AppBackgroundColor">#0B0B0C</Color>
@@ -189,6 +202,9 @@
             <SolidColorBrush x:Key="ToolTipStrokeBrush" Color="{ThemeResource ToolTipStrokeColor}" />
             <SolidColorBrush x:Key="SliderRailBrush" Color="#2EFFFFFF" />
             <SolidColorBrush x:Key="HighlightFillBrush" Color="#1AFFFFFF" />
+            <SolidColorBrush x:Key="AccentTextBrush" Color="#9D7BFA" />
+            <SolidColorBrush x:Key="AccentTintBrush" Color="#339D7BFA" />
+            <x:Double x:Key="ArtworkWashOpacity">0.55</x:Double>
             <LinearGradientBrush x:Key="HeroScrimBrush" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Offset="0" Color="#000B0B0C" />
                 <GradientStop Offset="0.45" Color="#260B0B0C" />
@@ -253,6 +269,8 @@
             so they stay readable as text on white.
         -->
         <ResourceDictionary x:Key="Light">
+            <!-- The window surface behind the shell (the Windows design makes it transparent for Mica). -->
+            <StaticResource x:Key="WindowBackgroundBrush" ResourceKey="AppBackgroundBrush" />
             <!-- App mark in the sidebar: the dark plate stands out on the light chrome. -->
             <BitmapImage x:Key="AppMarkImage" DecodePixelWidth="64" UriSource="ms-appx:///Assets/Brand/HushMarkDark.png" />
             <Color x:Key="AppBackgroundColor">#FFFFFF</Color>
@@ -268,7 +286,8 @@
             <Color x:Key="DangerColor">#D70015</Color>
             <Color x:Key="SuccessColor">#248A3D</Color>
             <Color x:Key="WarningColor">#B25000</Color>
-            <Color x:Key="ToggleOffFillColor">#E9E9EA</Color>
+            <!-- Translucent (iOS systemFill), so the off track still shows on the grey settings groups. -->
+            <Color x:Key="ToggleOffFillColor">#33787880</Color>
             <Color x:Key="ToggleKnobShadowColor">#26000000</Color>
             <Color x:Key="ToggleKnobStrokeColor">#0F000000</Color>
             <!-- Selected segment of a segmented control (raised: white on light, like macOS). -->
@@ -303,6 +322,11 @@
             <SolidColorBrush x:Key="ToolTipStrokeBrush" Color="{ThemeResource ToolTipStrokeColor}" />
             <SolidColorBrush x:Key="SliderRailBrush" Color="#21000000" />
             <SolidColorBrush x:Key="HighlightFillBrush" Color="#12000000" />
+            <!-- The default accent tuned for white (AccentPalette.MakeLegible); recoloured at runtime. -->
+            <SolidColorBrush x:Key="AccentTextBrush" Color="#4A0DF2" />
+            <SolidColorBrush x:Key="AccentTintBrush" Color="#334A0DF2" />
+            <!-- Lighter than on dark: a dark cover would otherwise turn the white header grey under dark-on-light text. -->
+            <x:Double x:Key="ArtworkWashOpacity">0.3</x:Double>
             <!-- Light hero: a white veil behind the dark name text, clearing again where the image fades out. -->
             <LinearGradientBrush x:Key="HeroScrimBrush" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Offset="0" Color="#00FFFFFF" />
@@ -367,7 +391,10 @@
     <!-- The album-art fallback before anything plays (dark theme; ThemeService/AccentColorService tune it for light). -->
     <Color x:Key="DefaultAccentColor">#9D7BFA</Color>
 
-    <!-- Dynamic accent. Colors are replaced at runtime; these are the defaults before anything plays. -->
+    <!--
+        Dynamic accent for fills, tuned for the theme the window shows (text and glyphs use AccentTextBrush, above).
+        Colors are replaced at runtime; these are the defaults before anything plays.
+    -->
     <SolidColorBrush x:Key="AccentBrush" Color="#9D7BFA" />
     <SolidColorBrush x:Key="AccentSoftBrush" Color="#339D7BFA" />
     <SolidColorBrush x:Key="AccentForegroundBrush" Color="#FFFFFF" />

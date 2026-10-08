@@ -179,7 +179,7 @@
                 <VisualState x:Name="Liked">
                     <VisualState.Setters>
                         <Setter Target="LikeGlyph.Glyph" Value="&#xEB52;" />
-                        <Setter Target="LikeGlyph.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="LikeGlyph.Foreground" Value="{ThemeResource AccentTextBrush}" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
@@ -188,7 +188,7 @@
                 <!-- Bars on the darkened artwork. -->
                 <VisualState x:Name="CurrentOnArt">
                     <VisualState.Setters>
-                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="TitleText.Foreground" Value="{ThemeResource AccentTextBrush}" />
                         <Setter Target="ArtScrim.Visibility" Value="Visible" />
                         <Setter Target="Equalizer.Visibility" Value="Visible" />
                     </VisualState.Setters>
@@ -196,10 +196,10 @@
                 <!-- Album rows: accent bars in place of the track number. -->
                 <VisualState x:Name="CurrentOnNumber">
                     <VisualState.Setters>
-                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="TitleText.Foreground" Value="{ThemeResource AccentTextBrush}" />
                         <Setter Target="NumberText.Opacity" Value="0" />
                         <Setter Target="Equalizer.Visibility" Value="Visible" />
-                        <Setter Target="Equalizer.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="Equalizer.Foreground" Value="{ThemeResource AccentTextBrush}" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>

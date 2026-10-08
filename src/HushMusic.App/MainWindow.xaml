@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!--  No system backdrop: the shell paints a solid AppBackgroundBrush; glass is in-app acrylic.  -->
+<!--
+    Hush design: no system backdrop; the shell paints a solid AppBackgroundBrush and glass is in-app acrylic.
+    Windows design: Mica (set in code).
+-->
 <Window
     x:Class="HushMusic.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"

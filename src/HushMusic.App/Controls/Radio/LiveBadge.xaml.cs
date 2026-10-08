@@ -4,9 +4,9 @@ using Microsoft.UI.Xaml.Media.Animation;
 namespace HushMusic.App.Controls.Radio;
 
 /// <summary>
-/// The "• LIVE" eyebrow shown above the title while a radio station plays: a small pill in the soft accent with accent
-/// text, its dot gently pulsing (static when Windows animations are off). Surfaces that stay dark (Now Playing, mini
-/// player) set <see cref="Accent"/> to AccentOnDarkBrush.
+/// The "• LIVE" eyebrow shown above the title while a radio station plays: a small pill in the accent tint with accent
+/// text, its dot gently pulsing (static when Windows animations are off). Both come from the theme-aware accent brushes,
+/// so the badge reads on the light app and inside dark surfaces (Now Playing, mini player) alike.
 /// </summary>
 public sealed partial class LiveBadge : UserControl
 {
@@ -22,13 +22,12 @@ public sealed partial class LiveBadge : UserControl
     public LiveBadge()
     {
         InitializeComponent();
-        UpdateBrushes();
         Loaded += (_, _) => UpdatePulse();
         Unloaded += (_, _) => StopPulse();
         RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => UpdatePulse());
     }
 
-    /// <summary>The dot and the text. Default: AccentBrush.</summary>
+    /// <summary>Overrides the dot and text colour. Default: AccentTextBrush for the theme the badge shows.</summary>
     public Brush? Accent
     {
         get => (Brush?)GetValue(AccentProperty);
@@ -39,10 +38,11 @@ public sealed partial class LiveBadge : UserControl
 
     private void UpdateBrushes()
     {
-        var accent = Accent ?? Application.Current.Resources["AccentBrush"] as Brush;
-        Dot.Fill = accent;
-        Label.Foreground = accent;
-        Pill.Background = Application.Current.Resources["AccentSoftBrush"] as Brush;
+        if (Accent is { } accent)
+        {
+            Dot.Fill = accent;
+            Label.Foreground = accent;
+        }
     }
 
     // An explicit storyboard (implicit transitions crash when they fire during layout), only while shown.

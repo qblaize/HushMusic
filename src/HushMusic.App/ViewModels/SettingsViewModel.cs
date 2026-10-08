@@ -67,6 +67,18 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         new("System", "Auto"),
     ];
 
+    public IReadOnlyList<SettingsChoice> DesignSystemOptions { get; } =
+    [
+        new(DesignSystems.Hush, "Hush"),
+        new(DesignSystems.Windows, "Windows"),
+    ];
+
+    public IReadOnlyList<SettingsChoice> PlayerLayoutOptions { get; } =
+    [
+        new(PlayerLayouts.Standard, "Standard"),
+        new(PlayerLayouts.Minimal, "Minimal"),
+    ];
+
     public IReadOnlyList<SettingsChoice> NowPlayingArtStyleOptions { get; } =
     [
         new(CoverFlowViewModel.SingleStyle, "Single"),
@@ -88,7 +100,25 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     public partial string NowPlayingArtStyle { get; set; } = CoverFlowViewModel.CoverFlowStyle;
 
-    /// <summary>"Album art" first, then the presets, coloured for the theme on screen.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDesignRestartPending))]
+    public partial string DesignSystem { get; set; } = DesignSystems.Hush;
+
+    /// <summary>The chosen design differs from the one the app started with.</summary>
+    public bool IsDesignRestartPending => DesignSystem != DesignSystems.Active;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsArtStyleAvailable), nameof(ArtStyleDescription))]
+    public partial string PlayerLayout { get; set; } = PlayerLayouts.Standard;
+
+    /// <summary>The Minimal layout always shows the single cover.</summary>
+    public bool IsArtStyleAvailable => !PlayerLayouts.IsMinimal(PlayerLayout);
+
+    public string ArtStyleDescription => IsArtStyleAvailable
+        ? "Show just the current cover, or the songs before and after it as a Cover Flow."
+        : "The Minimal player layout always shows just the current cover.";
+
+    /// <summary>"Album art" first, then the Windows accent and the presets, coloured for the theme on screen.</summary>
     [ObservableProperty]
     public partial IReadOnlyList<AccentSwatch> AccentSwatches { get; set; } = [];
 
@@ -256,8 +286,10 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         _loading = true;
         var current = _settings.Current;
         Theme = current.Theme;
-        AccentStyle = AccentPresets.Find(current.AccentStyle)?.Name ?? AccentPresets.Artwork;
+        AccentStyle = AccentPresets.Normalize(current.AccentStyle);
         NowPlayingArtStyle = CoverFlowViewModel.IsCoverFlow(current.NowPlayingArtStyle) ? CoverFlowViewModel.CoverFlowStyle : CoverFlowViewModel.SingleStyle;
+        DesignSystem = DesignSystems.Normalize(current.DesignSystem);
+        PlayerLayout = PlayerLayouts.IsMinimal(current.PlayerLayout) ? PlayerLayouts.Minimal : PlayerLayouts.Standard;
         ReportPlaybackHistory = current.ReportPlaybackHistory;
         UseAccountForStreams = current.UseAccountForStreams;
         NormalizeVolume = current.NormalizeVolume;
@@ -277,6 +309,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         {
             _subscribed = true;
             _theme.ThemeChanged += OnAppThemeChanged;
+            SystemAccent.Changed += OnSystemAccentChanged;
             _lastFm.StateChanged += OnLastFmStateChanged;
             _settings.Changed += OnSettingsChanged;
             _appUpdates.StateChanged += OnAppUpdateStateChanged;
@@ -297,6 +330,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         {
             _subscribed = false;
             _theme.ThemeChanged -= OnAppThemeChanged;
+            SystemAccent.Changed -= OnSystemAccentChanged;
             _lastFm.StateChanged -= OnLastFmStateChanged;
             _settings.Changed -= OnSettingsChanged;
             _appUpdates.StateChanged -= OnAppUpdateStateChanged;
@@ -430,6 +464,46 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     partial void OnAccentStyleChanged(string value) => Save(s => s.AccentStyle = value);
 
+    partial void OnDesignSystemChanged(string value)
+    {
+        if (!DesignSystemOptions.Any(o => o.Value == value))
+        {
+            return;
+        }
+
+        Save(s => s.DesignSystem = value);
+        if (_loading)
+        {
+            return;
+        }
+
+        // The automatic accent that fits each design: the Windows colour for Windows, the album art for Hush.
+        // An explicitly chosen preset stays as it is.
+        if (DesignSystems.IsWindows(value) && AccentStyle == AccentPresets.Artwork)
+        {
+            AccentStyle = AccentPresets.System;
+        }
+        else if (!DesignSystems.IsWindows(value) && AccentStyle == AccentPresets.System)
+        {
+            AccentStyle = AccentPresets.Artwork;
+        }
+    }
+
+    partial void OnPlayerLayoutChanged(string value)
+    {
+        if (PlayerLayoutOptions.Any(o => o.Value == value))
+        {
+            Save(s => s.PlayerLayout = value);
+        }
+    }
+
+    [RelayCommand]
+    private void RestartForDesign()
+    {
+        var reason = DesignSystems.Restart();
+        Notifications.ShowInfo("Couldn't restart Hush", $"Close and reopen Hush to apply the new design ({reason}).");
+    }
+
     partial void OnNowPlayingArtStyleChanged(string value)
     {
         if (NowPlayingArtStyleOptions.Any(o => o.Value == value))
@@ -498,12 +572,22 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         [
             new(AccentPresets.Artwork, "Album art", "Follows the cover of what's playing", [.. presets.Select(p => p.Color).OrderBy(Hue)], IsArtwork: true),
         ];
+
+        // Left out on the rare system that doesn't report an accent colour.
+        if (SystemAccent.Read() is { } system)
+        {
+            swatches.Add(new(AccentPresets.System, "Windows accent color", string.Empty, [AccentPalette.ForSystem(system, light)]));
+        }
+
         swatches.AddRange(presets.Select(p => new AccentSwatch(p.Preset.Name, p.Preset.Name, p.Preset.Description, [p.Color])));
         return swatches;
     }
 
     // ThemeChanged is raised on the UI thread.
     private void OnAppThemeChanged(object? sender, EventArgs e) => AccentSwatches = BuildAccentSwatches();
+
+    // The Windows accent colour changed while the page is open. Arrives on a background thread.
+    private void OnSystemAccentChanged(object? sender, EventArgs e) => _dispatcher.Run(() => AccentSwatches = BuildAccentSwatches());
 
     // The taskbar player can turn itself off from its menu while this page is open. Arrives on a background thread.
     private void OnSettingsChanged(object? sender, EventArgs e) => _dispatcher.Run(() =>

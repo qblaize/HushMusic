@@ -116,7 +116,7 @@
                 </VisualState>
                 <VisualState x:Name="Current">
                     <VisualState.Setters>
-                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="TitleText.Foreground" Value="{ThemeResource AccentTextBrush}" />
                         <Setter Target="ArtScrim.Visibility" Value="Visible" />
                         <Setter Target="Equalizer.Visibility" Value="Visible" />
                     </VisualState.Setters>
@@ -125,7 +125,7 @@
                     <VisualState.Setters>
                         <Setter Target="HoverFill.Opacity" Value="1" />
                         <Setter Target="MoreButton.Opacity" Value="1" />
-                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="TitleText.Foreground" Value="{ThemeResource AccentTextBrush}" />
                         <Setter Target="ArtScrim.Visibility" Value="Visible" />
                         <Setter Target="Equalizer.Visibility" Value="Visible" />
                     </VisualState.Setters>

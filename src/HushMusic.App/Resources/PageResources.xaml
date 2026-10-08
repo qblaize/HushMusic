@@ -56,7 +56,7 @@
 
     <!-- Reload while content stays visible (refresh, tab switch): a hairline at the top edge. -->
     <Style x:Key="BusyBarStyle" TargetType="ProgressBar">
-        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource AccentTextBrush}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="IsIndeterminate" Value="True" />
         <Setter Property="VerticalAlignment" Value="Top" />
@@ -89,6 +89,8 @@
     <SolidColorBrush x:Key="NowPlayingScrimBrush" Color="#99000000" />
     <!-- Glyphs drawn on darkened artwork (play, equaliser): white in both themes. -->
     <SolidColorBrush x:Key="OnArtForegroundBrush" Color="#FFFFFF" />
+    <!-- Text on the red DangerBrush fill: white in both themes (dark text on the light theme's red reads poorly). -->
+    <SolidColorBrush x:Key="OnDangerForegroundBrush" Color="#FFFFFF" />
 
     <!-- ===== Buttons ===== -->
 
@@ -218,7 +220,7 @@
         BasedOn="{StaticResource PillButtonStyle}"
         TargetType="Button">
         <Setter Property="Background" Value="{ThemeResource DangerBrush}" />
-        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource OnDangerForegroundBrush}" />
     </Style>
 
     <!-- Search "Top result": the one place a filled card is used. -->

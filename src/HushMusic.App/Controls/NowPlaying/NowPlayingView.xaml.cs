@@ -83,6 +83,14 @@ public sealed partial class NowPlayingView : UserControl
                 UpdateShownTab();
                 AnimatePanel(ViewModel.ShowsPanel, animate: Visibility == Visibility.Visible);
                 break;
+            case nameof(NowPlayingViewModel.IsMinimal):
+                // Player layout switched while the sheet is open: the backdrop drifts in Standard only.
+                if (ViewModel.IsOpen && Visibility == Visibility.Visible)
+                {
+                    Backdrop.SetDrifting(ViewModel.IsStandard);
+                }
+
+                break;
         }
     }
 
@@ -116,7 +124,7 @@ public sealed partial class NowPlayingView : UserControl
             return;
         }
 
-        Backdrop.SetDrifting(true);
+        Backdrop.SetDrifting(ViewModel.IsStandard);
         Animate(opening: true, version);
         PlayPauseButton.Focus(FocusState.Programmatic);
     }
@@ -285,7 +293,7 @@ public sealed partial class NowPlayingView : UserControl
         ApplyPanel();
     }
 
-    // ===== Side panel show / hide (Cover Flow mode) =====
+    // ===== Side panel show / hide (Cover Flow mode, Minimal layout) =====
     // The column width itself is tweened frame by frame, so the covers re-centre smoothly into the freed space
     // (Cover Flow lays out instantly on size changes).
 

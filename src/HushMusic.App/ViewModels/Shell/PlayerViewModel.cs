@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using HushMusic.App.Helpers;
+using HushMusic.App.Services.Shell;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Models;
 
@@ -12,6 +13,7 @@ namespace HushMusic.App.ViewModels.Shell;
 /// marshalled to the UI thread. Singleton.
 /// While a live radio station plays (<see cref="IsLive"/>), <see cref="Title"/> is the song it is playing (ICY metadata,
 /// else the station name) and <see cref="Subtitle"/> is "Artist · Station"; there is no timeline and nothing to rate.
+/// <see cref="IsMinimalLayout"/> follows the "Player layout" setting, live.
 /// </summary>
 public sealed partial class PlayerViewModel : ObservableObject
 {
@@ -68,6 +70,9 @@ public sealed partial class PlayerViewModel : ObservableObject
         _queue.Changed += (_, e) => _dispatcher.Run(() => OnQueueChanged(e.Kind));
         _auth.StatusChanged += (_, _) => _dispatcher.Run(() => OnPropertyChanged(nameof(CanRate)));
         _accountActions.TrackRated += (_, e) => _dispatcher.Run(() => OnTrackRated(e.VideoId, e.Status));
+
+        IsMinimalLayout = PlayerLayouts.IsMinimal(_settings.Current.PlayerLayout);
+        _settings.Changed += (_, _) => _dispatcher.Run(() => IsMinimalLayout = PlayerLayouts.IsMinimal(_settings.Current.PlayerLayout));
     }
 
     [ObservableProperty]
@@ -117,6 +122,16 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LikeGlyph), nameof(LikeLabel))]
     public partial bool IsLiked { get; set; }
+
+    /// <summary>
+    /// The Minimal player layout: a docked bar with the rest in a menu, and a calmer Now Playing. Standard is the floating
+    /// glass bar.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsStandardLayout))]
+    public partial bool IsMinimalLayout { get; set; }
+
+    public bool IsStandardLayout => !IsMinimalLayout;
 
     public bool HasTrack => Track is not null;
 
@@ -290,19 +305,20 @@ public sealed partial class PlayerViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CycleRepeat()
+    private void CycleRepeat() => SetRepeat(Repeat switch
     {
-        var next = Repeat switch
-        {
-            RepeatMode.Off => RepeatMode.All,
-            RepeatMode.All => RepeatMode.One,
-            _ => RepeatMode.Off,
-        };
+        RepeatMode.Off => RepeatMode.All,
+        RepeatMode.All => RepeatMode.One,
+        _ => RepeatMode.Off,
+    });
 
+    /// <summary>Sets the repeat mode directly (the minimal player bar's Repeat menu).</summary>
+    public void SetRepeat(RepeatMode mode)
+    {
         try
         {
-            _player.RepeatMode = next;
-            Repeat = next;
+            _player.RepeatMode = mode;
+            Repeat = mode;
         }
         catch (Exception ex)
         {

@@ -71,6 +71,28 @@ public static class ThemeResources
         return brush;
     }
 
+    /// <summary>
+    /// Every distinct value <paramref name="key"/> has in the app's theme dictionaries ("Default" and "Dark" count as
+    /// Dark), with its theme. For theme-aware resources that code recolours in place, e.g. AccentTextBrush.
+    /// </summary>
+    public static IReadOnlyList<(ElementTheme Theme, object Value)> AllThemeValues(string key)
+    {
+        List<(ElementTheme, object)> found = [];
+        if (Application.Current?.Resources is { } resources)
+        {
+            try
+            {
+                Collect(resources, key, found);
+            }
+            catch (Exception)
+            {
+                // A dictionary that can't be read contributes nothing.
+            }
+        }
+
+        return found;
+    }
+
     /// <summary>Called by <see cref="ThemeService"/> when the shown theme changes.</summary>
     internal static void Apply(ElementTheme theme)
     {
@@ -102,6 +124,26 @@ public static class ThemeResources
 
         value = null;
         return false;
+    }
+
+    private static void Collect(ResourceDictionary dictionary, string key, List<(ElementTheme, object)> found)
+    {
+        foreach (var (themeKey, theme) in new[] { ("Default", ElementTheme.Dark), ("Dark", ElementTheme.Dark), ("Light", ElementTheme.Light) })
+        {
+            if (dictionary.ThemeDictionaries.TryGetValue(themeKey, out var themed)
+                && themed is ResourceDictionary themeDictionary
+                && themeDictionary.TryGetValue(key, out var value)
+                && value is not null
+                && !found.Exists(f => ReferenceEquals(f.Item2, value)))
+            {
+                found.Add((theme, value));
+            }
+        }
+
+        foreach (var merged in dictionary.MergedDictionaries)
+        {
+            Collect(merged, key, found);
+        }
     }
 
     // The indexer also searches merged dictionaries (TryGetValue doesn't); it throws for a missing key.

@@ -50,7 +50,7 @@
                         x:Name="Root"
                         Background="{TemplateBinding Background}"
                         CornerRadius="{TemplateBinding CornerRadius}">
-                        <Border x:Name="SelectionFill" Background="{StaticResource AccentSoftBrush}" Opacity="0" />
+                        <Border x:Name="SelectionFill" Background="{ThemeResource AccentTintBrush}" Opacity="0" />
                         <Border x:Name="HoverFill" Background="{ThemeResource HoverFillBrush}" Opacity="0" />
                         <Grid x:Name="IconHost">
                             <TextBlock
@@ -69,7 +69,7 @@
                                 AutomationProperties.AccessibilityView="Raw"
                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                 FontSize="18"
-                                Foreground="{StaticResource AccentBrush}"
+                                Foreground="{ThemeResource AccentTextBrush}"
                                 Opacity="0"
                                 Text="{TemplateBinding Glyph}" />
                             <ContentPresenter

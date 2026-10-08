@@ -57,6 +57,7 @@ public partial class App : Application
         var settings = Services.GetRequiredService<ISettingsService>();
         await settings.LoadAsync();
         AppHost.ApplyLogLevel(Services, settings.Current.LogLevel);
+        ApplyDesignSystem(settings.Current.DesignSystem);
 
         // Restore the saved session before any page loads, or the first Home feed is fetched signed out.
         // Local only (file read + DPAPI), so it doesn't delay the window noticeably.
@@ -95,6 +96,27 @@ public partial class App : Application
         {
             _logger.LogError(ex, "A background feature failed to start");
             Services.GetRequiredService<INotificationService>().ShowError("A background feature failed to start", ex);
+        }
+    }
+
+    // The design can't change while running: its resources must be in place before the first window or page loads.
+    private void ApplyDesignSystem(string? setting)
+    {
+        DesignSystems.Active = DesignSystems.Normalize(setting);
+        if (!DesignSystems.IsWindowsActive)
+        {
+            return;
+        }
+
+        try
+        {
+            var dropped = DesignSystems.UseWindowsResources(Resources);
+            _logger?.LogInformation("Design: Windows ({Dropped} stock overrides of the Hush theme dropped)", dropped);
+        }
+        catch (Exception ex)
+        {
+            DesignSystems.Active = DesignSystems.Hush;
+            _logger?.LogError(ex, "Could not load the Windows design");
         }
     }
 

@@ -108,10 +108,17 @@ a blurred backdrop, a floating glass player bar and a full-window Now Playing vi
 - `Resources/ShellResources.xaml` and `Resources/PageResources.xaml` hold the shell's and the pages' templates.
 - Use the keys rather than hard-coded values:
   - palette and glass through `{ThemeResource}`, because they switch live with the theme;
-  - accent brushes through `{StaticResource}`, because they are recoloured in place;
+  - accent fills (buttons, selected chips, the toggle track) use `AccentBrush` with `AccentForegroundBrush` on top,
+    through `{StaticResource}`, because they are recoloured in place;
+  - accent text, glyphs, thin strokes and selection washes use `AccentTextBrush` and `AccentTintBrush` through
+    `{ThemeResource}`: there is one per theme, each tuned to be legible on that theme's surfaces (so accent text inside
+    an always-dark view stays readable when the app is light);
   - a subtree that sits on album art (Now Playing, mini player) sets `RequestedTheme="Dark"`.
-- `IThemeService` applies Light, Dark or Auto. `IAccentColorService` takes the accent from the current album art or a
-  preset (`AccentPresets`: Crimson, Forest, Frost, Ember, Iris), tuned per theme for legibility.
+- `IThemeService` applies Light, Dark or Auto. `IAccentColorService` takes the accent from the current album art, a
+  preset (`AccentPresets`: Crimson, Forest, Frost, Ember, Iris) or the Windows accent colour, tuned per theme for
+  legibility.
+- `AppSettings.PlayerLayout` switches between the Standard player (floating glass bar, Cover Flow) and Minimal (a docked
+  bar with the essentials and a "…" menu; Now Playing shows the single cover). It applies live.
 - The typeface is [Inter](https://github.com/rsms/inter) (bundled, SIL OFL 1.1). Icons are Segoe Fluent Icons from
   Windows.
 

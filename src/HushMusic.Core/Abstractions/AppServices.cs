@@ -78,6 +78,12 @@ public sealed class AppSettings
     /// <summary>Cover Flow mode only: the Up next / Lyrics / Related panel is hidden so the covers get the whole view.</summary>
     public bool NowPlayingPanelHidden { get; set; }
 
+    /// <summary>"Hush" (the app's own design) or "Windows" (stock Windows 11 / Fluent look with Mica). Applied at startup.</summary>
+    public string DesignSystem { get; set; } = "Hush";
+
+    /// <summary>"Standard" or "Minimal" (a calmer, docked player bar and a plain Now Playing view).</summary>
+    public string PlayerLayout { get; set; } = "Standard";
+
     /// <summary>Evens out loudness between tracks using YouTube's per-track loudness (only ever turns loud tracks down).</summary>
     public bool NormalizeVolume { get; set; } = true;
 

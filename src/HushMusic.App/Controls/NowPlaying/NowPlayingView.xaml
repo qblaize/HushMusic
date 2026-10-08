@@ -25,7 +25,7 @@
         AutomationProperties.Name="Now Playing"
         Background="{ThemeResource AppBackgroundBrush}">
 
-        <!--  Album art, blurred and drifting, then a frosted dark scrim for legibility.  -->
+        <!--  Album art, blurred and drifting (held still in the Minimal layout), then a frosted dark scrim for legibility.  -->
         <local:ArtworkBackdrop x:Name="Backdrop" Url="{x:Bind ViewModel.BackdropArtUrl, Mode=OneWay}" />
         <Border Background="{ThemeResource BackdropBlurBrush}" IsHitTestVisible="False" />
         <Border
@@ -49,7 +49,7 @@
             Style="{StaticResource IconButtonStyle}"
             ToolTipService.ToolTip="Close (Esc)" />
 
-        <!--  Cover Flow only: hide / show the side panel. In the title band too, left of the caption buttons.  -->
+        <!--  Cover Flow and the Minimal layout: hide / show the side panel. In the title band too, left of the caption buttons.  -->
         <Button
             x:Name="PanelToggleButton"
             Width="32"
@@ -181,7 +181,8 @@
                                 Content="&#xE712;"
                                 FontSize="18"
                                 Style="{StaticResource IconButtonStyle}"
-                                ToolTipService.ToolTip="More" />
+                                ToolTipService.ToolTip="More"
+                                Visibility="{x:Bind ViewModel.IsStandard, Mode=OneWay}" />
                         </Grid>
 
                         <!--  Seek (live radio: a static accent hairline in its place, no times)  -->
@@ -312,12 +313,11 @@
                                 ToolTipService.ToolTip="{x:Bind ViewModel.Player.RepeatLabel, Mode=OneWay}" />
                         </StackPanel>
 
-                        <!--  Volume, sleep timer, mini player  -->
-                        <Grid Margin="0,14,0,0" ColumnSpacing="6">
+                        <!--  Volume, sleep timer, mini player (the Minimal layout keeps only the volume)  -->
+                        <Grid Margin="0,14,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <Button
@@ -331,7 +331,7 @@
                                 ToolTipService.ToolTip="{x:Bind ViewModel.Player.MuteLabel, Mode=OneWay}" />
                             <Slider
                                 Grid.Column="1"
-                                Margin="0,0,10,0"
+                                Margin="6,0,0,0"
                                 VerticalAlignment="Center"
                                 AutomationProperties.AutomationId="NowPlayingVolume"
                                 AutomationProperties.Name="Volume"
@@ -341,39 +341,44 @@
                                 SmallChange="2"
                                 StepFrequency="1"
                                 Value="{x:Bind ViewModel.Player.Volume, Mode=TwoWay}" />
-                            <Button
+                            <StackPanel
                                 Grid.Column="2"
-                                VerticalAlignment="Center"
-                                AutomationProperties.AutomationId="NowPlayingSleepTimer"
-                                AutomationProperties.Name="Sleep timer"
-                                AutomationProperties.HelpText="{x:Bind ViewModel.SleepTimer.Label, Mode=OneWay}"
-                                Style="{StaticResource IconButtonStyle}"
-                                ToolTipService.ToolTip="{x:Bind ViewModel.SleepTimer.Label, Mode=OneWay}">
-                                <Grid>
-                                    <FontIcon
-                                        FontSize="15"
-                                        Glyph="&#xE708;"
-                                        Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.SleepTimer.IsActive), Mode=OneWay}" />
-                                    <FontIcon
-                                        FontSize="15"
-                                        Foreground="{StaticResource AccentOnDarkBrush}"
-                                        Glyph="&#xE708;"
-                                        Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.SleepTimer.IsActive), Mode=OneWay}" />
-                                </Grid>
-                                <Button.Flyout>
-                                    <local:SleepTimerMenuFlyout Placement="TopEdgeAlignedRight" ViewModel="{x:Bind ViewModel.SleepTimer}" />
-                                </Button.Flyout>
-                            </Button>
-                            <Button
-                                Grid.Column="3"
-                                VerticalAlignment="Center"
-                                AutomationProperties.AutomationId="NowPlayingMiniPlayer"
-                                AutomationProperties.Name="Mini player"
-                                Command="{x:Bind ViewModel.EnterMiniPlayerCommand}"
-                                Content="&#xE92C;"
-                                FontSize="15"
-                                Style="{StaticResource IconButtonStyle}"
-                                ToolTipService.ToolTip="Mini player" />
+                                Margin="16,0,0,0"
+                                Orientation="Horizontal"
+                                Spacing="6"
+                                Visibility="{x:Bind ViewModel.IsStandard, Mode=OneWay}">
+                                <Button
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.AutomationId="NowPlayingSleepTimer"
+                                    AutomationProperties.Name="Sleep timer"
+                                    AutomationProperties.HelpText="{x:Bind ViewModel.SleepTimer.Label, Mode=OneWay}"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.SleepTimer.Label, Mode=OneWay}">
+                                    <Grid>
+                                        <FontIcon
+                                            FontSize="15"
+                                            Glyph="&#xE708;"
+                                            Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.SleepTimer.IsActive), Mode=OneWay}" />
+                                        <FontIcon
+                                            FontSize="15"
+                                            Foreground="{StaticResource AccentOnDarkBrush}"
+                                            Glyph="&#xE708;"
+                                            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.SleepTimer.IsActive), Mode=OneWay}" />
+                                    </Grid>
+                                    <Button.Flyout>
+                                        <local:SleepTimerMenuFlyout Placement="TopEdgeAlignedRight" ViewModel="{x:Bind ViewModel.SleepTimer}" />
+                                    </Button.Flyout>
+                                </Button>
+                                <Button
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.AutomationId="NowPlayingMiniPlayer"
+                                    AutomationProperties.Name="Mini player"
+                                    Command="{x:Bind ViewModel.EnterMiniPlayerCommand}"
+                                    Content="&#xE92C;"
+                                    FontSize="15"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTipService.ToolTip="Mini player" />
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </Grid>

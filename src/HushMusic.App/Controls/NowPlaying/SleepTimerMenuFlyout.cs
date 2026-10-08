@@ -7,15 +7,19 @@ public sealed partial class SleepTimerMenuFlyout : MenuFlyout
 {
     public SleepTimerMenuFlyout()
     {
-        Opening += (_, _) => Build();
+        Opening += (_, _) => Fill(Items, ViewModel);
     }
 
     public SleepTimerViewModel? ViewModel { get; set; }
 
-    private void Build()
+    /// <summary>
+    /// Replaces <paramref name="items"/> with the timer's choices, the current one checked. Also fills the Sleep timer
+    /// submenu of the minimal player bar's menu.
+    /// </summary>
+    public static void Fill(IList<MenuFlyoutItemBase> items, SleepTimerViewModel? viewModel)
     {
-        Items.Clear();
-        if (ViewModel is not { } viewModel)
+        items.Clear();
+        if (viewModel is null)
         {
             return;
         }
@@ -25,7 +29,7 @@ public sealed partial class SleepTimerMenuFlyout : MenuFlyout
         {
             if (choice is SleepTimerChoice.Minutes15 or SleepTimerChoice.EndOfTrack)
             {
-                Items.Add(new MenuFlyoutSeparator());
+                items.Add(new MenuFlyoutSeparator());
             }
 
             var item = new RadioMenuFlyoutItem
@@ -36,7 +40,7 @@ public sealed partial class SleepTimerMenuFlyout : MenuFlyout
                 IsEnabled = choice != SleepTimerChoice.EndOfTrack || viewModel.CanStopAtEndOfTrack,
             };
             item.Click += (_, _) => viewModel.Choose(choice);
-            Items.Add(item);
+            items.Add(item);
         }
     }
 }

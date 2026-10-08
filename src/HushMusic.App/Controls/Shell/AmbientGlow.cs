@@ -11,6 +11,7 @@ namespace HushMusic.App.Controls.Shell;
 /// <summary>
 /// Ambient glow in the accent colour: a soft wash from the top-left behind the whole shell, blended over the background of
 /// the theme shown. Two stretched bitmaps cross-fade on every accent change; a theme change re-renders instantly.
+/// <see cref="IsActive"/> false hides it (the Minimal player layout) and stops it following the accent.
 /// </summary>
 /// <remarks>
 /// The glow is a tiny bitmap computed here and stretched over the window (bilinear upscaling makes it smooth).
@@ -19,6 +20,9 @@ namespace HushMusic.App.Controls.Shell;
 /// </remarks>
 public sealed partial class AmbientGlow : Grid
 {
+    public static readonly DependencyProperty IsActiveProperty = DependencyProperty.Register(
+        nameof(IsActive), typeof(bool), typeof(AmbientGlow), new PropertyMetadata(true, (d, _) => ((AmbientGlow)d).OnIsActiveChanged()));
+
     private const int GlowPixels = 64;
 
     // A hint of colour, not a light show. On white the same amount reads much stronger, so light gets a subtler wash.
@@ -34,28 +38,75 @@ public sealed partial class AmbientGlow : Grid
     private Color _background = DarkBackground;
     private double _strength = DarkStrength;
     private bool _showsA = true;
+    private bool _subscribed;
 
     public AmbientGlow()
     {
         IsHitTestVisible = false;
+
+        // Its opaque glow would cover Mica in the Windows design.
+        if (DesignSystems.IsWindowsActive)
+        {
+            Visibility = Visibility.Collapsed;
+        }
+
         Children.Add(_glowA);
         Children.Add(_glowB);
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    public bool IsActive
     {
+        get => (bool)GetValue(IsActiveProperty);
+        set => SetValue(IsActiveProperty, value);
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e) => Start();
+
+    private void OnUnloaded(object sender, RoutedEventArgs e) => Stop();
+
+    private void OnIsActiveChanged()
+    {
+        Visibility = IsActive ? Visibility.Visible : Visibility.Collapsed;
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (IsActive)
+        {
+            Start();
+        }
+        else
+        {
+            Stop();
+        }
+    }
+
+    // Follows the accent and the theme while loaded and active; shows the current accent at once.
+    private void Start()
+    {
+        if (!IsActive || _subscribed)
+        {
+            return;
+        }
+
+        _subscribed = true;
         UpdateTheme();
-        _accent.Changed -= OnAccentChanged;
         _accent.Changed += OnAccentChanged;
-        ActualThemeChanged -= OnActualThemeChanged;
         ActualThemeChanged += OnActualThemeChanged;
         Apply(_accent.Current, TimeSpan.Zero);
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e)
+    private void Stop()
     {
+        if (!_subscribed)
+        {
+            return;
+        }
+
+        _subscribed = false;
         _accent.Changed -= OnAccentChanged;
         ActualThemeChanged -= OnActualThemeChanged;
     }

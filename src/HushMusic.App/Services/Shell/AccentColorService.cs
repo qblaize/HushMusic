@@ -10,15 +10,17 @@ using HushMusic.Core.Models;
 namespace HushMusic.App.Services.Shell;
 
 /// <summary>
-/// The app accent: the current track's album-art colour (<see cref="AppSettings.AccentStyle"/> "Artwork") or a fixed
-/// <see cref="AccentPresets"/> entry, each tuned for legibility on the theme shown. The shared <c>AccentBrush</c>,
-/// <c>AccentSoftBrush</c> and <c>AccentForegroundBrush</c> resources are recoloured in place, so everything that
-/// references them follows. <c>AccentOnDarkBrush</c> is always the dark-theme tuning, for surfaces that stay dark in the
-/// light theme (Now Playing, mini player). Custom features can read <see cref="Current"/> or listen to <see cref="Changed"/>.
+/// The app accent: the current track's album-art colour (<see cref="AppSettings.AccentStyle"/> "Artwork"), a fixed
+/// <see cref="AccentPresets"/> entry or the Windows accent colour ("System"), each tuned for legibility per theme.
+/// The accent resources of Theme.xaml are recoloured in place, so everything that references them follows:
+/// <c>AccentBrush</c>, <c>AccentSoftBrush</c> and <c>AccentForegroundBrush</c> get the tuning of the theme the window
+/// shows, <c>AccentOnDarkBrush</c> always the dark one, and the theme-dictionary brushes <c>AccentTextBrush</c> and
+/// <c>AccentTintBrush</c> the tuning of their own theme. Custom features can read <see cref="Current"/> or listen to
+/// <see cref="Changed"/>.
 /// </summary>
 public interface IAccentColorService
 {
-    /// <summary>The accent colour being shown (or transitioned to). UI thread.</summary>
+    /// <summary>The accent colour being shown (or transitioned to), tuned for the window's theme. UI thread.</summary>
     Color Current { get; }
 
     /// <summary>Raised on the UI thread when a new accent is chosen, as its transition starts.</summary>
@@ -44,6 +46,9 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
 
     private const uint SampleSize = 40;
     private const int ArtWidth = 120;
+
+    // Alpha of the soft accent washes (AccentSoftBrush, AccentTintBrush).
+    private const byte TintAlpha = 0x33;
     private static readonly Color FallbackAccent = ColorHelper.FromArgb(0xFF, 0x9D, 0x7B, 0xFA);
 
     private readonly IPlayer _player;
@@ -55,21 +60,34 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
     private readonly Lock _gate = new();
     private readonly Stopwatch _clock = new();
 
+    // The theme-dictionary brushes: each takes the light or the dark tuning, as a solid colour or as a tint.
+    private readonly List<(SolidColorBrush Brush, bool Light, bool Tint)> _themed = [];
+
     private SolidColorBrush? _accentBrush;
     private SolidColorBrush? _softBrush;
     private SolidColorBrush? _foregroundBrush;
     private SolidColorBrush? _onDarkBrush;
     private Color _defaultAccent = FallbackAccent;
     private Color? _artColor;
+
+    // What the brushes show now, where the running transition started, and where it ends (Current is the window's accent).
+    private Color _shownLight;
+    private Color _shownDark;
+    private Color _shownAccent;
+    private Color _shownForeground;
+    private Color _fromLight;
+    private Color _fromDark;
     private Color _fromAccent;
     private Color _fromForeground;
+    private Color _toLight;
+    private Color _toDark;
     private Color _toForeground;
-    private Color _fromOnDark;
-    private Color _toOnDark;
+
     private CancellationTokenSource? _cts;
     private string? _requestedArt;
     private bool _started;
     private bool _animating;
+    private bool _systemAccentMissingLogged;
 
     public AccentColorService(
         IPlayer player,
@@ -104,18 +122,25 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
         _softBrush = FindResource("AccentSoftBrush") as SolidColorBrush;
         _foregroundBrush = FindResource("AccentForegroundBrush") as SolidColorBrush;
         _onDarkBrush = FindResource("AccentOnDarkBrush") as SolidColorBrush;
+        FindThemedBrushes("AccentTextBrush", tint: false);
+        FindThemedBrushes("AccentTintBrush", tint: true);
         if (FindResource("DefaultAccentColor") is Color defaultColor)
         {
             _defaultAccent = defaultColor;
         }
 
-        // Start on the right colour for the setting and theme, without a visible fade.
-        Current = _accentBrush?.Color ?? _defaultAccent;
+        // Start on the right colours for the setting and theme, without a visible fade.
+        _shownAccent = _accentBrush?.Color ?? _defaultAccent;
+        _shownDark = _onDarkBrush?.Color ?? _defaultAccent;
+        _shownLight = AccentPalette.MakeLegible(_defaultAccent, onLight: true);
+        _shownForeground = _foregroundBrush?.Color ?? Colors.White;
+        Current = _shownAccent;
         Retarget(animate: false);
 
         _theme.ThemeChanged += OnThemeChanged;
         _settings.Changed += OnSettingsChanged;
         _player.TrackChanged += OnTrackChanged;
+        SystemAccent.Changed += OnSystemAccentChanged;
         Follow(_player.CurrentTrack);
     }
 
@@ -124,6 +149,7 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
         _player.TrackChanged -= OnTrackChanged;
         _settings.Changed -= OnSettingsChanged;
         _theme.ThemeChanged -= OnThemeChanged;
+        SystemAccent.Changed -= OnSystemAccentChanged;
         lock (_gate)
         {
             _cts?.Cancel();
@@ -137,31 +163,53 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
         }
     }
 
-    // Player and settings events arrive on background threads; ThemeChanged on the UI thread.
+    // Player, settings and Windows colour events arrive on background threads; ThemeChanged on the UI thread.
     private void OnTrackChanged(object? sender, TrackChangedEventArgs e) => Follow(e.Track);
 
     private void OnSettingsChanged(object? sender, EventArgs e) => _dispatcher.Run(() => Retarget(animate: true));
 
     private void OnThemeChanged(object? sender, EventArgs e) => Retarget(animate: true);
 
-    private void Retarget(bool animate) => TransitionTo(Target(_theme.ActualTheme == ElementTheme.Light), Target(light: false), animate);
+    private void OnSystemAccentChanged(object? sender, EventArgs e) => _dispatcher.Run(() =>
+    {
+        if (AccentPresets.IsSystem(_settings.Current.AccentStyle))
+        {
+            Retarget(animate: true);
+        }
+    });
 
-    /// <summary>What the accent should be now: the preset, else the album-art colour, else the default, tuned for the theme.</summary>
+    private void Retarget(bool animate) => TransitionTo(Target(light: true), Target(light: false), animate);
+
+    /// <summary>What the accent should be now: the preset, the Windows accent, else the album-art colour, else the default, tuned for the theme.</summary>
     private Color Target(bool light)
     {
-        if (AccentPresets.Find(_settings.Current.AccentStyle) is { } preset)
+        var style = _settings.Current.AccentStyle;
+        if (AccentPresets.Find(style) is { } preset)
         {
             return light ? preset.Light : preset.Dark;
         }
 
-        if (_artColor is { } art)
+        if (AccentPresets.IsSystem(style))
         {
-            return AccentPalette.MakeLegible(art, light);
+            if (SystemAccent.Read() is { } shades)
+            {
+                return AccentPalette.ForSystem(shades, light);
+            }
+
+            if (!_systemAccentMissingLogged)
+            {
+                _systemAccentMissingLogged = true;
+                _logger.LogWarning("Windows did not report an accent colour; using the default accent");
+            }
+
+            return DefaultFor(light);
         }
 
-        // The dark default is the designed brand colour; on light it is darkened to stay readable.
-        return light ? AccentPalette.MakeLegible(_defaultAccent, onLight: true) : _defaultAccent;
+        return _artColor is { } art ? AccentPalette.MakeLegible(art, light) : DefaultFor(light);
     }
+
+    // The dark default is the designed brand colour; on light it is darkened to stay readable.
+    private Color DefaultFor(bool light) => light ? AccentPalette.MakeLegible(_defaultAccent, onLight: true) : _defaultAccent;
 
     private void Follow(Track? track)
     {
@@ -186,7 +234,7 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
             _cts = cts;
         }
 
-        // Extracted even while a preset is active, so switching back to "Artwork" is instant.
+        // Extracted even while a preset or the Windows accent is active, so switching back to "Artwork" is instant.
         _ = Task.Run(() => ResolveAsync(art, cts.Token));
     }
 
@@ -253,18 +301,25 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
         return AccentPalette.PickVibrant(pixels);
     }
 
-    private void TransitionTo(Color accent, Color onDark, bool animate)
+    private void TransitionTo(Color light, Color dark, bool animate)
     {
-        var shown = _accentBrush?.Color ?? Current;
-        if (!_started || (accent.Equals(Current) && (_animating || shown.Equals(accent))))
+        if (!_started)
+        {
+            return;
+        }
+
+        var accent = _theme.ActualTheme == ElementTheme.Light ? light : dark;
+        var settled = _shownAccent.Equals(accent) && _shownLight.Equals(light) && _shownDark.Equals(dark);
+        if (accent.Equals(Current) && light.Equals(_toLight) && dark.Equals(_toDark) && (_animating || settled))
         {
             return;
         }
 
         var previous = Current;
         Current = accent;
+        _toLight = light;
+        _toDark = dark;
         _toForeground = AccentPalette.ForegroundFor(accent);
-        _toOnDark = onDark;
         if (!animate)
         {
             if (_animating)
@@ -274,13 +329,14 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
                 _clock.Stop();
             }
 
-            Apply(accent, _toForeground, onDark);
+            Apply(light, dark, accent, _toForeground);
         }
         else
         {
-            _fromAccent = _accentBrush?.Color ?? previous;
-            _fromForeground = _foregroundBrush?.Color ?? Colors.White;
-            _fromOnDark = _onDarkBrush?.Color ?? onDark;
+            _fromLight = _shownLight;
+            _fromDark = _shownDark;
+            _fromAccent = _shownAccent;
+            _fromForeground = _shownForeground;
             _clock.Restart();
             if (!_animating)
             {
@@ -302,7 +358,11 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
 
         // Ease in-out (smoothstep): no visible jump at either end.
         var k = t * t * (3 - (2 * t));
-        Apply(AccentPalette.Lerp(_fromAccent, Current, k), AccentPalette.Lerp(_fromForeground, _toForeground, k), AccentPalette.Lerp(_fromOnDark, _toOnDark, k));
+        Apply(
+            AccentPalette.Lerp(_fromLight, _toLight, k),
+            AccentPalette.Lerp(_fromDark, _toDark, k),
+            AccentPalette.Lerp(_fromAccent, Current, k),
+            AccentPalette.Lerp(_fromForeground, _toForeground, k));
         if (t >= 1)
         {
             CompositionTarget.Rendering -= OnRendering;
@@ -325,11 +385,32 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
         }
     }
 
-    private void Apply(Color accent, Color foreground, Color onDark)
+    private void FindThemedBrushes(string key, bool tint)
     {
+        foreach (var (theme, value) in ThemeResources.AllThemeValues(key))
+        {
+            if (value is SolidColorBrush brush)
+            {
+                _themed.Add((brush, theme == ElementTheme.Light, tint));
+            }
+        }
+
+        if (!_themed.Exists(t => t.Tint == tint))
+        {
+            _logger.LogWarning("Theme resource {Key} not found; accent text will not follow the accent", key);
+        }
+    }
+
+    private void Apply(Color light, Color dark, Color accent, Color foreground)
+    {
+        _shownLight = light;
+        _shownDark = dark;
+        _shownAccent = accent;
+        _shownForeground = foreground;
+
         if (_onDarkBrush is not null)
         {
-            _onDarkBrush.Color = onDark;
+            _onDarkBrush.Color = dark;
         }
 
         if (_accentBrush is not null)
@@ -339,12 +420,18 @@ public sealed class AccentColorService : IAccentColorService, IDisposable
 
         if (_softBrush is not null)
         {
-            _softBrush.Color = AccentPalette.WithAlpha(accent, 0x33);
+            _softBrush.Color = AccentPalette.WithAlpha(accent, TintAlpha);
         }
 
         if (_foregroundBrush is not null)
         {
             _foregroundBrush.Color = foreground;
+        }
+
+        foreach (var (brush, isLight, tint) in _themed)
+        {
+            var color = isLight ? light : dark;
+            brush.Color = tint ? AccentPalette.WithAlpha(color, TintAlpha) : color;
         }
     }
 }

@@ -102,7 +102,7 @@ public sealed partial class AccentSwatchPicker : UserControl
                 button.Content = new FontIcon { Glyph = "", FontSize = 11 };
             }
 
-            var label = $"{swatch.Name}, {swatch.Description}";
+            var label = string.IsNullOrEmpty(swatch.Description) ? swatch.Name : $"{swatch.Name}, {swatch.Description}";
             AutomationProperties.SetName(button, label);
             AutomationProperties.SetPositionInSet(button, i + 1);
             AutomationProperties.SetSizeOfSet(button, swatches.Count);

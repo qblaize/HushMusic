@@ -1,0 +1,7 @@
+# Text files use LF in the repository and in working copies (see .editorconfig).
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.ttf binary
+*.zip binary

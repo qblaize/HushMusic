@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.Foundation;
@@ -9,8 +10,9 @@ using HushMusic.App.ViewModels.Shell;
 namespace HushMusic.App.Views;
 
 /// <summary>
-/// Window content: icon rail, title band, page frame, floating player bar, Now Playing, toasts and the search modal.
-/// Code-behind is UI glue only: shortcuts, rail labels, and hiding the shell while Now Playing covers it.
+/// Window content: icon rail, title band, page frame, player bar (floating or docked), Now Playing, toasts and the
+/// search modal. Code-behind is UI glue only: shortcuts, rail labels, the player bar for the layout, and hiding the shell
+/// while Now Playing covers it.
 /// </summary>
 public sealed partial class ShellPage : Page
 {
@@ -35,6 +37,13 @@ public sealed partial class ShellPage : Page
         NowPlaying.CoverChanged += (_, covered) => SetCoveredByNowPlaying(covered);
         AddHandler(PointerPressedEvent, new PointerEventHandler(OnPointerPressed), handledEventsToo: true);
         Loaded += OnLoaded;
+        Loaded += (_, _) =>
+        {
+            ViewModel.Player.PropertyChanged -= OnPlayerPropertyChanged;
+            ViewModel.Player.PropertyChanged += OnPlayerPropertyChanged;
+            ApplyPlayerLayout();
+        };
+        Unloaded += (_, _) => ViewModel.Player.PropertyChanged -= OnPlayerPropertyChanged;
     }
 
     /// <summary>Interactive elements inside the title band changed size or position (the window updates its pass-through regions).</summary>
@@ -114,6 +123,32 @@ public sealed partial class ShellPage : Page
         }
 
         TitleBarLayoutChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ===== Player layout =====
+
+    private void OnPlayerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PlayerViewModel.IsMinimalLayout))
+        {
+            ApplyPlayerLayout();
+        }
+    }
+
+    // The standard bar follows the layout by binding. The minimal one is created on first use, then only shown or
+    // hidden: switching back and forth never builds a second one.
+    private void ApplyPlayerLayout()
+    {
+        var minimal = ViewModel.Player.IsMinimalLayout;
+        if (minimal && MinimalBar is null)
+        {
+            FindName(nameof(MinimalBar));
+        }
+
+        if (MinimalBar is not null)
+        {
+            MinimalBar.Visibility = minimal ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
 
     // ===== Rail labels: shown at once, to the right of the item, vertically centred =====

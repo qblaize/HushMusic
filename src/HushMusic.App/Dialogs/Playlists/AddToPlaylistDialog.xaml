@@ -33,7 +33,7 @@
                     CornerRadius="{StaticResource RadiusSmall}">
                     <FontIcon
                         FontSize="14"
-                        Foreground="{StaticResource AccentBrush}"
+                        Foreground="{ThemeResource AccentTextBrush}"
                         Glyph="&#xE710;" />
                 </Border>
                 <TextBlock

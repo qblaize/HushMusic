@@ -1,6 +1,7 @@
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using HushMusic.App.Controls.MiniPlayer;
 using HushMusic.App.Services.Shell;
@@ -19,6 +20,13 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        if (DesignSystems.IsWindowsActive)
+        {
+            // Windows design: Mica, showing through wherever the content above is transparent.
+            SystemBackdrop = new MicaBackdrop();
+            RootGrid.Background = null;
+        }
 
         ExtendsContentIntoTitleBar = true;
         AppWindow.Resize(new SizeInt32(1280, 840));

@@ -12,7 +12,7 @@ namespace HushMusic.App.ViewModels.NowPlaying;
 /// The Cover Flow in Now Playing: the queue items around the current one, in play order (so shuffled when the queue
 /// is), keyed by <see cref="QueueItem.Id"/> so the view can glide each cover from its old place to its new one. Only
 /// <see cref="Reach"/> items on each side are mirrored. Off, with nothing mirrored, while the "Now Playing artwork"
-/// setting is Single. Singleton; every change is applied on the UI thread.
+/// setting is Single or the player layout is Minimal. Singleton; every change is applied on the UI thread.
 /// </summary>
 public sealed partial class CoverFlowViewModel : ObservableObject
 {
@@ -57,7 +57,7 @@ public sealed partial class CoverFlowViewModel : ObservableObject
         _dispatcher.Run(ApplySetting);
     }
 
-    /// <summary>False while the setting is Single: <see cref="Items"/> is empty and the view shows the single cover.</summary>
+    /// <summary>False while the setting is Single (or the layout Minimal): <see cref="Items"/> is empty and the view shows the single cover.</summary>
     [ObservableProperty]
     public partial bool IsEnabled { get; set; }
 
@@ -77,7 +77,7 @@ public sealed partial class CoverFlowViewModel : ObservableObject
 
     private void ApplySetting()
     {
-        var enabled = IsCoverFlow(_settings.Current.NowPlayingArtStyle);
+        var enabled = IsCoverFlow(_settings.Current.NowPlayingArtStyle) && !_playerViewModel.IsMinimalLayout;
         if (enabled != IsEnabled)
         {
             IsEnabled = enabled;
@@ -169,6 +169,10 @@ public sealed partial class CoverFlowViewModel : ObservableObject
         if (e.PropertyName is nameof(PlayerViewModel.LiveArtUrl) or nameof(PlayerViewModel.Track))
         {
             UpdateLiveArt();
+        }
+        else if (e.PropertyName == nameof(PlayerViewModel.IsMinimalLayout))
+        {
+            ApplySetting();
         }
     }
 

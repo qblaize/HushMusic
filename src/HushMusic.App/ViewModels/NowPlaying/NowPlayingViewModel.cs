@@ -18,6 +18,8 @@ public enum NowPlayingTab
 /// <summary>
 /// The full-window Now Playing view: open state, the right panel's tab, artwork and credits. Transport, seek and volume
 /// come from <see cref="PlayerViewModel"/>, shared with the player bar. Any navigation closes the view. Singleton.
+/// In the Minimal player layout the view keeps to the single artwork and the essential controls, and the side panel
+/// stays hidden until it is asked for (its toggle, or the bar's Lyrics / Up next).
 /// </summary>
 public sealed partial class NowPlayingViewModel : ObservableObject
 {
@@ -53,9 +55,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
             if (e.PropertyName == nameof(CoverFlowViewModel.IsEnabled))
             {
                 UpdateTrack();
-                OnPropertyChanged(nameof(ShowsPanel));
-                OnPropertyChanged(nameof(CanTogglePanel));
-                UpdateActiveTabs();
+                OnPanelStateChanged();
             }
         };
         Related.Navigating += (_, _) => Close();
@@ -106,16 +106,29 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     [ObservableProperty]
     public partial IReadOnlyList<CreditLink> ArtistCredits { get; set; } = [];
 
-    /// <summary>Cover Flow mode lets the user hide the side panel; the single artwork always shows it.</summary>
+    /// <summary>
+    /// Cover Flow mode lets the user hide the side panel (remembered); the single artwork always shows it, except in the
+    /// Minimal layout (see <see cref="IsMinimalPanelShown"/>).
+    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPanel), nameof(PanelToggleLabel))]
     public partial bool IsPanelHidden { get; set; }
 
-    public string PanelToggleLabel => IsPanelHidden ? "Show Up next and lyrics" : "Hide Up next and lyrics";
+    /// <summary>Minimal layout: the side panel is shown. Off each time the view opens without asking for a tab.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsPanel), nameof(PanelToggleLabel))]
+    public partial bool IsMinimalPanelShown { get; set; }
 
-    public bool ShowsPanel => !CoverFlow.IsEnabled || !IsPanelHidden;
+    /// <summary>The Minimal player layout: no Cover Flow, no drifting backdrop, fewer buttons, the panel on request.</summary>
+    public bool IsMinimal => Player.IsMinimalLayout;
 
-    public bool CanTogglePanel => CoverFlow.IsEnabled;
+    public bool IsStandard => !IsMinimal;
+
+    public string PanelToggleLabel => ShowsPanel ? "Hide Up next and lyrics" : "Show Up next and lyrics";
+
+    public bool ShowsPanel => IsMinimal ? IsMinimalPanelShown : !CoverFlow.IsEnabled || !IsPanelHidden;
+
+    public bool CanTogglePanel => IsMinimal || CoverFlow.IsEnabled;
 
     /// <summary>Lyrics and Related exist for YouTube tracks only, not live radio.</summary>
     public bool HasSongTabs => !Player.IsLive;
@@ -147,10 +160,18 @@ public sealed partial class NowPlayingViewModel : ObservableObject
             Tab = value;
 
             // Asked for a tab (player bar lyrics / queue buttons): show it even if the panel was hidden.
-            if (IsPanelHidden)
+            if (IsMinimal)
+            {
+                IsMinimalPanelShown = true;
+            }
+            else if (IsPanelHidden)
             {
                 TogglePanel();
             }
+        }
+        else if (IsMinimal && !IsOpen)
+        {
+            IsMinimalPanelShown = false;
         }
 
         IsOpen = true;
@@ -199,12 +220,20 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     [RelayCommand]
     private void TogglePanel()
     {
+        if (IsMinimal)
+        {
+            IsMinimalPanelShown = !IsMinimalPanelShown;
+            return;
+        }
+
         IsPanelHidden = !IsPanelHidden;
         var hidden = IsPanelHidden;
         _ = _settings.UpdateAsync(s => s.NowPlayingPanelHidden = hidden);
     }
 
     partial void OnIsPanelHiddenChanged(bool value) => UpdateActiveTabs();
+
+    partial void OnIsMinimalPanelShownChanged(bool value) => UpdateActiveTabs();
 
     partial void OnIsOpenChanged(bool value) => UpdateActiveTabs();
 
@@ -259,6 +288,22 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         {
             UpdateLiveCredits();
         }
+        else if (e.PropertyName == nameof(PlayerViewModel.IsMinimalLayout))
+        {
+            // Switching to Minimal starts with the panel hidden, also while the view is open.
+            IsMinimalPanelShown = false;
+            OnPropertyChanged(nameof(IsMinimal));
+            OnPropertyChanged(nameof(IsStandard));
+            OnPanelStateChanged();
+        }
+    }
+
+    private void OnPanelStateChanged()
+    {
+        OnPropertyChanged(nameof(ShowsPanel));
+        OnPropertyChanged(nameof(CanTogglePanel));
+        OnPropertyChanged(nameof(PanelToggleLabel));
+        UpdateActiveTabs();
     }
 
     private void UpdateTrack()

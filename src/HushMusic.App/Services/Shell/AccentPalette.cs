@@ -3,7 +3,7 @@ using Windows.UI;
 
 namespace HushMusic.App.Services.Shell;
 
-/// <summary>Colour maths for the album-art accent: dominant vibrant colour, legibility clamp, foreground choice. Pure and thread-safe.</summary>
+/// <summary>Colour maths for the accent: dominant vibrant colour of album art, legibility per theme, Windows accent shades, foreground choice. Pure and thread-safe.</summary>
 public static class AccentPalette
 {
     private const int HueBins = 36;
@@ -105,14 +105,7 @@ public static class AccentPalette
         // Saturation up a little: the luminance floor below lightens the colour, which would otherwise read as pastel.
         s = Math.Clamp(s * 1.15, 0.6, 0.95);
         l = Math.Clamp(l, 0.48, 0.72);
-        var result = FromHsl(h, s, l);
-        while (RelativeLuminance(result) < MinLuminance && l < 0.82)
-        {
-            l += 0.02;
-            result = FromHsl(h, s, l);
-        }
-
-        return result;
+        return Lighten(h, s, l, 0.82);
     }
 
     /// <summary>
@@ -129,14 +122,40 @@ public static class AccentPalette
         ToHsl(color, out var h, out var s, out var l);
         s = Math.Clamp(s * 1.1, 0.55, 0.9);
         l = Math.Clamp(l, 0.3, 0.5);
-        var result = FromHsl(h, s, l);
-        while (RelativeLuminance(result) > MaxLuminanceOnLight && l > 0.16)
+        return Darken(h, s, l, 0.16);
+    }
+
+    /// <summary>
+    /// The Windows accent for the theme: the shade Windows itself uses there (Light2 on dark, Dark1 on light), or the
+    /// next one that reads well enough as accent text. Hue and saturation are kept as the user chose them, so a muted or
+    /// grey accent stays muted; only the lightness is nudged when no shade is legible.
+    /// </summary>
+    public static Color ForSystem(SystemAccentShades shades, bool onLight)
+    {
+        if (onLight)
         {
-            l -= 0.02;
-            result = FromHsl(h, s, l);
+            foreach (var shade in (ReadOnlySpan<Color>)[shades.Dark1, shades.Dark2, shades.Dark3])
+            {
+                if (RelativeLuminance(shade) <= MaxLuminanceOnLight)
+                {
+                    return shade;
+                }
+            }
+
+            ToHsl(shades.Dark3, out var h, out var s, out var l);
+            return Darken(h, s, l, 0.1);
         }
 
-        return result;
+        foreach (var shade in (ReadOnlySpan<Color>)[shades.Light2, shades.Light3])
+        {
+            if (RelativeLuminance(shade) >= MinLuminance)
+            {
+                return shade;
+            }
+        }
+
+        ToHsl(shades.Light3, out var hue, out var saturation, out var lightness);
+        return Lighten(hue, saturation, lightness, 0.9);
     }
 
     /// <summary>
@@ -162,6 +181,32 @@ public static class AccentPalette
         ColorHelper.FromArgb(0xFF, LerpByte(background.R, tint.R, amount), LerpByte(background.G, tint.G, amount), LerpByte(background.B, tint.B, amount));
 
     private static byte LerpByte(byte a, byte b, double t) => (byte)Math.Round(a + ((b - a) * t));
+
+    // Raises the HSL lightness in small steps until the colour reads on the dark background (or the cap is reached).
+    private static Color Lighten(double h, double s, double l, double maxLightness)
+    {
+        var result = FromHsl(h, s, l);
+        while (RelativeLuminance(result) < MinLuminance && l < maxLightness)
+        {
+            l += 0.02;
+            result = FromHsl(h, s, l);
+        }
+
+        return result;
+    }
+
+    // Lowers the HSL lightness in small steps until the colour reads on white (or the floor is reached).
+    private static Color Darken(double h, double s, double l, double minLightness)
+    {
+        var result = FromHsl(h, s, l);
+        while (RelativeLuminance(result) > MaxLuminanceOnLight && l > minLightness)
+        {
+            l -= 0.02;
+            result = FromHsl(h, s, l);
+        }
+
+        return result;
+    }
 
     private static double Linear(byte channel)
     {

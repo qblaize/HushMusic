@@ -21,7 +21,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="ACCOUNT" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Account')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <Grid Padding="16" ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
@@ -93,9 +93,33 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="APPEARANCE" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Appearance')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
+                        <settings:SettingsRow Title="Design" Description="Hush's own look, or the standard Windows 11 look (Mica, Segoe UI, stock controls).">
+                            <settings:SegmentedPicker
+                                AutomationProperties.AutomationId="DesignSystemPicker"
+                                Options="{x:Bind ViewModel.DesignSystemOptions}"
+                                SelectedValue="{x:Bind ViewModel.DesignSystem, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <settings:SettingsRow
+                            Title="Restart to apply the new design"
+                            Description="The rest of your settings stay as they are."
+                            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsDesignRestartPending), Mode=OneWay}">
+                            <Button
+                                AutomationProperties.AutomationId="RestartForDesignButton"
+                                Command="{x:Bind ViewModel.RestartForDesignCommand}"
+                                Content="Restart now"
+                                Style="{StaticResource PillButtonStyle}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Player layout" Description="Minimal keeps the player bar and Now Playing to the essentials.">
+                            <settings:SegmentedPicker
+                                AutomationProperties.AutomationId="PlayerLayoutPicker"
+                                Options="{x:Bind ViewModel.PlayerLayoutOptions}"
+                                SelectedValue="{x:Bind ViewModel.PlayerLayout, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Theme" Description="Auto follows the light or dark mode set in Windows.">
                             <settings:SegmentedPicker Options="{x:Bind ViewModel.ThemeOptions}" SelectedValue="{x:Bind ViewModel.Theme, Mode=TwoWay}" />
                         </settings:SettingsRow>
@@ -104,9 +128,10 @@
                             <settings:AccentSwatchPicker SelectedValue="{x:Bind ViewModel.AccentStyle, Mode=TwoWay}" Swatches="{x:Bind ViewModel.AccentSwatches, Mode=OneWay}" />
                         </settings:SettingsRow>
                         <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
-                        <settings:SettingsRow Title="Now Playing artwork" Description="Show just the current cover, or the songs before and after it as a Cover Flow.">
+                        <settings:SettingsRow Title="Now Playing artwork" Description="{x:Bind ViewModel.ArtStyleDescription, Mode=OneWay}">
                             <settings:SegmentedPicker
                                 AutomationProperties.AutomationId="NowPlayingArtStylePicker"
+                                IsEnabled="{x:Bind ViewModel.IsArtStyleAvailable, Mode=OneWay}"
                                 Options="{x:Bind ViewModel.NowPlayingArtStyleOptions}"
                                 SelectedValue="{x:Bind ViewModel.NowPlayingArtStyle, Mode=TwoWay}" />
                         </settings:SettingsRow>
@@ -117,7 +142,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="PLAYBACK" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Playback')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
                         <settings:SettingsRow Title="Normalize volume" Description="Evens out loud and quiet songs, so you don't have to keep reaching for the volume.">
@@ -142,7 +167,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="WINDOW" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Window')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
                         <settings:SettingsRow Title="Keep playing in the notification area when closed" Description="Closing the window keeps the music going. Quit from the icon in the notification area.">
@@ -163,7 +188,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="LAST.FM" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Last.fm')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
                         <!--  Status, with the actions of the current step on the right.  -->
@@ -287,7 +312,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="CONTENT" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Content')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <settings:SettingsRow Title="Content country" Description="Two-letter country code (InnerTube gl, e.g. US) that shapes recommendations and charts. Leave empty for the default.">
                         <TextBox
@@ -303,7 +328,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="STREAM RESOLVER (YT-DLP)" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Stream resolver (yt-dlp)')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
                         <Grid Style="{StaticResource SettingsRowStyle}">
@@ -399,7 +424,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="DIAGNOSTICS" />
+                    Text="{x:Bind helpers:Format.SectionHeader('Diagnostics')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
                         <settings:SettingsRow Title="Log level">
@@ -435,7 +460,7 @@
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
-                    Text="ABOUT" />
+                    Text="{x:Bind helpers:Format.SectionHeader('About')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
                         <Grid Style="{StaticResource SettingsRowStyle}">

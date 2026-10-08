@@ -16,7 +16,7 @@
         <items:FadingArtwork
             DecodeSize="24"
             FadeFrom="0.3"
-            Opacity="0.55"
+            Opacity="{ThemeResource ArtworkWashOpacity}"
             TopOpacity="0.35"
             Url="{x:Bind WashUrl(ArtUrl, PreviewArtUrl), Mode=OneWay}" />
 
@@ -63,7 +63,9 @@
                 MaxWidth="760"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Bottom">
+                <!-- Secondary, not the eyebrow's usual tertiary: it sits on the artwork wash, not on the plain page. -->
                 <TextBlock
+                    Foreground="{ThemeResource TextSecondaryBrush}"
                     Style="{StaticResource EyebrowStyle}"
                     Text="{x:Bind items:ItemFormat.Upper(Eyebrow), Mode=OneWay}"
                     Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(Eyebrow), Mode=OneWay}" />
@@ -77,7 +79,7 @@
                 <items:ArtistLinks
                     Margin="0,4,0,0"
                     Artists="{x:Bind Artists, Mode=OneWay}"
-                    LinkForeground="{StaticResource AccentBrush}"
+                    LinkForeground="{ThemeResource AccentTextBrush}"
                     TextStyle="{StaticResource Title3Style}" />
                 <items:ClampedText
                     MaxWidth="640"

@@ -228,13 +228,13 @@
                         Width="6"
                         Height="6"
                         VerticalAlignment="Center"
-                        Fill="{StaticResource AccentBrush}" />
+                        Fill="{ThemeResource AccentTextBrush}" />
                     <TextBlock
                         VerticalAlignment="Center"
                         CharacterSpacing="40"
                         FontSize="10"
                         FontWeight="SemiBold"
-                        Foreground="{StaticResource AccentBrush}"
+                        Foreground="{ThemeResource AccentTextBrush}"
                         Style="{StaticResource FootnoteStyle}"
                         Text="LIVE" />
                     <TextBlock

@@ -7,6 +7,7 @@
     <!--
         The Application theme stays Dark (it can't change while running). The theme the user picks (Dark / Light / follow
         Windows) is applied by ThemeService as RequestedTheme on the window content; popups get it explicitly.
+        The Windows design (Settings > Design) puts Resources/Fluent over these dictionaries at startup (DesignSystems).
     -->
     <Application.Resources>
         <ResourceDictionary>

@@ -7,8 +7,8 @@ using HushMusic.App.ViewModels.Shell;
 namespace HushMusic.App.Controls;
 
 /// <summary>
-/// Floating glass player bar. Logic lives in <see cref="PlayerViewModel"/> and <see cref="NowPlayingViewModel"/>; this
-/// tracks seek drags and accepts tracks dropped from pages (added to the queue).
+/// Floating glass player bar (Standard layout). Logic lives in <see cref="PlayerViewModel"/> and
+/// <see cref="NowPlayingViewModel"/>; this tracks seek drags and accepts tracks dropped from pages (added to the queue).
 /// </summary>
 public sealed partial class PlayerBar : UserControl
 {
@@ -26,28 +26,23 @@ public sealed partial class PlayerBar : UserControl
 
     public NowPlayingViewModel NowPlaying { get; } = App.GetService<NowPlayingViewModel>();
 
-    private void OnSeekPointerPressed(object sender, PointerRoutedEventArgs e) => ViewModel.BeginSeek();
-
-    private void OnSeekPointerReleased(object sender, PointerRoutedEventArgs e) => ViewModel.EndSeek();
-
-    private void OnDragOver(object sender, DragEventArgs e)
+    /// <summary>Accepts tracks dragged over a player bar. Returns false for anything else.</summary>
+    internal static bool AcceptTrackDrag(DragEventArgs e)
     {
         if (!TrackDragData.Has(e.DataView))
         {
-            return;
+            return false;
         }
 
         e.AcceptedOperation = DataPackageOperation.Copy;
         e.DragUIOverride.Caption = "Add to queue";
         e.DragUIOverride.IsGlyphVisible = false;
-        DropHighlight.Visibility = Visibility.Visible;
+        return true;
     }
 
-    private void OnDragLeave(object sender, DragEventArgs e) => DropHighlight.Visibility = Visibility.Collapsed;
-
-    private async void OnDrop(object sender, DragEventArgs e)
+    /// <summary>Adds the tracks dropped on a player bar to the queue.</summary>
+    internal static async Task AddDroppedTracksAsync(DragEventArgs e, NowPlayingViewModel nowPlaying)
     {
-        DropHighlight.Visibility = Visibility.Collapsed;
         if (!TrackDragData.Has(e.DataView))
         {
             return;
@@ -58,7 +53,7 @@ public sealed partial class PlayerBar : UserControl
         {
             if (await TrackDragData.TryGetAsync(e.DataView) is { Count: > 0 } tracks)
             {
-                NowPlaying.Queue.AddToQueue(tracks);
+                nowPlaying.Queue.AddToQueue(tracks);
             }
         }
         catch (Exception)
@@ -69,5 +64,25 @@ public sealed partial class PlayerBar : UserControl
         {
             deferral.Complete();
         }
+    }
+
+    private void OnSeekPointerPressed(object sender, PointerRoutedEventArgs e) => ViewModel.BeginSeek();
+
+    private void OnSeekPointerReleased(object sender, PointerRoutedEventArgs e) => ViewModel.EndSeek();
+
+    private void OnDragOver(object sender, DragEventArgs e)
+    {
+        if (AcceptTrackDrag(e))
+        {
+            DropHighlight.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void OnDragLeave(object sender, DragEventArgs e) => DropHighlight.Visibility = Visibility.Collapsed;
+
+    private async void OnDrop(object sender, DragEventArgs e)
+    {
+        DropHighlight.Visibility = Visibility.Collapsed;
+        await AddDroppedTracksAsync(e, NowPlaying);
     }
 }

@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
 using Microsoft.Windows.AppLifecycle;
 using Velopack;
+using HushMusic.App.Services.Shell;
 using HushMusic.App.Services.Updates;
 using HushMusic.Core.Services;
 
@@ -33,6 +34,10 @@ public static class Program
 
         XamlCheckProcessRequirements();
         WinRT.ComWrappersSupport.InitializeComWrappers();
+
+        // A restart (e.g. for a new design) starts this copy while the old one is still shutting down: let it finish
+        // before this one becomes the running copy.
+        DesignSystems.WaitForPreviousInstance(args);
 
         var mainInstance = AppInstance.FindOrRegisterForKey(InstanceKey);
         if (!mainInstance.IsCurrent)

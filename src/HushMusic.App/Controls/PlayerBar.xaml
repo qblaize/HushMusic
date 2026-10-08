@@ -9,85 +9,9 @@
 
     <UserControl.Resources>
         <ResourceDictionary>
-            <!--
-                Thin Apple-style sliders: 3 px rail, accent fill that follows the accent, knob only on hover.
-                Aliases to theme tokens live in theme dictionaries: a plain StaticResource alias would keep one theme's value.
-            -->
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Default">
-                    <StaticResource x:Key="SliderTrackFill" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderTrackFillDisabled" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderThumbBackgroundPointerOver" ResourceKey="TextPrimaryBrush" />
-                    <StaticResource x:Key="SliderThumbBackgroundPressed" ResourceKey="TextPrimaryBrush" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Light">
-                    <StaticResource x:Key="SliderTrackFill" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderTrackFillDisabled" ResourceKey="SliderRailBrush" />
-                    <StaticResource x:Key="SliderThumbBackgroundPointerOver" ResourceKey="TextPrimaryBrush" />
-                    <StaticResource x:Key="SliderThumbBackgroundPressed" ResourceKey="TextPrimaryBrush" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-
-            <x:Double x:Key="SliderTrackThemeHeight">3</x:Double>
-            <x:Double x:Key="SliderHorizontalHeight">16</x:Double>
-            <x:Double x:Key="SliderPreContentMargin">6.5</x:Double>
-            <x:Double x:Key="SliderPostContentMargin">6.5</x:Double>
-            <x:Double x:Key="SliderHorizontalThumbWidth">14</x:Double>
-            <x:Double x:Key="SliderHorizontalThumbHeight">14</x:Double>
-            <x:Double x:Key="SliderInnerThumbWidth">11</x:Double>
-            <x:Double x:Key="SliderInnerThumbHeight">11</x:Double>
-            <CornerRadius x:Key="SliderTrackCornerRadius">1.5</CornerRadius>
-            <StaticResource x:Key="SliderTrackValueFill" ResourceKey="AccentBrush" />
-            <StaticResource x:Key="SliderTrackValueFillPointerOver" ResourceKey="AccentBrush" />
-            <StaticResource x:Key="SliderTrackValueFillPressed" ResourceKey="AccentBrush" />
-            <SolidColorBrush x:Key="SliderOuterThumbBackground" Color="Transparent" />
-            <SolidColorBrush x:Key="SliderThumbBorderBrush" Color="Transparent" />
-            <SolidColorBrush x:Key="SliderThumbBackground" Color="Transparent" />
-            <SolidColorBrush x:Key="SliderThumbBackgroundDisabled" Color="Transparent" />
-            <SolidColorBrush x:Key="SliderTrackValueFillDisabled" Color="Transparent" />
-
-            <!--  The artwork opens Now Playing: no chrome, dims a little when pressed.  -->
-            <Style x:Key="PlayerArtButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="Transparent" />
-                <Setter Property="BorderThickness" Value="0" />
-                <Setter Property="Padding" Value="0" />
-                <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
-                <Setter Property="UseSystemFocusVisuals" Value="True" />
-                <Setter Property="FocusVisualMargin" Value="-2" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <ContentPresenter
-                                x:Name="ContentPresenter"
-                                AutomationProperties.AccessibilityView="Raw"
-                                Background="{TemplateBinding Background}"
-                                Content="{TemplateBinding Content}"
-                                CornerRadius="{TemplateBinding CornerRadius}">
-                                <VisualStateManager.VisualStateGroups>
-                                    <VisualStateGroup x:Name="CommonStates">
-                                        <VisualState x:Name="Normal" />
-                                        <VisualState x:Name="PointerOver">
-                                            <VisualState.Setters>
-                                                <Setter Target="ContentPresenter.Opacity" Value="0.88" />
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="Pressed">
-                                            <VisualState.Setters>
-                                                <Setter Target="ContentPresenter.Opacity" Value="0.72" />
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="Disabled" />
-                                    </VisualStateGroup>
-                                </VisualStateManager.VisualStateGroups>
-                            </ContentPresenter>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Controls/PlayerBarResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -286,7 +210,7 @@
                             Height="2"
                             Margin="44,0,44,0"
                             VerticalAlignment="Center"
-                            Fill="{StaticResource AccentBrush}"
+                            Fill="{ThemeResource AccentTextBrush}"
                             Opacity="0.35"
                             RadiusX="1"
                             RadiusY="1" />
@@ -375,7 +299,7 @@
                                 Visibility="{x:Bind helpers:Format.CollapsedIf(NowPlaying.SleepTimer.IsActive), Mode=OneWay}" />
                             <FontIcon
                                 FontSize="15"
-                                Foreground="{StaticResource AccentBrush}"
+                                Foreground="{ThemeResource AccentTextBrush}"
                                 Glyph="&#xE708;"
                                 Visibility="{x:Bind helpers:Format.VisibleIf(NowPlaying.SleepTimer.IsActive), Mode=OneWay}" />
                         </Grid>

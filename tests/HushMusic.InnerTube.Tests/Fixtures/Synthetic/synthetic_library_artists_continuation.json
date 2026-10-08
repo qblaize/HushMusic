@@ -1,0 +1,153 @@
+{
+ "_synthetic": "musicShelfContinuation page; row copied from search_artists.json row 3",
+ "continuationContents": {
+  "musicShelfContinuation": {
+   "contents": [
+    {
+     "musicResponsiveListItemRenderer": {
+      "thumbnail": {
+       "musicThumbnailRenderer": {
+        "thumbnail": {
+         "thumbnails": [
+          {
+           "url": "https://lh3.googleusercontent.com/4tfdSY9xKgidwJ8GwVmiKAFMfSAW-5TEXCy78ATFMzXjg57kXNx_pmLCuJafVE8R3wGkhxquy0np5Ok=w60-h60-p-l90-rj",
+           "width": 60,
+           "height": 60
+          },
+          {
+           "url": "https://lh3.googleusercontent.com/4tfdSY9xKgidwJ8GwVmiKAFMfSAW-5TEXCy78ATFMzXjg57kXNx_pmLCuJafVE8R3wGkhxquy0np5Ok=w120-h120-p-l90-rj",
+           "width": 120,
+           "height": 120
+          }
+         ]
+        },
+        "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_CIRCLE",
+        "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+       }
+      },
+      "flexColumns": [
+       {
+        "musicResponsiveListItemFlexColumnRenderer": {
+         "text": {
+          "runs": [
+           {
+            "text": "Pharrell"
+           }
+          ]
+         },
+         "displayPriority": "MUSIC_RESPONSIVE_LIST_ITEM_COLUMN_DISPLAY_PRIORITY_HIGH"
+        }
+       },
+       {
+        "musicResponsiveListItemFlexColumnRenderer": {
+         "text": {
+          "runs": [
+           {
+            "text": "Artist"
+           },
+           {
+            "text": " • "
+           },
+           {
+            "text": "75.4M monthly audience"
+           }
+          ],
+          "accessibility": {
+           "accessibilityData": {
+            "label": "Artist • 75.4M monthly audience"
+           }
+          }
+         },
+         "displayPriority": "MUSIC_RESPONSIVE_LIST_ITEM_COLUMN_DISPLAY_PRIORITY_HIGH"
+        }
+       }
+      ],
+      "menu": {
+       "menuRenderer": {
+        "items": [
+         {
+          "menuNavigationItemRenderer": {
+           "text": {
+            "runs": [
+             {
+              "text": "Shuffle play"
+             }
+            ]
+           },
+           "icon": {
+            "iconType": "MUSIC_SHUFFLE"
+           },
+           "navigationEndpoint": {
+            "watchPlaylistEndpoint": {
+             "playlistId": "RDAO_6oDXbk7AC3eLw4RBn9IIg",
+             "params": "wAEB8gECGAE%3D"
+            }
+           }
+          }
+         },
+         {
+          "menuNavigationItemRenderer": {
+           "text": {
+            "runs": [
+             {
+              "text": "Start mix"
+             }
+            ]
+           },
+           "icon": {
+            "iconType": "MIX"
+           },
+           "navigationEndpoint": {
+            "watchPlaylistEndpoint": {
+             "playlistId": "RDEM_6oDXbk7AC3eLw4RBn9IIg",
+             "params": "wAEB"
+            }
+           }
+          }
+         },
+         {
+          "menuNavigationItemRenderer": {
+           "text": {
+            "runs": [
+             {
+              "text": "Share"
+             }
+            ]
+           },
+           "icon": {
+            "iconType": "SHARE"
+           },
+           "navigationEndpoint": {
+            "shareEntityEndpoint": {
+             "serializedShareEntity": "GhhVQ0p3OFZ5TzZlM3Y2UzAzMjdBc2d3Y1E%3D",
+             "sharePanelType": "SHARE_PANEL_TYPE_UNIFIED_SHARE_PANEL"
+            }
+           }
+          }
+         }
+        ],
+        "accessibility": {
+         "accessibilityData": {
+          "label": "Action menu"
+         }
+        }
+       }
+      },
+      "flexColumnDisplayStyle": "MUSIC_RESPONSIVE_LIST_ITEM_FLEX_COLUMN_DISPLAY_STYLE_TWO_LINE_STACK",
+      "navigationEndpoint": {
+       "browseEndpoint": {
+        "browseId": "UCJw8VyO6e3v6S0327AsgwcQ",
+        "browseEndpointContextSupportedConfigs": {
+         "browseEndpointContextMusicConfig": {
+          "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+         }
+        }
+       }
+      },
+      "itemHeight": "MUSIC_RESPONSIVE_LIST_ITEM_HEIGHT_TALL"
+     }
+    }
+   ]
+  }
+ }
+}

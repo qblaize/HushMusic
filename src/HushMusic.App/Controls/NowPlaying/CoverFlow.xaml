@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--  The Now Playing Cover Flow: the current cover in the middle, the songs before and after it stacked behind.  -->
+<UserControl
+    x:Class="HushMusic.App.Controls.NowPlaying.CoverFlow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    IsTabStop="False">
+
+    <!--  Covers are placed in code; Tab moves through the side covers in queue order.  -->
+    <Canvas x:Name="Stage" TabFocusNavigation="Local" />
+</UserControl>

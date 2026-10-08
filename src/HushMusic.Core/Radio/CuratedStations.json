@@ -1,0 +1,689 @@
+{
+  "genres": [
+    {
+      "id": "deep-house",
+      "name": "Deep House",
+      "tags": [
+        "deep house"
+      ],
+      "stations": [
+        {
+          "id": "960eb232-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Beat Blender",
+          "streamUrl": "https://ice2.somafm.com/beatblender-128-mp3",
+          "homepage": "https://somafm.com/beatblender/",
+          "logoUrl": "https://somafm.com/img3/beatblender-400.jpg",
+          "tags": [
+            "deep house",
+            "downtempo",
+            "chillout"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "f65094f5-2cae-4d4e-ab4a-12f2e7d274bb",
+          "name": "Deep House Radio Bucharest",
+          "streamUrl": "http://live.dancemusic.ro:7000/radio.mp3",
+          "homepage": "http://www.dancemusic.ro/",
+          "logoUrl": "http://www.dancemusic.ro/dancemusic-favicon.png",
+          "tags": [
+            "deep house"
+          ],
+          "country": "Romania",
+          "countryCode": "RO",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "fd92e72f-2cbe-11e8-91bf-52543be04c81",
+          "name": "dinamo.fm deep",
+          "streamUrl": "http://channels.dinamo.fm/deep-mp3",
+          "homepage": "http://www.dinamo.fm/",
+          "logoUrl": "https://www.dinamo.fm/favicons/dinamo-deep-favicon.jpg",
+          "tags": [
+            "deep house",
+            "nu disco"
+          ],
+          "country": "Türkiye",
+          "countryCode": "TR",
+          "codec": "MP3",
+          "bitrate": 320
+        },
+        {
+          "id": "83fd90c1-8810-4007-ab47-5a351ac41192",
+          "name": "Radio Record Deep",
+          "streamUrl": "https://radiorecord.hostingradio.ru/deep96.aacp",
+          "homepage": "https://www.radiorecord.ru/",
+          "logoUrl": "https://www.radiorecord.ru/icons/apple-touch-icon.png",
+          "tags": [
+            "deep house"
+          ],
+          "country": "Russia",
+          "countryCode": "RU",
+          "codec": "AAC+"
+        },
+        {
+          "id": "962a748b-0601-11e8-ae97-52543be04c81",
+          "name": "1.FM Deep House Radio",
+          "streamUrl": "http://strm112.1.fm/deephouse_mobile_mp3",
+          "homepage": "http://www.1.fm/",
+          "tags": [
+            "deep house"
+          ],
+          "country": "Switzerland",
+          "countryCode": "CH",
+          "codec": "MP3",
+          "bitrate": 256
+        },
+        {
+          "id": "cc0fdbe3-a2fb-4f0a-b67d-b47acd6354c7",
+          "name": "Technolovers Deep House",
+          "streamUrl": "https://stream.technolovers.fm/deep-house",
+          "homepage": "https://technolovers.fm/",
+          "logoUrl": "https://i.ibb.co/Y7PzyGxb/Deep-House-TL.png",
+          "tags": [
+            "deep house"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 192
+        }
+      ]
+    },
+    {
+      "id": "tech-house",
+      "name": "Tech House",
+      "tags": [
+        "tech house"
+      ],
+      "stations": [
+        {
+          "id": "efe59d93-2fe4-11e8-91bf-52543be04c81",
+          "name": "Sunshine Live Tech House",
+          "streamUrl": "https://stream.sunshine-live.de/sp4/mp3-192/stream.sunshine-live.de/",
+          "homepage": "https://www.sunshine-live.de/",
+          "tags": [
+            "tech house"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "b52522ba-f0b3-475f-88a2-0c9016fe1d05",
+          "name": "bigFM House Beats",
+          "streamUrl": "https://stream.bigfm.de/deeptechhouse/mp3-128/radio-browser",
+          "homepage": "https://www.bigfm.de/",
+          "logoUrl": "https://image.atsw.de/atsw/production/2024-12/600x600_pxbigfm_houseb.jpg",
+          "tags": [
+            "tech house",
+            "deep house"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "fd0cfcb9-2ad5-11e8-91bf-52543be04c81",
+          "name": "RauteMusik TechHouse",
+          "streamUrl": "https://techhouse-high.rautemusik.fm/",
+          "homepage": "https://www.rm.fm/techhouse",
+          "logoUrl": "https://www.rm.fm/favicon.ico",
+          "tags": [
+            "tech house"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 192
+        },
+        {
+          "id": "0ac7f5db-6f86-428f-8bb2-66ecce89ad1a",
+          "name": "1.FM Deep Techno & Deep House",
+          "streamUrl": "http://strm112.1.fm/deeptech_mobile_mp3",
+          "homepage": "http://www.1.fm/",
+          "tags": [
+            "deep tech",
+            "tech house"
+          ],
+          "country": "Switzerland",
+          "countryCode": "CH",
+          "codec": "MP3",
+          "bitrate": 256
+        },
+        {
+          "id": "01fa3ef0-acf6-4e63-8777-f5bb4957b5ec",
+          "name": "Technolovers Minimal",
+          "streamUrl": "https://stream.technolovers.fm/minimal",
+          "homepage": "https://technolovers.fm/",
+          "logoUrl": "https://i.ibb.co/LncDTYz/MINIMAL-TL.jpg",
+          "tags": [
+            "minimal",
+            "tech house"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 192
+        },
+        {
+          "id": "960e4940-0601-11e8-ae97-52543be04c81",
+          "name": "Ibiza Global Radio",
+          "streamUrl": "http://ibizaglobalradio.streaming-pro.com:8024/",
+          "homepage": "https://www.ibizaglobalradio.com/",
+          "logoUrl": "https://static-media.streema.com/media/cache/3f/59/3f598fc0753b556f206a5c9d80d034ea.jpg",
+          "tags": [
+            "house",
+            "tech house"
+          ],
+          "country": "Spain",
+          "countryCode": "ES",
+          "codec": "MP3"
+        }
+      ]
+    },
+    {
+      "id": "smooth",
+      "name": "Smooth & Lounge",
+      "tags": [
+        "smooth jazz",
+        "lounge"
+      ],
+      "stations": [
+        {
+          "id": "960c7c81-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Secret Agent",
+          "streamUrl": "https://ice2.somafm.com/secretagent-128-mp3",
+          "homepage": "https://somafm.com/secretagent/",
+          "logoUrl": "https://somafm.com/img3/secretagent-400.jpg",
+          "tags": [
+            "lounge",
+            "downtempo"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "c279cd11-8c6e-4bcf-b2c2-64a85bea22be",
+          "name": "SomaFM Bossa Beyond",
+          "streamUrl": "https://ice5.somafm.com/bossa-128-aac",
+          "homepage": "https://somafm.com/bossa/",
+          "logoUrl": "https://somafm.com/logos/400/bossa-400.jpg",
+          "tags": [
+            "bossa nova",
+            "lounge"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "AAC",
+          "bitrate": 128
+        },
+        {
+          "id": "478fd7f4-dc36-11e9-a8ba-52543be04c81",
+          "name": "Smooth Chill",
+          "streamUrl": "https://media-ssl.musicradio.com/ChillMP3",
+          "homepage": "https://www.smoothradio.com/chill/",
+          "logoUrl": "https://www.smoothradio.com/assets_v4r/smooth/img/favicon-196x196.png",
+          "tags": [
+            "chill",
+            "smooth"
+          ],
+          "country": "United Kingdom",
+          "countryCode": "GB",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "961ac56b-0601-11e8-ae97-52543be04c81",
+          "name": "Radio Swiss Jazz",
+          "streamUrl": "http://stream.srg-ssr.ch/m/rsj/mp3_128",
+          "homepage": "https://www.radioswissjazz.ch/",
+          "logoUrl": "https://www.radioswissjazz.ch/social-media/rsj-web.png",
+          "tags": [
+            "jazz",
+            "smooth jazz"
+          ],
+          "country": "Switzerland",
+          "countryCode": "CH",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "d28420a4-eccf-47a2-ace1-088c7e7cb7e0",
+          "name": "101 Smooth Jazz",
+          "streamUrl": "http://jking.cdnstream1.com/b22139_128mp3",
+          "homepage": "http://101smoothjazz.com/",
+          "logoUrl": "http://101smoothjazz.com/favicon.ico",
+          "tags": [
+            "smooth jazz"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 192
+        },
+        {
+          "id": "d88c0d24-adb2-11e9-88f4-52543be04c81",
+          "name": "Radio Paradise Mellow Mix",
+          "streamUrl": "https://stream.radioparadise.com/mellow-128",
+          "homepage": "https://radioparadise.com/",
+          "logoUrl": "https://radioparadise.com/apple-touch-icon.png",
+          "tags": [
+            "mellow",
+            "eclectic"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "AAC",
+          "bitrate": 320
+        },
+        {
+          "id": "9612102b-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Seven Inch Soul",
+          "streamUrl": "https://ice2.somafm.com/7soul-128-mp3",
+          "homepage": "https://somafm.com/7soul/",
+          "logoUrl": "https://somafm.com/img3/7soul-400.jpg",
+          "tags": [
+            "soul"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 160
+        }
+      ]
+    },
+    {
+      "id": "fresh",
+      "name": "Fresh",
+      "tags": [
+        "new music",
+        "indie"
+      ],
+      "stations": [
+        {
+          "id": "96394224-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Indie Pop Rocks!",
+          "streamUrl": "https://ice2.somafm.com/indiepop-128-aac",
+          "homepage": "https://somafm.com/indiepop/",
+          "logoUrl": "https://somafm.com/img3/indiepop-400.jpg",
+          "tags": [
+            "indie pop",
+            "new music"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "AAC",
+          "bitrate": 128
+        },
+        {
+          "id": "960e0117-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM PopTron",
+          "streamUrl": "https://ice2.somafm.com/poptron-128-mp3",
+          "homepage": "https://somafm.com/poptron/",
+          "logoUrl": "https://somafm.com/img3/poptron-400.png",
+          "tags": [
+            "electropop",
+            "indie"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "961591c6-0601-11e8-ae97-52543be04c81",
+          "name": "FluxFM",
+          "streamUrl": "https://streams.fluxfm.de/live/mp3-320/audio/",
+          "homepage": "https://www.fluxfm.de/",
+          "logoUrl": "https://www.fluxfm.de/assets/favicons/apple-icon-180x180.png",
+          "tags": [
+            "alternative",
+            "indie"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "961e6cac-0601-11e8-ae97-52543be04c81",
+          "name": "NTS Radio 1",
+          "streamUrl": "https://stream-relay-geo.ntslive.net/stream",
+          "homepage": "https://www.nts.live/",
+          "logoUrl": "https://www.nts.live/apple-touch-icon.png",
+          "tags": [
+            "eclectic",
+            "new music"
+          ],
+          "country": "United Kingdom",
+          "countryCode": "GB",
+          "codec": "MP3",
+          "bitrate": 256
+        },
+        {
+          "id": "9634ab94-0601-11e8-ae97-52543be04c81",
+          "name": "NTS Radio 2",
+          "streamUrl": "https://stream-relay-geo.ntslive.net/stream2",
+          "homepage": "https://www.nts.live/",
+          "logoUrl": "https://www.nts.live/apple-touch-icon.png",
+          "tags": [
+            "eclectic",
+            "new music"
+          ],
+          "country": "United Kingdom",
+          "countryCode": "GB",
+          "codec": "MP3",
+          "bitrate": 256
+        },
+        {
+          "id": "d61e880e-e8f0-11e9-a96c-52543be04c81",
+          "name": "Radio Paradise",
+          "streamUrl": "https://stream.radioparadise.com/aac-128",
+          "homepage": "https://radioparadise.com/",
+          "logoUrl": "https://radioparadise.com/apple-touch-icon.png",
+          "tags": [
+            "eclectic",
+            "rock"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "AAC",
+          "bitrate": 128
+        }
+      ]
+    },
+    {
+      "id": "chillout",
+      "name": "Chillout",
+      "tags": [
+        "chillout"
+      ],
+      "stations": [
+        {
+          "id": "960cf833-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Groove Salad",
+          "streamUrl": "https://ice2.somafm.com/groovesalad-128-mp3",
+          "homepage": "https://somafm.com/groovesalad/",
+          "logoUrl": "https://somafm.com/img3/groovesalad-400.jpg",
+          "tags": [
+            "chillout",
+            "downtempo"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "961173b5-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Lush",
+          "streamUrl": "https://ice2.somafm.com/lush-128-mp3",
+          "homepage": "https://somafm.com/lush/",
+          "logoUrl": "https://somafm.com/img3/lush-400.jpg",
+          "tags": [
+            "chillout",
+            "vocal"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "960eb2e9-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Drone Zone",
+          "streamUrl": "https://ice2.somafm.com/dronezone-128-mp3",
+          "homepage": "https://somafm.com/dronezone/",
+          "logoUrl": "https://somafm.com/img3/dronezone-400.jpg",
+          "tags": [
+            "ambient"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 128
+        },
+        {
+          "id": "ee636add-2a57-11e8-91bf-52543be04c81",
+          "name": "Sunshine Live Chillout",
+          "streamUrl": "https://stream.sunshine-live.de/sp8/mp3-192/stream.sunshine-live.de/",
+          "homepage": "https://www.sunshine-live.de/",
+          "tags": [
+            "chillout"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "928a3762-2514-11e8-91bf-52543be04c81",
+          "name": "Costa del Mar Chillout",
+          "streamUrl": "http://stream.cdm-chillout.com:8020/stream-mp3-Chill",
+          "homepage": "https://www.costadelmar-radio.com/",
+          "tags": [
+            "chillout",
+            "lounge"
+          ],
+          "codec": "MP3",
+          "bitrate": 96
+        },
+        {
+          "id": "a766146d-d522-4a55-aa33-b3e14a3550e0",
+          "name": "Radio Record Chill House",
+          "streamUrl": "https://radiorecord.hostingradio.ru/organic96.aacp",
+          "homepage": "https://www.radiorecord.ru/",
+          "logoUrl": "https://www.radiorecord.ru/icons/apple-touch-icon.png",
+          "tags": [
+            "chill house"
+          ],
+          "country": "Russia",
+          "countryCode": "RU",
+          "codec": "AAC+"
+        }
+      ]
+    },
+    {
+      "id": "techno",
+      "name": "Techno",
+      "tags": [
+        "techno"
+      ],
+      "stations": [
+        {
+          "id": "9627c2e6-0601-11e8-ae97-52543be04c81",
+          "name": "Sunshine Live Techno",
+          "streamUrl": "https://stream.sunshine-live.de/techno/mp3-192/stream.sunshine-live.de/",
+          "homepage": "https://www.sunshine-live.de/",
+          "tags": [
+            "techno"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "18ab1514-a53b-4f44-936e-f8583a68b5aa",
+          "name": "RauteMusik Techno",
+          "streamUrl": "https://streams.rautemusik.fm/techno/mp3-192/",
+          "homepage": "https://www.rm.fm/techno",
+          "logoUrl": "https://www.rm.fm/favicon.ico",
+          "tags": [
+            "techno"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 192
+        },
+        {
+          "id": "2100610c-13c2-4536-879f-6a88ccb07dc8",
+          "name": "Technolovers Techno",
+          "streamUrl": "https://stream.technolovers.fm/techno",
+          "homepage": "https://technolovers.fm/",
+          "logoUrl": "https://i.ibb.co/ScwBQ49/TECHNO-TL.jpg",
+          "tags": [
+            "techno"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 192
+        },
+        {
+          "id": "1aa5a707-c24c-4c5d-abcc-6f9b7a8f2f2e",
+          "name": "Technolovers Melodic Techno",
+          "streamUrl": "https://stream.technolovers.fm/melodic-house-techno",
+          "homepage": "https://technolovers.fm/",
+          "logoUrl": "https://i.ibb.co/mFjn8LB/TL-Melodic-House-Techno-png.jpg",
+          "tags": [
+            "melodic techno"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 192
+        },
+        {
+          "id": "9643c506-0601-11e8-ae97-52543be04c81",
+          "name": "FluxFM Techno Underground",
+          "streamUrl": "https://streams.fluxfm.de/technoug/mp3-128/audio/",
+          "homepage": "https://www.fluxfm.de/",
+          "logoUrl": "https://www.fluxfm.de/assets/favicons/apple-icon-180x180.png",
+          "tags": [
+            "techno"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "curated-record-techno",
+          "name": "Radio Record Techno",
+          "streamUrl": "https://radiorecord.hostingradio.ru/techno96.aacp",
+          "homepage": "https://www.radiorecord.ru/",
+          "logoUrl": "https://www.radiorecord.ru/icons/apple-touch-icon.png",
+          "tags": [
+            "techno"
+          ],
+          "codec": "AAC+"
+        },
+        {
+          "id": "e231378a-e6d1-11e9-a96c-52543be04c81",
+          "name": "NTS 4 To The Floor",
+          "streamUrl": "https://stream-mixtape-geo.ntslive.net/mixtape5",
+          "homepage": "https://www.nts.live/infinite-mixtapes/4-to-the-floor",
+          "logoUrl": "https://www.nts.live/apple-touch-icon.png",
+          "tags": [
+            "house",
+            "techno"
+          ],
+          "country": "United Kingdom",
+          "countryCode": "GB",
+          "codec": "MP3",
+          "bitrate": 256
+        }
+      ]
+    },
+    {
+      "id": "lofi",
+      "name": "Lo-fi",
+      "tags": [
+        "lofi",
+        "lo-fi"
+      ],
+      "stations": [
+        {
+          "id": "58d3cce6-62b5-43f1-8f41-8d024998aabc",
+          "name": "FluxFM Chillhop",
+          "streamUrl": "https://streams.fluxfm.de/Chillhop/mp3-320/streams.fluxfm.de/",
+          "homepage": "https://www.fluxfm.de/",
+          "logoUrl": "https://www.fluxfm.de/assets/favicons/apple-icon-180x180.png",
+          "tags": [
+            "chillhop",
+            "lofi"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "0f89b1e4-ea1d-47e1-906b-7581691b6849",
+          "name": "bigFM LoFi Focus",
+          "streamUrl": "https://stream.bigfm.de/lofifocus/mp3-128/radiobrowser",
+          "homepage": "https://www.bigfm.de/",
+          "logoUrl": "https://image.atsw.de/atsw/production/2022-12/LoFi%20Focus_1600x1600Px.jpg",
+          "tags": [
+            "lofi",
+            "focus"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3"
+        },
+        {
+          "id": "4e681355-3ebb-4b6c-a79a-d7cc81a0afd5",
+          "name": "REYFM #lofi",
+          "streamUrl": "https://listen.reyfm.de/lofi_320kbps.mp3",
+          "homepage": "https://reyfm.de/",
+          "tags": [
+            "lofi"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 320
+        },
+        {
+          "id": "c1484aa5-b758-47a1-b098-69db58d6fb78",
+          "name": "I Love Chillhop",
+          "streamUrl": "https://ilm.stream35.radiohost.de/ilm_ilovechillhop_mp3-192",
+          "homepage": "https://www.ilovemusic.de/",
+          "logoUrl": "https://www.ilovemusic.de/favicon.ico",
+          "tags": [
+            "chillhop",
+            "lofi"
+          ],
+          "country": "Germany",
+          "countryCode": "DE",
+          "codec": "MP3",
+          "bitrate": 192
+        },
+        {
+          "id": "251e6b0c-2536-4a15-a948-2f6bbf5fb14b",
+          "name": "Radio Record Lo-Fi",
+          "streamUrl": "https://radiorecord.hostingradio.ru/lofi96.aacp",
+          "homepage": "https://www.radiorecord.ru/station/lofi",
+          "logoUrl": "https://cdn-profiles.tunein.com/s255374/images/logog.png",
+          "tags": [
+            "lofi",
+            "chillhop"
+          ],
+          "country": "Russia",
+          "countryCode": "RU",
+          "codec": "AAC+"
+        },
+        {
+          "id": "9614e0a1-0601-11e8-ae97-52543be04c81",
+          "name": "SomaFM Fluid",
+          "streamUrl": "https://ice2.somafm.com/fluid-128-mp3",
+          "homepage": "https://somafm.com/fluid/",
+          "logoUrl": "https://somafm.com/img3/fluid-400.jpg",
+          "tags": [
+            "instrumental hip hop",
+            "future soul"
+          ],
+          "country": "United States",
+          "countryCode": "US",
+          "codec": "MP3",
+          "bitrate": 128
+        }
+      ]
+    }
+  ]
+}

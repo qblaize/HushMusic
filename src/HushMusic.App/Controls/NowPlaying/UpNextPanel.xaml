@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.NowPlaying.UpNextPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    xmlns:local="using:HushMusic.App.Controls.NowPlaying"
+    xmlns:radio="using:HushMusic.App.Controls.Radio"
+    xmlns:vm="using:HushMusic.App.ViewModels.Shell"
+    IsTabStop="False">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  "Playing from …", count, clear  -->
+        <Grid
+            Padding="20,6,12,8"
+            ColumnSpacing="8"
+            Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.IsEmpty), Mode=OneWay}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+                <TextBlock
+                    Style="{StaticResource HeadlineStyle}"
+                    Text="{x:Bind ViewModel.SourceText, Mode=OneWay}"
+                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.SourceText), Mode=OneWay}" />
+                <TextBlock
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Style="{StaticResource FootnoteStyle}"
+                    Text="{x:Bind ViewModel.CountText, Mode=OneWay}" />
+            </StackPanel>
+            <Button
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="Clear up next"
+                Command="{x:Bind ViewModel.ClearQueueCommand}"
+                Content="Clear"
+                Foreground="{ThemeResource TextSecondaryBrush}"
+                Style="{StaticResource TextActionButtonStyle}"
+                ToolTipService.ToolTip="Remove the songs after this one" />
+        </Grid>
+
+        <!--  The queue: click plays, drag reorders, tracks dragged in from pages drop at the pointer.  -->
+        <ListView
+            x:Name="QueueList"
+            Grid.Row="1"
+            Padding="8,0,8,16"
+            AllowDrop="True"
+            AutomationProperties.AutomationId="NowPlayingQueue"
+            AutomationProperties.Name="Up next"
+            CanDragItems="True"
+            CanReorderItems="True"
+            ContainerContentChanging="OnContainerContentChanging"
+            DragItemsCompleted="OnDragItemsCompleted"
+            DragItemsStarting="OnDragItemsStarting"
+            IsItemClickEnabled="True"
+            ItemClick="OnItemClick"
+            ItemContainerStyle="{StaticResource ShellListItemStyle}"
+            ItemsSource="{x:Bind ViewModel.Items}"
+            KeyDown="OnListKeyDown"
+            SelectionMode="None">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:QueueItemViewModel">
+                    <Grid
+                        Padding="0,6"
+                        AutomationProperties.Name="{x:Bind Title}"
+                        Background="Transparent"
+                        ColumnSpacing="12"
+                        Opacity="{x:Bind local:UpNextPanel.RowOpacity(IsPlayed), Mode=OneWay}"
+                        PointerCanceled="OnRowPointerExited"
+                        PointerEntered="OnRowPointerEntered"
+                        PointerExited="OnRowPointerExited">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Command="{x:Bind PlayCommand}" Text="Play">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE768;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Command="{x:Bind RemoveCommand}" Text="Remove from queue">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE711;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </Grid.ContextFlyout>
+
+                        <Grid
+                            Width="40"
+                            Height="40"
+                            Background="{ThemeResource Surface2Brush}"
+                            CornerRadius="{StaticResource RadiusSmall}">
+                            <FontIcon
+                                FontSize="14"
+                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                Glyph="&#xEC4F;" />
+                            <Image
+                                helpers:ImageLoader.DecodeWidth="40"
+                                helpers:ImageLoader.Url="{x:Bind CoverUrl}"
+                                Stretch="UniformToFill" />
+                            <radio:StationArt
+                                LogoUrl="{x:Bind StationLogoUrl}"
+                                StationName="{x:Bind StationName}"
+                                Visibility="{x:Bind IsStation}" />
+                            <!--  Playing: equaliser over a dimmed cover.  -->
+                            <Grid Visibility="{x:Bind helpers:Format.VisibleIf(IsCurrent), Mode=OneWay}">
+                                <Border Background="{ThemeResource AppBackgroundBrush}" Opacity="0.55" />
+                                <items:NowPlayingIndicator Foreground="{ThemeResource TextPrimaryBrush}" IsPlaying="{x:Bind IsPlaying, Mode=OneWay}" />
+                            </Grid>
+                        </Grid>
+
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="1">
+                            <Grid>
+                                <TextBlock
+                                    Style="{StaticResource BodyStyle}"
+                                    Text="{x:Bind Title}"
+                                    Visibility="{x:Bind helpers:Format.CollapsedIf(IsCurrent), Mode=OneWay}" />
+                                <TextBlock
+                                    Foreground="{StaticResource AccentOnDarkBrush}"
+                                    Style="{StaticResource HeadlineStyle}"
+                                    Text="{x:Bind Title}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(IsCurrent), Mode=OneWay}" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource FootnoteStyle}" Text="{x:Bind ArtistsText}" />
+                        </StackPanel>
+
+                        <Grid Grid.Column="2" VerticalAlignment="Center">
+                            <TextBlock
+                                x:Name="DurationLabel"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                Style="{StaticResource FootnoteStyle}"
+                                Text="{x:Bind DurationText}"
+                                Typography.NumeralAlignment="Tabular" />
+                            <!--  Shown on hover (keyboard: Delete or the context menu).  -->
+                            <Button
+                                x:Name="RemoveButton"
+                                Width="28"
+                                Height="28"
+                                HorizontalAlignment="Right"
+                                AutomationProperties.Name="Remove from queue"
+                                Command="{x:Bind RemoveCommand}"
+                                Content="&#xE711;"
+                                FontSize="10"
+                                IsTabStop="False"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="Remove from queue"
+                                Visibility="Collapsed" />
+                        </Grid>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!--  Drop marker for tracks dragged in from pages.  -->
+        <Canvas
+            x:Name="DropLayer"
+            Grid.Row="1"
+            IsHitTestVisible="False">
+            <Rectangle
+                x:Name="DropMarker"
+                Height="2"
+                Fill="{StaticResource AccentOnDarkBrush}"
+                RadiusX="1"
+                RadiusY="1"
+                Visibility="Collapsed" />
+        </Canvas>
+
+        <StackPanel
+            Grid.RowSpan="2"
+            Margin="32,0,32,48"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="6"
+            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsEmpty), Mode=OneWay}">
+            <FontIcon
+                Margin="0,0,0,6"
+                FontSize="28"
+                Foreground="{ThemeResource TextTertiaryBrush}"
+                Glyph="&#xE8FD;" />
+            <TextBlock
+                HorizontalAlignment="Center"
+                Style="{StaticResource HeadlineStyle}"
+                Text="Nothing up next" />
+            <TextBlock
+                HorizontalAlignment="Center"
+                Style="{StaticResource SubheadStyle}"
+                Text="Play an album, a playlist or a radio, or drag songs here."
+                TextAlignment="Center"
+                TextTrimming="None"
+                TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+</UserControl>

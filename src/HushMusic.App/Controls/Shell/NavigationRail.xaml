@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Shell.NavigationRail"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:shell="using:HushMusic.App.Controls.Shell"
+    Width="{StaticResource SidebarWidth}">
+
+    <!--  Fixed-width icon rail. It never expands; labels appear next to the icons on hover (see ShellPage).  -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--  App mark: sits in the draggable title band.  -->
+        <Grid Height="{StaticResource TitleBarHeight}">
+            <Image
+                Width="28"
+                Height="28"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                AutomationProperties.AccessibilityView="Raw"
+                Source="{ThemeResource AppMarkImage}"
+                Stretch="Uniform" />
+        </Grid>
+
+        <StackPanel
+            x:Name="MainItems"
+            Grid.Row="1"
+            Margin="0,12,0,0"
+            AutomationProperties.Name="Navigation"
+            Spacing="6"
+            TabFocusNavigation="Once"
+            XYFocusKeyboardNavigation="Enabled">
+            <shell:RailButton
+                Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="Home"
+                Glyph="&#xE80F;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Home'), Mode=OneWay}"
+                Label="Home"
+                Style="{StaticResource RailButtonStyle}" />
+            <shell:RailButton
+                Command="{x:Bind ViewModel.OpenSearchCommand}"
+                Glyph="&#xE721;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Search'), Mode=OneWay}"
+                Label="Search"
+                Shortcut="Ctrl+F"
+                Style="{StaticResource RailButtonStyle}" />
+            <shell:RailButton
+                Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="Radio"
+                Glyph="&#xEC05;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Radio'), Mode=OneWay}"
+                Label="Radio"
+                Style="{StaticResource RailButtonStyle}" />
+            <!-- Library and Playlists open when songs are dragged over them (their playlist cards take drops). -->
+            <shell:RailButton
+                AllowDrop="True"
+                Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="Library"
+                DragEnter="OnSpringDragOver"
+                DragLeave="OnSpringDragLeave"
+                DragOver="OnSpringDragOver"
+                Glyph="&#xE8F1;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Library'), Mode=OneWay}"
+                Label="Library"
+                Style="{StaticResource RailButtonStyle}" />
+            <shell:RailButton
+                Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="LikedSongs"
+                Glyph="&#xEB51;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'LikedSongs'), Mode=OneWay}"
+                Label="Liked songs"
+                Style="{StaticResource RailButtonStyle}" />
+            <shell:RailButton
+                AllowDrop="True"
+                Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="Playlists"
+                DragEnter="OnSpringDragOver"
+                DragLeave="OnSpringDragLeave"
+                DragOver="OnSpringDragOver"
+                Glyph="&#xE90B;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Playlists'), Mode=OneWay}"
+                Label="Playlists"
+                Style="{StaticResource RailButtonStyle}" />
+            <shell:RailButton
+                Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="History"
+                Glyph="&#xE81C;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'History'), Mode=OneWay}"
+                Label="History"
+                Style="{StaticResource RailButtonStyle}" />
+        </StackPanel>
+
+        <StackPanel
+            x:Name="FooterItems"
+            Grid.Row="2"
+            Margin="0,0,0,18"
+            Spacing="6"
+            TabFocusNavigation="Once"
+            XYFocusKeyboardNavigation="Enabled">
+            <shell:AccountButton x:Name="Account" HorizontalAlignment="Center" />
+            <shell:RailButton
+                Command="{x:Bind ViewModel.NavigateToCommand}"
+                CommandParameter="Settings"
+                Glyph="&#xE713;"
+                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Settings'), Mode=OneWay}"
+                Label="Settings"
+                Style="{StaticResource RailButtonStyle}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

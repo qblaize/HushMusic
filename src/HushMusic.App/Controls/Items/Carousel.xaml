@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.Carousel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    PointerCanceled="OnPointerExited"
+    PointerEntered="OnPointerEntered"
+    PointerExited="OnPointerExited">
+
+    <UserControl.Resources>
+        <!-- ShowAsRows ("Quick picks"): columns of four compact song rows, filled top to bottom, scrolling sideways. -->
+        <ItemsPanelTemplate x:Key="RowsPanel">
+            <ItemsWrapGrid
+                Background="Transparent"
+                ItemHeight="{StaticResource QuickPickRowHeight}"
+                ItemWidth="372"
+                MaximumRowsOrColumns="4"
+                Orientation="Vertical" />
+        </ItemsPanelTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <!--
+            The list overhangs the control by its padding: cards still line up with the shelf title, while the
+            hover lift and its shadow have room inside the list's clip.
+        -->
+        <ListView
+            x:Name="List"
+            Margin="-12,-8,-12,-20"
+            Padding="12,8,12,20"
+            ContainerContentChanging="OnContainerContentChanging"
+            IsItemClickEnabled="True"
+            ItemClick="OnListItemClick"
+            ItemContainerStyle="{StaticResource CarouselItemContainerStyle}"
+            ItemTemplateSelector="{StaticResource CardTemplateSelector}"
+            ItemsSource="{x:Bind ItemsSource, Mode=OneWay}"
+            Loaded="OnListLoaded"
+            ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+            ScrollViewer.HorizontalScrollMode="Enabled"
+            ScrollViewer.IsHorizontalRailEnabled="True"
+            ScrollViewer.VerticalScrollBarVisibility="Disabled"
+            ScrollViewer.VerticalScrollMode="Disabled"
+            SelectionMode="None"
+            items:TrackDrag.IsEnabled="True"
+            items:TrackMenu.IsEnabled="True">
+            <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <ItemsStackPanel Background="Transparent" Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+        </ListView>
+
+        <!-- Glass arrows, vertically centred on the artwork (cards are CardArtSize tall). -->
+        <Button
+            x:Name="PreviousButton"
+            Margin="-6,67,0,0"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            AutomationProperties.Name="Scroll left"
+            Click="OnPreviousClick"
+            IsTabStop="False"
+            Opacity="0"
+            Style="{StaticResource CarouselArrowButtonStyle}"
+            Visibility="Collapsed">
+            <Button.OpacityTransition>
+                <ScalarTransition Duration="0:0:0.15" />
+            </Button.OpacityTransition>
+            <FontIcon FontSize="12" Glyph="&#xE76B;" />
+        </Button>
+        <Button
+            x:Name="NextButton"
+            Margin="0,67,-6,0"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Top"
+            AutomationProperties.Name="Scroll right"
+            Click="OnNextClick"
+            IsTabStop="False"
+            Opacity="0"
+            Style="{StaticResource CarouselArrowButtonStyle}"
+            Visibility="Collapsed">
+            <Button.OpacityTransition>
+                <ScalarTransition Duration="0:0:0.15" />
+            </Button.OpacityTransition>
+            <FontIcon FontSize="12" Glyph="&#xE76C;" />
+        </Button>
+    </Grid>
+</UserControl>

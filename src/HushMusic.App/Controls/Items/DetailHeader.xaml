@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.DetailHeader"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    IsTabStop="False">
+
+    <Grid>
+        <!--
+            Blurred artwork wash: the art decoded at a few pixels and stretched (a soft blur), fading to transparent
+            towards the bottom so it melts into the page and the shell's ambient glow. It has no desired size, so the
+            header is as tall as its content.
+        -->
+        <items:FadingArtwork
+            DecodeSize="24"
+            FadeFrom="0.3"
+            Opacity="0.55"
+            TopOpacity="0.35"
+            Url="{x:Bind WashUrl(ArtUrl, PreviewArtUrl), Mode=OneWay}" />
+
+        <Grid
+            x:Name="Layout"
+            Padding="40,48,40,28"
+            ColumnSpacing="32"
+            SizeChanged="OnLayoutSizeChanged">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- The cover: the target (and source, going back) of the cover-zoom connected animation. -->
+            <Grid
+                x:Name="Art"
+                Width="{StaticResource HeaderArtSize}"
+                Height="{StaticResource HeaderArtSize}"
+                VerticalAlignment="Bottom"
+                Background="{ThemeResource Surface2Brush}"
+                CornerRadius="{StaticResource RadiusLarge}"
+                Translation="0,0,40">
+                <Grid.Shadow>
+                    <ThemeShadow />
+                </Grid.Shadow>
+                <FontIcon
+                    FontSize="56"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Glyph="{x:Bind PlaceholderGlyph, Mode=OneWay}" />
+                <!-- The card's (already cached) art first, then the large art on top once it has loaded. -->
+                <Image
+                    x:Name="PreviewImage"
+                    helpers:ImageLoader.Url="{x:Bind PreviewArtUrl, Mode=OneWay}"
+                    Stretch="UniformToFill" />
+                <Image
+                    x:Name="ArtImage"
+                    helpers:ImageLoader.Url="{x:Bind ArtUrl, Mode=OneWay}"
+                    Stretch="UniformToFill" />
+            </Grid>
+
+            <StackPanel
+                x:Name="TextPanel"
+                Grid.Column="1"
+                MaxWidth="760"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom">
+                <TextBlock
+                    Style="{StaticResource EyebrowStyle}"
+                    Text="{x:Bind items:ItemFormat.Upper(Eyebrow), Mode=OneWay}"
+                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(Eyebrow), Mode=OneWay}" />
+                <TextBlock
+                    Margin="0,8,0,0"
+                    AutomationProperties.HeadingLevel="Level1"
+                    MaxLines="2"
+                    Style="{StaticResource Title1Style}"
+                    Text="{x:Bind Title, Mode=OneWay}"
+                    TextWrapping="Wrap" />
+                <items:ArtistLinks
+                    Margin="0,4,0,0"
+                    Artists="{x:Bind Artists, Mode=OneWay}"
+                    LinkForeground="{StaticResource AccentBrush}"
+                    TextStyle="{StaticResource Title3Style}" />
+                <items:ClampedText
+                    MaxWidth="640"
+                    Margin="0,14,0,0"
+                    CollapsedLines="2"
+                    Text="{x:Bind Description, Mode=OneWay}" />
+                <ContentPresenter
+                    x:Name="ActionsPresenter"
+                    Margin="0,20,0,0"
+                    Content="{x:Bind Actions, Mode=OneWay}" />
+                <!-- Loading with a known title (opened from a card): only the buttons are still placeholders. -->
+                <items:Skeleton
+                    x:Name="ActionsSkeleton"
+                    Margin="0,20,0,0"
+                    Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border
+                            Width="92"
+                            Height="36"
+                            CornerRadius="18"
+                            Style="{StaticResource SkeletonBlockStyle}" />
+                        <Border
+                            Width="112"
+                            Height="36"
+                            CornerRadius="18"
+                            Style="{StaticResource SkeletonFaintBlockStyle}" />
+                    </StackPanel>
+                </items:Skeleton>
+            </StackPanel>
+
+            <!-- Loading with nothing known yet: eyebrow, title, artist, two description lines, buttons. -->
+            <items:Skeleton
+                x:Name="TextSkeleton"
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Visibility="Collapsed">
+                <StackPanel>
+                    <Border
+                        Width="96"
+                        Height="10"
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource SkeletonFaintBlockStyle}" />
+                    <Border
+                        Width="320"
+                        Height="26"
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource SkeletonBlockStyle}" />
+                    <Border
+                        Width="168"
+                        Height="16"
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource SkeletonBlockStyle}" />
+                    <Border
+                        Width="420"
+                        Height="10"
+                        Margin="0,20,0,0"
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource SkeletonFaintBlockStyle}" />
+                    <Border
+                        Width="340"
+                        Height="10"
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Left"
+                        Style="{StaticResource SkeletonFaintBlockStyle}" />
+                    <StackPanel
+                        Margin="0,22,0,0"
+                        Orientation="Horizontal"
+                        Spacing="10">
+                        <Border
+                            Width="92"
+                            Height="36"
+                            CornerRadius="18"
+                            Style="{StaticResource SkeletonBlockStyle}" />
+                        <Border
+                            Width="112"
+                            Height="36"
+                            CornerRadius="18"
+                            Style="{StaticResource SkeletonFaintBlockStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </items:Skeleton>
+        </Grid>
+    </Grid>
+</UserControl>

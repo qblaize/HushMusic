@@ -1,0 +1,50 @@
+# Push a tag that matches <Version> in Directory.Build.props (e.g. v0.2.0) to build the installer and publish it as a
+# GitHub release. Installed copies of Hush update from the latest published release.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the release and upload its files
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Test
+        shell: pwsh
+        run: |
+          foreach ($project in Get-ChildItem tests -Recurse -Filter '*.Tests.csproj') {
+            dotnet test --project $project.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      # release.ps1 fails if the tag doesn't match the version. The token only lives in this step's environment.
+      - name: Build installer and publish release
+        shell: pwsh
+        env:
+          VPK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./build/release.ps1 -Upload -Tag "${{ github.ref_name }}" -RepoUrl "${{ github.server_url }}/${{ github.repository }}"
+
+      - name: Keep the build output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hush-${{ github.ref_name }}-win-x64
+          path: artifacts/releases/win-x64/
+          if-no-files-found: ignore
+          retention-days: 14

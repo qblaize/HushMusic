@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.Pages.SearchPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    xmlns:vm="using:HushMusic.App.ViewModels.Pages"
+    NavigationCacheMode="Required">
+
+    <Page.Resources>
+        <CollectionViewSource
+            x:Name="GroupsSource"
+            IsSourceGrouped="True"
+            Source="{x:Bind ViewModel.Groups}" />
+
+        <!-- Header of both result lists: the top result as one large card with a Play pill. -->
+        <DataTemplate x:Key="TopResultTemplate" x:DataType="vm:SearchViewModel">
+            <Grid
+                MaxWidth="620"
+                Margin="8,4,8,0"
+                HorizontalAlignment="Left"
+                Visibility="{x:Bind HasTopResult, Mode=OneWay}"
+                items:TrackMenu.Track="{x:Bind TopResultTrack, Mode=OneWay}">
+                <Button
+                    Padding="20,20,140,20"
+                    AutomationProperties.Name="{x:Bind items:ItemFormat.Title(TopResult), Mode=OneWay}"
+                    Command="{x:Bind OpenResultCommand}"
+                    CommandParameter="{x:Bind TopResult, Mode=OneWay}"
+                    Style="{StaticResource TopResultButtonStyle}">
+                    <Grid ColumnSpacing="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid
+                            Width="112"
+                            Height="112"
+                            Background="{ThemeResource Surface2Brush}"
+                            CornerRadius="{x:Bind items:ItemFormat.ArtCorner(TopResult), Mode=OneWay}">
+                            <FontIcon
+                                FontSize="32"
+                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                Glyph="{x:Bind items:ItemFormat.PlaceholderGlyph(TopResult), Mode=OneWay}" />
+                            <Image helpers:ImageLoader.Url="{x:Bind items:ItemFormat.CardArt(TopResult), Mode=OneWay}" Stretch="UniformToFill" />
+                        </Grid>
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="4">
+                            <TextBlock Style="{StaticResource EyebrowStyle}" Text="{x:Bind items:ItemFormat.TopResultEyebrow(TopResult), Mode=OneWay}" />
+                            <TextBlock
+                                MaxLines="2"
+                                Style="{StaticResource Title2Style}"
+                                Text="{x:Bind items:ItemFormat.Title(TopResult), Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource SubheadStyle}" Text="{x:Bind items:ItemFormat.CardSubtitle(TopResult), Mode=OneWay}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+                <Button
+                    Margin="0,0,20,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Play top result"
+                    Command="{x:Bind PlayTopResultCommand}"
+                    Style="{StaticResource PillButtonStyle}"
+                    Visibility="{x:Bind CanPlayTopResult, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="12" Glyph="&#xF5B0;" />
+                        <TextBlock Text="Play" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Padding="40,28,40,12" Spacing="16">
+            <TextBlock
+                AutomationProperties.HeadingLevel="Level1"
+                Style="{StaticResource Title1Style}"
+                Text="{x:Bind ViewModel.Heading, Mode=OneWay}" />
+            <!-- Filter chips (ToggleButtons kept exclusive by ToggleGroup). -->
+            <ScrollViewer
+                Margin="0,0,-40,0"
+                HorizontalScrollBarVisibility="Hidden"
+                HorizontalScrollMode="Auto"
+                VerticalScrollBarVisibility="Disabled"
+                VerticalScrollMode="Disabled"
+                Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.ShowPrompt), Mode=OneWay}">
+                <StackPanel
+                    x:Name="Filters"
+                    Padding="0,0,40,0"
+                    AutomationProperties.Name="Filters"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <ToggleButton
+                        Checked="OnFilterChecked"
+                        Unchecked="OnFilterUnchecked"
+                        Content="All"
+                        IsChecked="True"
+                        Style="{StaticResource ChipToggleButtonStyle}"
+                        Tag="All" />
+                    <ToggleButton
+                        Checked="OnFilterChecked"
+                        Unchecked="OnFilterUnchecked"
+                        Content="Songs"
+                        Style="{StaticResource ChipToggleButtonStyle}"
+                        Tag="Songs" />
+                    <ToggleButton
+                        Checked="OnFilterChecked"
+                        Unchecked="OnFilterUnchecked"
+                        Content="Videos"
+                        Style="{StaticResource ChipToggleButtonStyle}"
+                        Tag="Videos" />
+                    <ToggleButton
+                        Checked="OnFilterChecked"
+                        Unchecked="OnFilterUnchecked"
+                        Content="Albums"
+                        Style="{StaticResource ChipToggleButtonStyle}"
+                        Tag="Albums" />
+                    <ToggleButton
+                        Checked="OnFilterChecked"
+                        Unchecked="OnFilterUnchecked"
+                        Content="Artists"
+                        Style="{StaticResource ChipToggleButtonStyle}"
+                        Tag="Artists" />
+                    <ToggleButton
+                        Checked="OnFilterChecked"
+                        Unchecked="OnFilterUnchecked"
+                        Content="Community playlists"
+                        Style="{StaticResource ChipToggleButtonStyle}"
+                        Tag="CommunityPlaylists" />
+                    <ToggleButton
+                        Checked="OnFilterChecked"
+                        Unchecked="OnFilterUnchecked"
+                        Content="Featured playlists"
+                        Style="{StaticResource ChipToggleButtonStyle}"
+                        Tag="FeaturedPlaylists" />
+                </StackPanel>
+            </ScrollViewer>
+        </StackPanel>
+
+        <Grid Grid.Row="1" items:Reveal.IsShown="{x:Bind ViewModel.HasContent, Mode=OneWay}">
+            <!-- Results in titled sections. -->
+            <ListView
+                Padding="32,8,32,120"
+                IsItemClickEnabled="True"
+                ItemClick="OnItemClick"
+                ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
+                ItemTemplateSelector="{StaticResource RowTemplateSelector}"
+                ItemsPanel="{StaticResource FlatGroupedItemsPanel}"
+                ItemsSource="{x:Bind GroupsSource.View, Mode=OneWay}"
+                SelectionMode="None"
+                Visibility="{x:Bind ViewModel.ShowGroupedResults, Mode=OneWay}"
+                items:TrackDrag.IsEnabled="True"
+                items:TrackMenu.IsEnabled="True">
+                <ListView.Header>
+                    <ContentControl
+                        HorizontalContentAlignment="Stretch"
+                        Content="{x:Bind ViewModel}"
+                        ContentTemplate="{StaticResource TopResultTemplate}"
+                        IsTabStop="False" />
+                </ListView.Header>
+                <ListView.GroupStyle>
+                    <GroupStyle HeaderContainerStyle="{StaticResource GroupHeaderContainerStyle}">
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate x:DataType="vm:MediaGroup">
+                                <items:SectionHeader
+                                    Title="{x:Bind Title}"
+                                    ActionText="{x:Bind ShowAllText}"
+                                    Command="{x:Bind ShowAllCommand}" />
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ListView.GroupStyle>
+            </ListView>
+
+            <!-- One flat list: filtered results, or an unfiltered search without sections. More pages on demand. -->
+            <ListView
+                Padding="32,8,32,120"
+                IncrementalLoadingTrigger="None"
+                IsItemClickEnabled="True"
+                ItemClick="OnItemClick"
+                ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
+                ItemTemplateSelector="{StaticResource RowTemplateSelector}"
+                ItemsSource="{x:Bind ViewModel.Results}"
+                SelectionMode="None"
+                Visibility="{x:Bind ViewModel.ShowFlatResults, Mode=OneWay}"
+                items:TrackDrag.IsEnabled="True"
+                items:TrackMenu.IsEnabled="True">
+                <ListView.Header>
+                    <ContentControl
+                        Margin="0,0,0,20"
+                        HorizontalContentAlignment="Stretch"
+                        Content="{x:Bind ViewModel}"
+                        ContentTemplate="{StaticResource TopResultTemplate}"
+                        IsTabStop="False"
+                        Visibility="{x:Bind ViewModel.HasTopResult, Mode=OneWay}" />
+                </ListView.Header>
+                <ListView.Footer>
+                    <Grid Margin="0,20,0,0">
+                        <Button
+                            HorizontalAlignment="Center"
+                            Command="{x:Bind ViewModel.LoadMoreCommand}"
+                            Content="Load more"
+                            Style="{StaticResource PillSecondaryButtonStyle}"
+                            Visibility="{x:Bind helpers:Format.VisibleIfAndNot(ViewModel.Results.HasMoreItems, ViewModel.Results.IsLoading), Mode=OneWay}" />
+                        <items:Skeleton Margin="0,-20,0,0" Visibility="{x:Bind ViewModel.Results.IsLoading, Mode=OneWay}">
+                            <items:SkeletonRows Count="3" />
+                        </items:Skeleton>
+                    </Grid>
+                </ListView.Footer>
+            </ListView>
+        </Grid>
+
+        <!-- Searching: the top result card, then rows. -->
+        <items:Skeleton
+            Grid.Row="1"
+            Padding="32,8,32,0"
+            Visibility="{x:Bind ViewModel.ShowLoading, Mode=OneWay}">
+            <StackPanel>
+                <Border
+                    Height="152"
+                    MaxWidth="620"
+                    Margin="8,4,8,0"
+                    HorizontalAlignment="Stretch"
+                    CornerRadius="{StaticResource RadiusLarge}"
+                    Style="{StaticResource SkeletonArtStyle}" />
+                <Border
+                    Width="96"
+                    Height="18"
+                    Margin="8,40,8,14"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource SkeletonBlockStyle}" />
+                <items:SkeletonRows Count="8" />
+            </StackPanel>
+        </items:Skeleton>
+
+        <ProgressBar
+            Grid.Row="1"
+            Style="{StaticResource BusyBarStyle}"
+            Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            Glyph="&#xE721;"
+            Heading="Search YouTube Music"
+            Message="Press Ctrl+F to find songs, albums, artists and playlists."
+            Visibility="{x:Bind ViewModel.ShowPrompt, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            Glyph="&#xE721;"
+            Heading="No results"
+            Message="Try different words or another filter."
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            ActionText="Try again"
+            Command="{x:Bind ViewModel.RetryCommand}"
+            Glyph="&#xE783;"
+            Heading="Search failed"
+            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.ShowError, Mode=OneWay}" />
+    </Grid>
+</Page>

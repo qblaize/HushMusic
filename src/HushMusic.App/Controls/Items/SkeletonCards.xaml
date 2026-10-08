@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.SkeletonCards"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    AutomationProperties.AccessibilityView="Raw"
+    IsHitTestVisible="False"
+    IsTabStop="False">
+
+    <UserControl.Resources>
+        <!-- A row of cards clipped at the page edge, like a carousel. -->
+        <StackLayout
+            x:Key="RowLayout"
+            Orientation="Horizontal"
+            Spacing="20" />
+        <!-- A wrapping grid, like the card grids (each grid card carries a 20 px right gap). -->
+        <UniformGridLayout
+            x:Key="GridLayout"
+            ItemsStretch="None"
+            MinColumnSpacing="20"
+            MinRowSpacing="28" />
+    </UserControl.Resources>
+
+    <!-- Placeholder MediaCards: square (or round) art and two short lines. -->
+    <ItemsRepeater
+        x:Name="Repeater"
+        ItemsSource="{x:Bind Items, Mode=OneWay}"
+        Layout="{StaticResource RowLayout}">
+        <ItemsRepeater.ItemTemplate>
+            <DataTemplate x:DataType="items:SkeletonItem">
+                <StackPanel Width="{StaticResource CardArtSize}">
+                    <Border
+                        Height="{StaticResource CardArtSize}"
+                        Margin="0,0,0,12"
+                        CornerRadius="{x:Bind items:SkeletonCards.ArtCorner(IsRound)}"
+                        Style="{StaticResource SkeletonArtStyle}" />
+                    <Border
+                        Width="{x:Bind Primary}"
+                        Height="11"
+                        HorizontalAlignment="{x:Bind items:SkeletonCards.LineAlignment(IsRound)}"
+                        Style="{StaticResource SkeletonBlockStyle}" />
+                    <Border
+                        Width="{x:Bind Secondary}"
+                        Height="9"
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="{x:Bind items:SkeletonCards.LineAlignment(IsRound)}"
+                        Style="{StaticResource SkeletonFaintBlockStyle}" />
+                </StackPanel>
+            </DataTemplate>
+        </ItemsRepeater.ItemTemplate>
+    </ItemsRepeater>
+</UserControl>

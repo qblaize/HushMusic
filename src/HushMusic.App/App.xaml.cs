@@ -1,0 +1,142 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
+using HushMusic.App.Hosting;
+using HushMusic.App.Services.Shell;
+using HushMusic.Core.Abstractions;
+using HushMusic.Core.Services;
+
+namespace HushMusic.App;
+
+public partial class App : Application
+{
+    private IHost? _host;
+    private ILogger<App>? _logger;
+
+    public App()
+    {
+        InitializeComponent();
+        UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+    }
+
+    public static IServiceProvider Services { get; private set; } = null!;
+
+    public static MainWindow? MainWindow { get; private set; }
+
+    public static T GetService<T>()
+        where T : notnull => Services.GetRequiredService<T>();
+
+    /// <summary>Another launch was redirected here: show (also from the notification area), restore and focus the main window. Safe from any thread.</summary>
+    internal static void BringToFront()
+    {
+        if (MainWindow is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Services?.GetService<IWindowModeService>()?.ShowMainWindow();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Shutting down.
+        }
+    }
+
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        _host = AppHost.Build(DispatcherQueue.GetForCurrentThread());
+        Services = _host.Services;
+        _logger = Services.GetRequiredService<ILogger<App>>();
+        _logger.LogInformation("HushMusic starting, version {Version}", typeof(App).Assembly.GetName().Version);
+
+        var settings = Services.GetRequiredService<ISettingsService>();
+        await settings.LoadAsync();
+        AppHost.ApplyLogLevel(Services, settings.Current.LogLevel);
+
+        // Restore the saved session before any page loads, or the first Home feed is fetched signed out.
+        // Local only (file read + DPAPI), so it doesn't delay the window noticeably.
+        try
+        {
+            await Services.GetRequiredService<IAuthService>().InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not restore the saved session");
+        }
+
+        MainWindow = new MainWindow();
+        MainWindow.Closed += OnMainWindowClosed;
+        if (AutoStartCommand.IsBackgroundLaunch(Environment.GetCommandLineArgs()))
+        {
+            // Started with Windows: hidden in the notification area (or minimized when close-to-tray is off).
+            MainWindow.Modes.StartInBackground();
+        }
+        else if (Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_BACKGROUND") == "1")
+        {
+            // Automated test instances: shown behind every other window and never focused.
+            TestWindowPlacement.ShowInBackground(MainWindow);
+            TestWindowPlacement.RunTestHooks(MainWindow);
+        }
+        else
+        {
+            MainWindow.Activate();
+        }
+
+        try
+        {
+            await _host.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "A background feature failed to start");
+            Services.GetRequiredService<INotificationService>().ShowError("A background feature failed to start", ex);
+        }
+    }
+
+    private void OnMainWindowClosed(object sender, WindowEventArgs args)
+    {
+        _logger?.LogInformation("HushMusic shutting down");
+        var host = _host;
+        if (host is null)
+        {
+            return;
+        }
+
+        // Stop off the UI thread so hosted services cannot deadlock on the dispatcher; then flush logs.
+        Task.Run(() => host.StopAsync(TimeSpan.FromSeconds(3))).Wait(TimeSpan.FromSeconds(4));
+        host.Dispose();
+    }
+
+    private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        _logger?.LogError(e.Exception, "Unhandled UI exception");
+        e.Handled = true;
+        TryNotify(e.Exception);
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        _logger?.LogError(e.Exception, "Unobserved task exception");
+        e.SetObserved();
+    }
+
+    private void OnDomainUnhandledException(object sender, System.UnhandledExceptionEventArgs e) =>
+        _logger?.LogCritical(e.ExceptionObject as Exception, "Fatal unhandled exception");
+
+    private static void TryNotify(Exception exception)
+    {
+        try
+        {
+            Services?.GetService<INotificationService>()?.ShowError("Something went wrong", exception);
+        }
+        catch
+        {
+            // Never let error reporting crash the app.
+        }
+    }
+}

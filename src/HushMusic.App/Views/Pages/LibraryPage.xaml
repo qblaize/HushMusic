@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.Pages.LibraryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items">
+
+    <Grid items:TrackMenu.Host="{x:Bind ViewModel}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Padding="40,28,40,12" Spacing="18">
+            <TextBlock
+                AutomationProperties.HeadingLevel="Level1"
+                Style="{StaticResource PageTitleStyle}"
+                Text="Library" />
+            <!-- Segmented tabs (ToggleButtons kept exclusive by ToggleGroup). -->
+            <Border Style="{StaticResource SegmentedTrackStyle}" Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.RequiresSignIn), Mode=OneWay}">
+                <StackPanel x:Name="Tabs" AutomationProperties.Name="Library sections" Orientation="Horizontal">
+                    <ToggleButton
+                        Checked="OnTabChecked"
+                        Unchecked="OnTabUnchecked"
+                        Content="Playlists"
+                        IsChecked="True"
+                        Style="{StaticResource SegmentToggleButtonStyle}"
+                        Tag="Playlists" />
+                    <ToggleButton
+                        Checked="OnTabChecked"
+                        Unchecked="OnTabUnchecked"
+                        Content="Songs"
+                        Style="{StaticResource SegmentToggleButtonStyle}"
+                        Tag="Songs" />
+                    <ToggleButton
+                        Checked="OnTabChecked"
+                        Unchecked="OnTabUnchecked"
+                        Content="Albums"
+                        Style="{StaticResource SegmentToggleButtonStyle}"
+                        Tag="Albums" />
+                    <ToggleButton
+                        Checked="OnTabChecked"
+                        Unchecked="OnTabUnchecked"
+                        Content="Artists"
+                        Style="{StaticResource SegmentToggleButtonStyle}"
+                        Tag="Artists" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Playlist cards accept dropped songs (your own playlists only). -->
+        <GridView
+            Grid.Row="1"
+            Padding="{StaticResource GridPagePadding}"
+            IsItemClickEnabled="True"
+            ItemClick="OnItemClick"
+            ItemContainerStyle="{StaticResource CardGridItemContainerStyle}"
+            ItemTemplate="{StaticResource PlaylistDropCardTemplate}"
+            ItemsSource="{x:Bind ViewModel.Playlists}"
+            SelectionMode="None"
+            Visibility="{x:Bind ViewModel.IsPlaylistsTab, Mode=OneWay}" />
+
+        <ListView
+            Grid.Row="1"
+            Padding="32,4,32,120"
+            IsItemClickEnabled="True"
+            ItemClick="OnSongClick"
+            ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
+            ItemTemplate="{StaticResource TrackRowTemplate}"
+            ItemsSource="{x:Bind ViewModel.Songs}"
+            SelectionMode="None"
+            Visibility="{x:Bind ViewModel.IsSongsTab, Mode=OneWay}"
+            items:TrackDrag.IsEnabled="True"
+            items:TrackMenu.IsEnabled="True" />
+
+        <GridView
+            Grid.Row="1"
+            Padding="{StaticResource GridPagePadding}"
+            IsItemClickEnabled="True"
+            ItemClick="OnItemClick"
+            ItemContainerStyle="{StaticResource CardGridItemContainerStyle}"
+            ItemTemplate="{StaticResource SquareCardTemplate}"
+            ItemsSource="{x:Bind ViewModel.Albums}"
+            SelectionMode="None"
+            Visibility="{x:Bind ViewModel.IsAlbumsTab, Mode=OneWay}" />
+
+        <GridView
+            Grid.Row="1"
+            Padding="{StaticResource GridPagePadding}"
+            IsItemClickEnabled="True"
+            ItemClick="OnItemClick"
+            ItemContainerStyle="{StaticResource CardGridItemContainerStyle}"
+            ItemTemplate="{StaticResource CircleCardTemplate}"
+            ItemsSource="{x:Bind ViewModel.Artists}"
+            SelectionMode="None"
+            Visibility="{x:Bind ViewModel.IsArtistsTab, Mode=OneWay}" />
+
+        <!-- A tab's first load: placeholder cards or rows. -->
+        <items:Skeleton
+            Grid.Row="1"
+            Padding="40,12,20,0"
+            Visibility="{x:Bind ViewModel.ShowCardSkeleton, Mode=OneWay}">
+            <items:SkeletonCards
+                Count="12"
+                IsCircular="{x:Bind ViewModel.IsArtistsTab, Mode=OneWay}"
+                IsGrid="True" />
+        </items:Skeleton>
+        <items:Skeleton
+            Grid.Row="1"
+            Padding="32,4,32,0"
+            Visibility="{x:Bind ViewModel.ShowRowSkeleton, Mode=OneWay}">
+            <items:SkeletonRows Count="10" />
+        </items:Skeleton>
+
+        <ProgressBar
+            Grid.Row="1"
+            Style="{StaticResource BusyBarStyle}"
+            Visibility="{x:Bind ViewModel.ShowTabBusyBar, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            Glyph="&#xE77B;"
+            Heading="Sign in to see your library"
+            Message="Your playlists, songs, albums and artists from YouTube Music appear here once you sign in."
+            Visibility="{x:Bind ViewModel.RequiresSignIn, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            Glyph="&#xE8F1;"
+            Heading="Nothing here yet"
+            Message="{x:Bind ViewModel.EmptyMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+        <items:EmptyState
+            Grid.Row="1"
+            ActionText="Try again"
+            Command="{x:Bind ViewModel.RetryCommand}"
+            Glyph="&#xE783;"
+            Heading="Couldn't load your library"
+            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.ShowError, Mode=OneWay}" />
+    </Grid>
+</Page>

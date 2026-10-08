@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.MediaRow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    Loaded="OnLoaded"
+    PointerCanceled="OnPointerExited"
+    PointerEntered="OnPointerEntered"
+    PointerExited="OnPointerExited">
+
+    <Grid Height="{StaticResource RowHeight}" Background="Transparent">
+        <!-- Flat rounded hover fill; the row pads its content by 8 so the fill reaches past the text. -->
+        <Border
+            x:Name="HoverFill"
+            Background="{ThemeResource HoverFillBrush}"
+            CornerRadius="{StaticResource RadiusSmall}"
+            IsHitTestVisible="False"
+            Opacity="0" />
+
+        <Grid Padding="8,0" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="40" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid
+                x:Name="ArtHost"
+                Width="{StaticResource RowArtSize}"
+                Height="{StaticResource RowArtSize}"
+                VerticalAlignment="Center"
+                Background="{ThemeResource Surface2Brush}"
+                CornerRadius="{StaticResource RadiusSmall}">
+                <FontIcon
+                    FontSize="14"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Glyph="{x:Bind items:ItemFormat.PlaceholderGlyph(Item), Mode=OneWay}" />
+                <Image
+                    helpers:ImageLoader.DecodeWidth="40"
+                    helpers:ImageLoader.Url="{x:Bind items:ItemFormat.RowArt(Item), Mode=OneWay}"
+                    Stretch="UniformToFill" />
+            </Grid>
+
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Spacing="1">
+                <TextBlock Style="{StaticResource HeadlineStyle}" Text="{x:Bind items:ItemFormat.Title(Item), Mode=OneWay}" />
+                <TextBlock Style="{StaticResource SubheadStyle}" Text="{x:Bind items:ItemFormat.RowSubtitle(Item), Mode=OneWay}" />
+            </StackPanel>
+
+            <FontIcon
+                x:Name="Chevron"
+                Grid.Column="2"
+                FontSize="12"
+                Foreground="{ThemeResource TextTertiaryBrush}"
+                Glyph="&#xE76C;"
+                Opacity="0" />
+
+            <Rectangle
+                x:Name="Hairline"
+                Grid.Column="1"
+                Grid.ColumnSpan="2"
+                Height="1"
+                VerticalAlignment="Bottom"
+                Fill="{ThemeResource SeparatorBrush}"
+                IsHitTestVisible="False" />
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="HushMusic.App.Dialogs.Shell.CookieHeaderDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    Background="{ThemeResource Surface1Brush}"
+    BorderBrush="{ThemeResource SeparatorBrush}"
+    CloseButtonStyle="{StaticResource PillSecondaryButtonStyle}"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary"
+    FontFamily="{StaticResource AppFontFamily}"
+    IsPrimaryButtonEnabled="{x:Bind ViewModel.CanSubmit, Mode=OneWay}"
+    PrimaryButtonClick="OnPrimaryButtonClick"
+    PrimaryButtonStyle="{StaticResource PillButtonStyle}"
+    PrimaryButtonText="Sign in">
+
+    <!--
+        One flat surface (no separate command strip), hairline border. Colours are {ThemeResource} properties above, not
+        StaticResource aliases here (those would freeze the dark values); IDialogService sets the dialog's theme.
+    -->
+    <ContentDialog.Resources>
+        <SolidColorBrush x:Key="ContentDialogTopOverlay" Color="Transparent" />
+        <SolidColorBrush x:Key="ContentDialogSeparatorBorderBrush" Color="Transparent" />
+    </ContentDialog.Resources>
+
+    <ContentDialog.Title>
+        <TextBlock Style="{StaticResource Title2Style}" Text="Sign in with a cookie header" />
+    </ContentDialog.Title>
+
+    <ScrollViewer MaxWidth="520" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="16">
+            <TextBlock
+                Style="{StaticResource SubheadStyle}"
+                Text="Use this if the Google sign-in window doesn't work. You copy the session cookie from a browser where you're already signed in to YouTube Music."
+                TextTrimming="None"
+                TextWrapping="Wrap" />
+
+            <Border Padding="14,12" Background="{ThemeResource Surface2Brush}" CornerRadius="{StaticResource RadiusMedium}">
+                <StackPanel Spacing="8">
+                    <TextBlock Style="{StaticResource BodyTextBlockStyle}">
+                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="1" />
+                        <Run Text="  Open music.youtube.com in your browser and make sure you're signed in." />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource BodyTextBlockStyle}">
+                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="2" />
+                        <Run Text="  Press F12, open the Network tab and reload the page." />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource BodyTextBlockStyle}">
+                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="3" />
+                        <Run Text="  Select a request to music.youtube.com (for example" />
+                        <Run FontFamily="Consolas" Text="browse" /><Run Text="), find" />
+                        <Run FontFamily="Consolas" Text="cookie" />
+                        <Run Text="under Request Headers and copy its whole value." />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource BodyTextBlockStyle}">
+                        <Run FontWeight="SemiBold" Foreground="{ThemeResource TextTertiaryBrush}" Text="4" />
+                        <Run Text="  Paste it below." />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="6">
+                <TextBlock
+                    x:Name="CookieLabel"
+                    Style="{StaticResource HeadlineStyle}"
+                    Text="Cookie header" />
+                <TextBox
+                    Height="112"
+                    AcceptsReturn="True"
+                    AutomationProperties.LabeledBy="{x:Bind CookieLabel}"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    FontFamily="Consolas"
+                    FontSize="12"
+                    IsSpellCheckEnabled="False"
+                    IsTextPredictionEnabled="False"
+                    PlaceholderText="VISITOR_INFO1_LIVE=…; SAPISID=…; __Secure-3PAPISID=…"
+                    Text="{x:Bind ViewModel.CookieHeader, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Style="{StaticResource FootnoteStyle}"
+                    Text="This cookie gives full access to your Google account, like a password. Don't share it. The app stores it encrypted on this PC."
+                    TextTrimming="None"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <ProgressBar IsIndeterminate="True" Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsBusy), Mode=OneWay}" />
+
+            <Grid
+                Padding="12,10"
+                Background="{ThemeResource Surface2Brush}"
+                ColumnSpacing="10"
+                CornerRadius="{StaticResource RadiusMedium}"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.HasError), Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <FontIcon
+                    Margin="0,2,0,0"
+                    VerticalAlignment="Top"
+                    FontSize="14"
+                    Foreground="{ThemeResource DangerBrush}"
+                    Glyph="&#xEA39;" />
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Style="{StaticResource HeadlineStyle}" Text="Sign-in failed" />
+                    <TextBlock
+                        IsTextSelectionEnabled="True"
+                        Style="{StaticResource SubheadStyle}"
+                        Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                        TextTrimming="None"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

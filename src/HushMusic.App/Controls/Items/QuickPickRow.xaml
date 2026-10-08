@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.QuickPickRow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    Loaded="OnLoaded"
+    PointerCanceled="OnPointerExited"
+    PointerEntered="OnPointerEntered"
+    PointerExited="OnPointerExited"
+    Unloaded="OnUnloaded">
+
+    <!-- Compact song row of a "Quick picks" shelf: art with a hover play glyph, title, artists · plays, "more". -->
+    <Grid Height="{StaticResource QuickPickRowHeight}" Background="Transparent">
+        <Border
+            x:Name="HoverFill"
+            Background="{ThemeResource HoverFillBrush}"
+            CornerRadius="{StaticResource RadiusSmall}"
+            IsHitTestVisible="False"
+            Opacity="0" />
+
+        <Grid
+            Padding="8,0,2,0"
+            ColumnSpacing="12"
+            Opacity="{x:Bind items:ItemFormat.AvailabilityOpacity(CurrentTrack), Mode=OneWay}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="32" />
+            </Grid.ColumnDefinitions>
+
+            <Grid
+                Width="{StaticResource QuickPickArtSize}"
+                Height="{StaticResource QuickPickArtSize}"
+                VerticalAlignment="Center"
+                Background="{ThemeResource Surface2Brush}"
+                CornerRadius="6">
+                <FontIcon
+                    FontSize="16"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Glyph="&#xE8D6;" />
+                <Image
+                    helpers:ImageLoader.DecodeWidth="48"
+                    helpers:ImageLoader.Url="{x:Bind items:ItemFormat.RowArt(CurrentTrack), Mode=OneWay}"
+                    Stretch="UniformToFill" />
+                <Border
+                    x:Name="ArtScrim"
+                    Background="{StaticResource NowPlayingScrimBrush}"
+                    Visibility="Collapsed" />
+                <FontIcon
+                    x:Name="PlayGlyph"
+                    FontSize="16"
+                    Foreground="{StaticResource OnArtForegroundBrush}"
+                    Glyph="&#xF5B0;"
+                    Visibility="Collapsed" />
+                <items:NowPlayingIndicator
+                    x:Name="Equalizer"
+                    x:Load="False"
+                    Foreground="{StaticResource OnArtForegroundBrush}"
+                    Visibility="Collapsed" />
+            </Grid>
+
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Spacing="2">
+                <items:TrailingPanel Spacing="6">
+                    <TextBlock
+                        x:Name="TitleText"
+                        Style="{StaticResource HeadlineStyle}"
+                        Text="{x:Bind items:ItemFormat.Title(CurrentTrack), Mode=OneWay}" />
+                    <Border
+                        Width="15"
+                        Height="15"
+                        AutomationProperties.Name="Explicit"
+                        Background="{ThemeResource Surface3Brush}"
+                        CornerRadius="3"
+                        ToolTipService.ToolTip="Explicit"
+                        Visibility="{x:Bind items:ItemFormat.ExplicitVisibility(CurrentTrack), Mode=OneWay}">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource AppFontFamily}"
+                            FontSize="9"
+                            FontWeight="Bold"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="E" />
+                    </Border>
+                </items:TrailingPanel>
+                <TextBlock Style="{StaticResource SubheadStyle}" Text="{x:Bind items:ItemFormat.CardSubtitle(CurrentTrack), Mode=OneWay}" />
+            </StackPanel>
+
+            <Button
+                x:Name="MoreButton"
+                Grid.Column="2"
+                AutomationProperties.Name="More actions"
+                Click="OnMoreClick"
+                Opacity="0"
+                Style="{StaticResource RowIconButtonStyle}"
+                ToolTipService.ToolTip="More actions">
+                <FontIcon Glyph="&#xE712;" />
+            </Button>
+        </Grid>
+
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="RowStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="PointerOver">
+                    <VisualState.Setters>
+                        <Setter Target="HoverFill.Opacity" Value="1" />
+                        <Setter Target="MoreButton.Opacity" Value="1" />
+                        <Setter Target="ArtScrim.Visibility" Value="Visible" />
+                        <Setter Target="PlayGlyph.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Current">
+                    <VisualState.Setters>
+                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="ArtScrim.Visibility" Value="Visible" />
+                        <Setter Target="Equalizer.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="CurrentPointerOver">
+                    <VisualState.Setters>
+                        <Setter Target="HoverFill.Opacity" Value="1" />
+                        <Setter Target="MoreButton.Opacity" Value="1" />
+                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="ArtScrim.Visibility" Value="Visible" />
+                        <Setter Target="Equalizer.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+    </Grid>
+</UserControl>

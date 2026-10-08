@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.Pages.RadioPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    xmlns:radio="using:HushMusic.App.Controls.Radio"
+    xmlns:vm="using:HushMusic.App.ViewModels.Pages"
+    NavigationCacheMode="Required">
+
+    <Page.Resources>
+        <!--  Genre chips: like the search filter chips, but the selected one takes the accent.  -->
+        <Style x:Key="GenreChipStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="{ThemeResource Surface2Brush}" />
+            <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="16,0" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="CornerRadius" Value="17" />
+            <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid
+                            x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                            <ContentPresenter
+                                x:Name="ContentPresenter"
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AccessibilityView="Raw"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                Foreground="{TemplateBinding Foreground}" />
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                            <Setter Target="ContentPresenter.Opacity" Value="0.75" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Opacity" Value="0.4" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Checked">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Background" Value="{StaticResource AccentBrush}" />
+                                            <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentForegroundBrush}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="CheckedPointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Background" Value="{StaticResource AccentBrush}" />
+                                            <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentForegroundBrush}" />
+                                            <Setter Target="Root.Opacity" Value="0.9" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="CheckedPressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Background" Value="{StaticResource AccentBrush}" />
+                                            <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentForegroundBrush}" />
+                                            <Setter Target="Root.Opacity" Value="0.8" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="CheckedDisabled">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Background" Value="{StaticResource AccentBrush}" />
+                                            <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AccentForegroundBrush}" />
+                                            <Setter Target="Root.Opacity" Value="0.4" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Indeterminate" />
+                                    <VisualState x:Name="IndeterminatePointerOver" />
+                                    <VisualState x:Name="IndeterminatePressed" />
+                                    <VisualState x:Name="IndeterminateDisabled" />
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <UniformGridLayout
+            x:Key="StationGridLayout"
+            ItemsStretch="None"
+            MinColumnSpacing="20"
+            MinItemWidth="168"
+            MinRowSpacing="28" />
+
+        <DataTemplate x:Key="StationCardTemplate" x:DataType="vm:StationItem">
+            <radio:StationCard Item="{x:Bind}" />
+        </DataTemplate>
+    </Page.Resources>
+
+    <!--  No scroll anchoring: the grids are replaced wholesale (genre switch, results), which made the view jump.  -->
+    <ScrollViewer x:Name="Scroller" VerticalAnchorRatio="NaN">
+        <StackPanel Padding="{StaticResource PagePadding}">
+            <!--  Title and the directory search.  -->
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="2">
+                    <TextBlock Style="{StaticResource EyebrowStyle}" Text="LIVE STATIONS" />
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level1"
+                        Style="{StaticResource PageTitleStyle}"
+                        Text="Radio" />
+                </StackPanel>
+                <Grid
+                    Grid.Column="1"
+                    Width="280"
+                    Height="36"
+                    VerticalAlignment="Bottom"
+                    Background="{ThemeResource Surface2Brush}"
+                    ColumnSpacing="6"
+                    CornerRadius="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon
+                        Margin="14,0,0,0"
+                        FontSize="13"
+                        Foreground="{ThemeResource TextSecondaryBrush}"
+                        Glyph="&#xE721;" />
+                    <TextBox
+                        x:Name="SearchBox"
+                        Grid.Column="1"
+                        Margin="0,0,4,0"
+                        Padding="0,7,0,7"
+                        VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="RadioSearchBox"
+                        AutomationProperties.Name="Search stations"
+                        BorderThickness="0"
+                        FontSize="13"
+                        IsSpellCheckEnabled="False"
+                        IsTextPredictionEnabled="False"
+                        PlaceholderText="Search all stations"
+                        Text="{x:Bind ViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                        <TextBox.Resources>
+                            <ResourceDictionary>
+                                <!--  Palette aliases resolve per theme only from theme dictionaries.  -->
+                                <ResourceDictionary.ThemeDictionaries>
+                                    <ResourceDictionary x:Key="Default">
+                                        <StaticResource x:Key="TextControlForeground" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlForegroundPointerOver" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="TextTertiaryBrush" />
+                                        <StaticResource x:Key="TextControlPlaceholderForegroundPointerOver" ResourceKey="TextTertiaryBrush" />
+                                        <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="TextTertiaryBrush" />
+                                        <StaticResource x:Key="TextControlButtonBackgroundPointerOver" ResourceKey="HoverFillBrush" />
+                                        <StaticResource x:Key="TextControlButtonBackgroundPressed" ResourceKey="PressedFillBrush" />
+                                        <StaticResource x:Key="TextControlButtonForeground" ResourceKey="TextSecondaryBrush" />
+                                        <StaticResource x:Key="TextControlButtonForegroundPointerOver" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlButtonForegroundPressed" ResourceKey="TextPrimaryBrush" />
+                                    </ResourceDictionary>
+                                    <ResourceDictionary x:Key="Light">
+                                        <StaticResource x:Key="TextControlForeground" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlForegroundPointerOver" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="TextTertiaryBrush" />
+                                        <StaticResource x:Key="TextControlPlaceholderForegroundPointerOver" ResourceKey="TextTertiaryBrush" />
+                                        <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="TextTertiaryBrush" />
+                                        <StaticResource x:Key="TextControlButtonBackgroundPointerOver" ResourceKey="HoverFillBrush" />
+                                        <StaticResource x:Key="TextControlButtonBackgroundPressed" ResourceKey="PressedFillBrush" />
+                                        <StaticResource x:Key="TextControlButtonForeground" ResourceKey="TextSecondaryBrush" />
+                                        <StaticResource x:Key="TextControlButtonForegroundPointerOver" ResourceKey="TextPrimaryBrush" />
+                                        <StaticResource x:Key="TextControlButtonForegroundPressed" ResourceKey="TextPrimaryBrush" />
+                                    </ResourceDictionary>
+                                </ResourceDictionary.ThemeDictionaries>
+                                <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                                <Thickness x:Key="TextControlBorderThemeThickness">0</Thickness>
+                                <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
+                                <SolidColorBrush x:Key="TextControlButtonBackground" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlButtonBorderBrush" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlButtonBorderBrushPointerOver" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlButtonBorderBrushPressed" Color="Transparent" />
+                            </ResourceDictionary>
+                        </TextBox.Resources>
+                    </TextBox>
+                </Grid>
+            </Grid>
+
+            <!--  ===== Browsing: genres, favourites, curated and directory stations =====  -->
+            <StackPanel Visibility="{x:Bind ViewModel.IsBrowsing, Mode=OneWay}">
+                <!--  Genre chips (ToggleButtons kept exclusive by ToggleGroup), scrolling sideways on narrow windows.  -->
+                <ScrollViewer
+                    Margin="0,20,-40,0"
+                    HorizontalScrollBarVisibility="Hidden"
+                    HorizontalScrollMode="Auto"
+                    VerticalScrollBarVisibility="Disabled"
+                    VerticalScrollMode="Disabled">
+                    <StackPanel
+                        x:Name="GenreChips"
+                        Padding="0,0,40,0"
+                        AutomationProperties.Name="Genres"
+                        Orientation="Horizontal"
+                        Spacing="8" />
+                </ScrollViewer>
+
+                <!--  Favourites: one row.  -->
+                <StackPanel
+                    Margin="0,36,0,0"
+                    Spacing="14"
+                    Visibility="{x:Bind ViewModel.HasFavorites, Mode=OneWay}">
+                    <items:SectionHeader Title="Favourites" Eyebrow="Your stations" />
+                    <ScrollViewer
+                        Margin="0,0,-40,0"
+                        HorizontalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Auto"
+                        VerticalScrollBarVisibility="Disabled"
+                        VerticalScrollMode="Disabled">
+                        <ItemsRepeater
+                            Margin="0,0,40,16"
+                            AutomationProperties.Name="Favourite stations"
+                            ItemTemplate="{StaticResource StationCardTemplate}"
+                            ItemsSource="{x:Bind ViewModel.Favorites}">
+                            <ItemsRepeater.Layout>
+                                <StackLayout Orientation="Horizontal" Spacing="20" />
+                            </ItemsRepeater.Layout>
+                        </ItemsRepeater>
+                    </ScrollViewer>
+                </StackPanel>
+
+                <!--  Hand-picked stations of the genre.  -->
+                <StackPanel Margin="0,36,0,0" Spacing="14">
+                    <items:SectionHeader Title="{x:Bind ViewModel.CuratedHeading, Mode=OneWay}" Eyebrow="Hand-picked" />
+                    <ItemsRepeater
+                        AutomationProperties.Name="Hand-picked stations"
+                        ItemTemplate="{StaticResource StationCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.Curated}"
+                        Layout="{StaticResource StationGridLayout}" />
+                </StackPanel>
+
+                <!--  More of the genre from the Radio Browser directory.  -->
+                <StackPanel Margin="0,40,0,0" Spacing="14">
+                    <items:SectionHeader Title="{x:Bind ViewModel.DirectoryHeading, Mode=OneWay}" Eyebrow="Popular on Radio Browser" />
+                    <items:Skeleton Visibility="{x:Bind ViewModel.IsDirectoryLoading, Mode=OneWay}">
+                        <items:SkeletonCards Count="6" IsGrid="True" />
+                    </items:Skeleton>
+                    <ItemsRepeater
+                        AutomationProperties.Name="More stations"
+                        ItemTemplate="{StaticResource StationCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.Directory}"
+                        Layout="{StaticResource StationGridLayout}"
+                        Visibility="{x:Bind ViewModel.ShowDirectory, Mode=OneWay}" />
+                    <items:EmptyState
+                        ActionText="Try again"
+                        Command="{x:Bind ViewModel.RetryDirectoryCommand}"
+                        Glyph="&#xE783;"
+                        Heading="Couldn't load more stations"
+                        Message="{x:Bind ViewModel.DirectoryError, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.HasDirectoryError, Mode=OneWay}" />
+                </StackPanel>
+            </StackPanel>
+
+            <!--  ===== Searching the directory =====  -->
+            <StackPanel
+                Margin="0,36,0,0"
+                Spacing="14"
+                Visibility="{x:Bind ViewModel.IsSearching, Mode=OneWay}">
+                <items:SectionHeader Title="{x:Bind ViewModel.ResultsHeading, Mode=OneWay}" />
+                <items:Skeleton Visibility="{x:Bind ViewModel.IsSearchLoading, Mode=OneWay}">
+                    <items:SkeletonCards Count="12" IsGrid="True" />
+                </items:Skeleton>
+                <ItemsRepeater
+                    AutomationProperties.Name="Search results"
+                    ItemTemplate="{StaticResource StationCardTemplate}"
+                    ItemsSource="{x:Bind ViewModel.Results}"
+                    Layout="{StaticResource StationGridLayout}"
+                    Visibility="{x:Bind ViewModel.ShowResults, Mode=OneWay}" />
+                <items:EmptyState
+                    Glyph="&#xE721;"
+                    Heading="No stations found"
+                    Message="Try another name, or a genre like jazz or house."
+                    Visibility="{x:Bind ViewModel.IsSearchEmpty, Mode=OneWay}" />
+                <items:EmptyState
+                    ActionText="Try again"
+                    Command="{x:Bind ViewModel.RetrySearchCommand}"
+                    Glyph="&#xE783;"
+                    Heading="Search failed"
+                    Message="{x:Bind ViewModel.SearchError, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.HasSearchError, Mode=OneWay}" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

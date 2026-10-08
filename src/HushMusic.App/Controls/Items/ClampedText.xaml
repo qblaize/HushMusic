@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.ClampedText"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    HorizontalAlignment="Left">
+
+    <StackPanel Spacing="2">
+        <TextBlock
+            x:Name="Body"
+            IsTextSelectionEnabled="True"
+            IsTextTrimmedChanged="OnIsTextTrimmedChanged"
+            LineHeight="19"
+            Style="{StaticResource SubheadStyle}"
+            Text="{x:Bind Text, Mode=OneWay}"
+            TextTrimming="CharacterEllipsis"
+            TextWrapping="Wrap" />
+        <Button
+            x:Name="ToggleButton"
+            Margin="-6,0,0,0"
+            Padding="6,2"
+            HorizontalAlignment="Left"
+            Click="OnToggleClick"
+            Content="More"
+            Style="{StaticResource TextActionButtonStyle}"
+            Visibility="Collapsed" />
+    </StackPanel>
+</UserControl>

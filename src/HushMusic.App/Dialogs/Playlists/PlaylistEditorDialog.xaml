@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="HushMusic.App.Dialogs.Playlists.PlaylistEditorDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    CloseButtonText="Cancel">
+
+    <StackPanel MinWidth="380" Spacing="16">
+        <!--
+            Borderless fields on Surface2 (lightweight styling of the stock TextBox / ComboBox). Aliases to theme tokens
+            live in theme dictionaries: a plain StaticResource alias would keep one theme's value.
+        -->
+        <StackPanel.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Default">
+                        <StaticResource x:Key="TextControlBackground" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="TextPrimaryBrush" />
+                        <StaticResource x:Key="TextControlHeaderForeground" ResourceKey="TextSecondaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="TextTertiaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="TextTertiaryBrush" />
+                        <StaticResource x:Key="ComboBoxBackground" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="ComboBoxBackgroundFocused" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="ComboBoxHeaderForeground" ResourceKey="TextSecondaryBrush" />
+                        <!-- Focused field: a faint hairline. -->
+                        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#33FFFFFF" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Light">
+                        <StaticResource x:Key="TextControlBackground" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="TextPrimaryBrush" />
+                        <StaticResource x:Key="TextControlHeaderForeground" ResourceKey="TextSecondaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="TextTertiaryBrush" />
+                        <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="TextTertiaryBrush" />
+                        <StaticResource x:Key="ComboBoxBackground" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="Surface3Brush" />
+                        <StaticResource x:Key="ComboBoxBackgroundFocused" ResourceKey="Surface2Brush" />
+                        <StaticResource x:Key="ComboBoxHeaderForeground" ResourceKey="TextSecondaryBrush" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#29000000" />
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+                <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="Transparent" />
+                <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="Transparent" />
+                <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="Transparent" />
+                <SolidColorBrush x:Key="ComboBoxBorderBrushFocused" Color="Transparent" />
+            </ResourceDictionary>
+        </StackPanel.Resources>
+
+        <TextBox
+            x:Name="TitleBox"
+            Padding="12,9"
+            CornerRadius="{StaticResource RadiusMedium}"
+            Header="Title"
+            KeyDown="OnTitleKeyDown"
+            MaxLength="150"
+            PlaceholderText="My playlist"
+            Text="{x:Bind ViewModel.Title, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBox
+            Height="104"
+            Padding="12,9"
+            AcceptsReturn="True"
+            CornerRadius="{StaticResource RadiusMedium}"
+            Header="Description"
+            MaxLength="5000"
+            PlaceholderText="Optional"
+            Text="{x:Bind ViewModel.Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+            TextWrapping="Wrap" />
+        <ComboBox
+            MinWidth="200"
+            CornerRadius="{StaticResource RadiusMedium}"
+            Header="Privacy"
+            ItemsSource="{x:Bind ViewModel.PrivacyOptions}"
+            SelectedIndex="{x:Bind ViewModel.PrivacyIndex, Mode=TwoWay}" />
+    </StackPanel>
+</ContentDialog>

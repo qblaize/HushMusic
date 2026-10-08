@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.SkeletonRows"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    AutomationProperties.AccessibilityView="Raw"
+    IsHitTestVisible="False"
+    IsTabStop="False">
+
+    <!-- Placeholder track rows with the same geometry as TrackRow: lead (art or number), two text lines, duration. -->
+    <ItemsRepeater ItemsSource="{x:Bind Items, Mode=OneWay}">
+        <ItemsRepeater.ItemTemplate>
+            <DataTemplate x:DataType="items:SkeletonItem">
+                <Grid
+                    Height="{StaticResource RowHeight}"
+                    Padding="8,0"
+                    ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="40" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border
+                        Width="{x:Bind LeadWidth}"
+                        Height="{x:Bind LeadHeight}"
+                        Style="{StaticResource SkeletonArtStyle}" />
+                    <StackPanel
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                        <Border
+                            Width="{x:Bind Primary}"
+                            Height="11"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource SkeletonBlockStyle}" />
+                        <Border
+                            Width="{x:Bind Secondary}"
+                            Height="9"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource SkeletonFaintBlockStyle}" />
+                    </StackPanel>
+                    <Border
+                        Grid.Column="2"
+                        Width="30"
+                        Height="9"
+                        Style="{StaticResource SkeletonFaintBlockStyle}" />
+                </Grid>
+            </DataTemplate>
+        </ItemsRepeater.ItemTemplate>
+    </ItemsRepeater>
+</UserControl>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Settings.AccentSwatchPicker"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    IsTabStop="False">
+
+    <!--  Tab enters the row once; the arrow keys move between swatches, Space selects.  -->
+    <StackPanel
+        x:Name="SwatchPanel"
+        Orientation="Horizontal"
+        Spacing="6"
+        TabFocusNavigation="Once"
+        XYFocusKeyboardNavigation="Enabled" />
+</UserControl>

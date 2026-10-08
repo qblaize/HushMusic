@@ -1,0 +1,25 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/HushMusic.App/HushMusic.App.csproj">
+      <Deploy />
+    </Project>
+    <Project Path="src/HushMusic.Auth/HushMusic.Auth.csproj" />
+    <Project Path="src/HushMusic.Core/HushMusic.Core.csproj" />
+    <Project Path="src/HushMusic.InnerTube/HushMusic.InnerTube.csproj" />
+    <Project Path="src/HushMusic.Playback/HushMusic.Playback.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HushMusic.Core.Tests/HushMusic.Core.Tests.csproj" />
+    <Project Path="tests/HushMusic.InnerTube.Tests/HushMusic.InnerTube.Tests.csproj" />
+    <Project Path="tests/HushMusic.Playback.Tests/HushMusic.Playback.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+  </Folder>
+</Solution>

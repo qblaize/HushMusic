@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:settings="using:HushMusic.App.Controls.Settings"
+    xmlns:shell="using:HushMusic.App.Controls.Shell">
+
+    <ScrollViewer x:Name="Scroller">
+        <!--  One centred column (max SettingsColumnMaxWidth) in the space right of the rail.  -->
+        <Grid Padding="{StaticResource SettingsPagePadding}">
+            <StackPanel MaxWidth="{StaticResource SettingsColumnMaxWidth}" HorizontalAlignment="Stretch">
+                <TextBlock
+                    Margin="4,0,0,4"
+                    AutomationProperties.HeadingLevel="Level1"
+                    Style="{StaticResource LargeTitleStyle}"
+                    Text="Settings" />
+
+                <!--  ===== Account =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="ACCOUNT" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <Grid Padding="16" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Grid Width="56" Height="56">
+                            <PersonPicture
+                                Width="56"
+                                Height="56"
+                                helpers:ImageLoader.DecodeWidth="56"
+                                helpers:ImageLoader.Url="{x:Bind ViewModel.Account.PhotoUrl, Mode=OneWay}"
+                                DisplayName="{x:Bind ViewModel.Account.DisplayName, Mode=OneWay}"
+                                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.Account.IsSignedIn), Mode=OneWay}" />
+                            <Border
+                                Background="{ThemeResource Surface3Brush}"
+                                CornerRadius="28"
+                                Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.Account.IsSignedIn), Mode=OneWay}">
+                                <FontIcon
+                                    FontSize="24"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    Glyph="&#xE77B;" />
+                            </Border>
+                        </Grid>
+
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="2">
+                            <TextBlock
+                                Style="{StaticResource Title3Style}"
+                                Text="{x:Bind ViewModel.Account.StatusTitle, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Style="{StaticResource SubheadStyle}"
+                                Text="{x:Bind ViewModel.Account.Handle, Mode=OneWay}"
+                                Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.Account.Handle), Mode=OneWay}" />
+                            <TextBlock Style="{StaticResource SettingsRowDescriptionStyle}" Text="{x:Bind ViewModel.Account.StatusDetail, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <StackPanel
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Button
+                                Command="{x:Bind ViewModel.Account.SignInWithCookieHeaderCommand}"
+                                Content="Paste a cookie header…"
+                                Style="{StaticResource PillSecondaryButtonStyle}"
+                                Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.Account.IsSignedIn), Mode=OneWay}" />
+                            <Button
+                                Command="{x:Bind ViewModel.Account.SignInCommand}"
+                                Content="{x:Bind ViewModel.Account.SignInButtonText, Mode=OneWay}"
+                                Style="{StaticResource PillButtonStyle}"
+                                Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.Account.IsSignedIn), Mode=OneWay}" />
+                            <Button
+                                Command="{x:Bind ViewModel.Account.SignOutCommand}"
+                                Content="Sign out"
+                                Style="{StaticResource PillSecondaryButtonStyle}"
+                                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.Account.IsSignedIn), Mode=OneWay}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <TextBlock Style="{StaticResource SettingsFooterStyle}" Text="Sign in opens a small Google sign-in window. Once you're in, the app keeps only the YouTube Music session cookies, encrypted on this PC, and deletes the sign-in browser profile. Signing out removes them." />
+
+                <!--  ===== Appearance =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="APPEARANCE" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <settings:SettingsRow Title="Theme" Description="Auto follows the light or dark mode set in Windows.">
+                            <settings:SegmentedPicker Options="{x:Bind ViewModel.ThemeOptions}" SelectedValue="{x:Bind ViewModel.Theme, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Accent color" Description="Album art picks the color from the cover of the song that's playing.">
+                            <settings:AccentSwatchPicker SelectedValue="{x:Bind ViewModel.AccentStyle, Mode=TwoWay}" Swatches="{x:Bind ViewModel.AccentSwatches, Mode=OneWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Now Playing artwork" Description="Show just the current cover, or the songs before and after it as a Cover Flow.">
+                            <settings:SegmentedPicker
+                                AutomationProperties.AutomationId="NowPlayingArtStylePicker"
+                                Options="{x:Bind ViewModel.NowPlayingArtStyleOptions}"
+                                SelectedValue="{x:Bind ViewModel.NowPlayingArtStyle, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                    </StackPanel>
+                </Border>
+
+                <!--  ===== Playback =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="PLAYBACK" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <settings:SettingsRow Title="Normalize volume" Description="Evens out loud and quiet songs, so you don't have to keep reaching for the volume.">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.NormalizeVolume, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Resume where I left off" Description="Opens with your last queue and song, paused at the same spot.">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeLastSession, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Report played songs to my YouTube Music history">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.ReportPlaybackHistory, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Use my account when resolving streams" Description="Off is safer: yt-dlp warns that accounts used with it can be rate-limited or blocked. Turn on for age-restricted or account-only tracks.">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseAccountForStreams, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                    </StackPanel>
+                </Border>
+
+                <!--  ===== Window =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="WINDOW" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <settings:SettingsRow Title="Keep playing in the notification area when closed" Description="Closing the window keeps the music going. Quit from the icon in the notification area.">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.CloseToTray, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Start with Windows" Description="Starts in the notification area when you sign in to Windows.">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.StartWithWindows, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Show player on the taskbar" Description="A small player in the empty space of the taskbar. Scroll over it to change the volume; click it for the full controls.">
+                            <ToggleSwitch AutomationProperties.AutomationId="ShowTaskbarWidgetToggle" IsOn="{x:Bind ViewModel.ShowTaskbarWidget, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                    </StackPanel>
+                </Border>
+
+                <!--  ===== Last.fm =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="LAST.FM" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <!--  Status, with the actions of the current step on the right.  -->
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock
+                                    AutomationProperties.LiveSetting="Polite"
+                                    Style="{StaticResource SettingsRowLabelStyle}"
+                                    Text="{x:Bind ViewModel.LastFmStatusTitle, Mode=OneWay}" />
+                                <TextBlock Style="{StaticResource SettingsRowDescriptionStyle}" Text="{x:Bind ViewModel.LastFmStatusDetail, Mode=OneWay}" />
+                                <TextBlock
+                                    AutomationProperties.LiveSetting="Assertive"
+                                    Foreground="{ThemeResource WarningBrush}"
+                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                    Text="{x:Bind ViewModel.LastFmHint, Mode=OneWay}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.LastFmHint), Mode=OneWay}" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <ProgressRing
+                                    Width="18"
+                                    Height="18"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    IsActive="{x:Bind ViewModel.IsLastFmWorking, Mode=OneWay}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmWorking), Mode=OneWay}" />
+                                <Button
+                                    Command="{x:Bind ViewModel.CancelLastFmConnectCommand}"
+                                    Content="Cancel"
+                                    Style="{StaticResource PillSecondaryButtonStyle}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmAwaitingApproval), Mode=OneWay}" />
+                                <Button
+                                    Command="{x:Bind ViewModel.CompleteLastFmConnectCommand}"
+                                    Content="I've approved it"
+                                    Style="{StaticResource PillButtonStyle}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmAwaitingApproval), Mode=OneWay}" />
+                                <Button
+                                    Command="{x:Bind ViewModel.DisconnectLastFmCommand}"
+                                    Content="Disconnect"
+                                    Style="{StaticResource PillSecondaryButtonStyle}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmConnected), Mode=OneWay}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!--  Waiting for approval: the page may have opened behind other windows.  -->
+                        <StackPanel Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmAwaitingApproval), Mode=OneWay}">
+                            <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Button
+                                    Margin="-6,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Command="{x:Bind ViewModel.ReopenLastFmApprovalPageCommand}"
+                                    Content="Open the approval page again"
+                                    Style="{StaticResource TextActionButtonStyle}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!--  Connected.  -->
+                        <StackPanel Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmConnected), Mode=OneWay}">
+                            <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                            <settings:SettingsRow Title="Scrobble my plays" Description="A song counts once you've listened to half of it or 4 minutes, whichever comes first. Songs of 30 seconds or less don't count.">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.LastFmScrobbling, Mode=TwoWay}" />
+                            </settings:SettingsRow>
+                        </StackPanel>
+
+                        <!--  Not connected: the user's own API account.  -->
+                        <StackPanel Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmDisconnected), Mode=OneWay}">
+                            <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                            <settings:SettingsRow Title="API key">
+                                <TextBox
+                                    Width="{StaticResource SettingsInputWidth}"
+                                    IsSpellCheckEnabled="False"
+                                    PlaceholderText="32 letters and digits"
+                                    Style="{StaticResource SettingsTextBoxStyle}"
+                                    Text="{x:Bind ViewModel.LastFmApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </settings:SettingsRow>
+                            <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                            <settings:SettingsRow Title="Shared secret">
+                                <PasswordBox
+                                    Width="{StaticResource SettingsInputWidth}"
+                                    Password="{x:Bind ViewModel.LastFmSharedSecret, Mode=TwoWay}"
+                                    PlaceholderText="32 letters and digits"
+                                    Style="{StaticResource SettingsPasswordBoxStyle}" />
+                            </settings:SettingsRow>
+                            <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                            <Grid Style="{StaticResource SettingsRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button
+                                    Margin="-6,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Command="{x:Bind ViewModel.OpenLastFmApiAccountPageCommand}"
+                                    Content="Get an API key"
+                                    Style="{StaticResource TextActionButtonStyle}" />
+                                <Button
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Command="{x:Bind ViewModel.ConnectLastFmCommand}"
+                                    Content="Connect"
+                                    Style="{StaticResource PillButtonStyle}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                <TextBlock
+                    Style="{StaticResource SettingsFooterStyle}"
+                    Text="Last.fm needs a free API account of your own: select Get an API key, sign in, enter any application name and leave the callback URL empty. Connect then opens last.fm in your browser to approve the app. The key, secret and session are stored encrypted on this PC."
+                    Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmDisconnected), Mode=OneWay}" />
+
+                <!--  ===== Content =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="CONTENT" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <settings:SettingsRow Title="Content country" Description="Two-letter country code (InnerTube gl, e.g. US) that shapes recommendations and charts. Leave empty for the default.">
+                        <TextBox
+                            Width="96"
+                            MaxLength="2"
+                            PlaceholderText="Default"
+                            Style="{StaticResource SettingsTextBoxStyle}"
+                            Text="{x:Bind ViewModel.ContentLocation, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                    </settings:SettingsRow>
+                </Border>
+
+                <!--  ===== Stream resolver =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="STREAM RESOLVER (YT-DLP)" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="Version" />
+                                <TextBlock
+                                    IsTextSelectionEnabled="True"
+                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                    Text="{x:Bind ViewModel.YtDlpVersion, Mode=OneWay}" />
+                            </StackPanel>
+                            <ProgressRing
+                                Grid.Column="1"
+                                Width="18"
+                                Height="18"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                IsActive="{x:Bind ViewModel.IsCheckingForUpdate, Mode=OneWay}"
+                                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsCheckingForUpdate), Mode=OneWay}" />
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Command="{x:Bind ViewModel.CheckForYtDlpUpdateCommand}"
+                                Content="Check for update"
+                                IsEnabled="{x:Bind ViewModel.CanCheckForUpdate, Mode=OneWay}"
+                                Style="{StaticResource PillSecondaryButtonStyle}" />
+                        </Grid>
+
+                        <!--  Result of the last manual update check.  -->
+                        <Grid
+                            Padding="16,0,8,12"
+                            ColumnSpacing="10"
+                            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsUpdateResultOpen), Mode=OneWay}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                Margin="0,2,0,0"
+                                VerticalAlignment="Top"
+                                FontSize="14"
+                                Foreground="{x:Bind shell:ShellBindings.SeverityBrush(ViewModel.UpdateResultNotificationSeverity), Mode=OneWay}"
+                                Glyph="{x:Bind ViewModel.UpdateResultGlyph, Mode=OneWay}" />
+                            <StackPanel Grid.Column="1" Spacing="1">
+                                <TextBlock Style="{StaticResource HeadlineStyle}" Text="{x:Bind ViewModel.UpdateResultTitle, Mode=OneWay}" />
+                                <TextBlock
+                                    IsTextSelectionEnabled="True"
+                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                    Text="{x:Bind ViewModel.UpdateResultMessage, Mode=OneWay}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.UpdateResultMessage), Mode=OneWay}" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="2"
+                                Width="28"
+                                Height="28"
+                                VerticalAlignment="Top"
+                                AutomationProperties.Name="Dismiss"
+                                Command="{x:Bind ViewModel.DismissUpdateResultCommand}"
+                                Content="&#xE711;"
+                                FontSize="10"
+                                Style="{StaticResource IconButtonStyle}" />
+                        </Grid>
+
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Check for yt-dlp and Deno updates on startup">
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.CheckYtDlpUpdatesOnStartup, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Custom yt-dlp.exe path" Description="Leave empty to let the app manage it.">
+                            <TextBox
+                                Width="{StaticResource SettingsInputWidth}"
+                                PlaceholderText="Managed by the app"
+                                Style="{StaticResource SettingsTextBoxStyle}"
+                                Text="{x:Bind ViewModel.YtDlpPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="JavaScript runtime (--js-runtimes)" Description="auto (recommended), node, deno, or runtime:C:\path\to\runtime.exe">
+                            <TextBox
+                                Width="{StaticResource SettingsInputWidth}"
+                                PlaceholderText="auto"
+                                Style="{StaticResource SettingsTextBoxStyle}"
+                                Text="{x:Bind ViewModel.YtDlpJsRuntime, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                        </settings:SettingsRow>
+                    </StackPanel>
+                </Border>
+
+                <!--  ===== Diagnostics =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="DIAGNOSTICS" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <settings:SettingsRow Title="Log level">
+                            <ComboBox
+                                MinWidth="160"
+                                ItemsSource="{x:Bind ViewModel.LogLevels}"
+                                SelectedItem="{x:Bind ViewModel.LogLevel, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="Logs" />
+                                <TextBlock
+                                    IsTextSelectionEnabled="True"
+                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                    Text="{x:Bind ViewModel.LogFolder}" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Command="{x:Bind ViewModel.OpenLogFolderCommand}"
+                                Content="Open folder"
+                                Style="{StaticResource PillSecondaryButtonStyle}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!--  ===== About =====  -->
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="ABOUT" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="Hush" />
+                                <TextBlock
+                                    AutomationProperties.AutomationId="AppVersionText"
+                                    IsTextSelectionEnabled="True"
+                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                    Text="{x:Bind ViewModel.AppVersion}" />
+                            </StackPanel>
+                        </Grid>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+
+                        <!--  Updates: status on the left, the next step on the right.  -->
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="Updates" />
+                                <TextBlock
+                                    AutomationProperties.AutomationId="AppUpdateStatusText"
+                                    AutomationProperties.LiveSetting="Polite"
+                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                    Text="{x:Bind ViewModel.AppUpdateStatus, Mode=OneWay}" />
+                            </StackPanel>
+                            <ProgressRing
+                                Grid.Column="1"
+                                Width="18"
+                                Height="18"
+                                Margin="0,0,12,0"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                IsActive="{x:Bind ViewModel.IsAppUpdateBusy, Mode=OneWay}"
+                                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsAppUpdateBusy), Mode=OneWay}" />
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="CheckForAppUpdateButton"
+                                Command="{x:Bind ViewModel.CheckForAppUpdateCommand}"
+                                Content="Check for updates"
+                                Style="{StaticResource PillSecondaryButtonStyle}"
+                                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.ShowCheckForAppUpdate), Mode=OneWay}" />
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="RestartToUpdateButton"
+                                Command="{x:Bind ViewModel.RestartToUpdateCommand}"
+                                Content="Restart to update"
+                                Style="{StaticResource PillButtonStyle}"
+                                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsAppUpdateReady), Mode=OneWay}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</Page>

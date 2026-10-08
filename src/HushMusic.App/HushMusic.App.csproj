@@ -1,0 +1,86 @@
+<!-- Platform is local: a solution build passes Platform=AnyCPU, which would otherwise win over the x64 default below and
+     write a framework-dependent build over the self-contained one in the same (unified) output folder. -->
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="Platform">
+
+  <PropertyGroup>
+    <TargetFramework>$(WindowsTfm)</TargetFramework>
+    <TargetPlatformMinVersion>$(WindowsMinVersion)</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>$(WindowsMinVersion)</SupportedOSPlatformVersion>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>HushMusic.App</RootNamespace>
+    <AssemblyName>HushMusic</AssemblyName>
+
+    <!-- WinUI 3, unpackaged. Development runs from bin (F5 / dotnet run); releases are Velopack installers made by
+         build/release.ps1. MSIX sideload via publish is still possible, see README. -->
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <!-- Program.cs provides Main (single-instance redirection). -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Platforms>x64;ARM64</Platforms>
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <!-- One output folder whether built from the solution (AnyCPU) or the project (x64): two copies of the app in
+         two folders would each count as a separate single instance. -->
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <!-- Builds made while the app is running go elsewhere (the running copy locks bin); releases use it too. -->
+    <OutputPath Condition="'$(HushOutputDir)' != ''">$(HushOutputDir)\</OutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+
+  <!-- Release builds are what users install (build/release.ps1): .NET and the Windows App SDK runtime ship inside the
+       app folder, so nothing has to be installed first. Debug keeps using the Windows App Runtime installed with the
+       dev tools. An MSIX build (WindowsPackageType=MSIX) keeps its framework package dependency. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(WindowsPackageType)' == 'None'">
+    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+
+  <!-- Builds get Content through the WinUI layout step; dotnet publish (releases) only copies it when asked to. -->
+  <ItemGroup>
+    <Content Include="Assets\**\*.png" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\**\*.ico" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\*.ttf" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\*.txt" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Velopack" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HushMusic.Core\HushMusic.Core.csproj" />
+    <ProjectReference Include="..\HushMusic.InnerTube\HushMusic.InnerTube.csproj" />
+    <ProjectReference Include="..\HushMusic.Auth\HushMusic.Auth.csproj" />
+    <ProjectReference Include="..\HushMusic.Playback\HushMusic.Playback.csproj" />
+  </ItemGroup>
+
+  <!-- The Windows App SDK metapackage also ships Windows ML's runtimes (onnxruntime, DirectML: ~38 MB). Hush doesn't
+       use Windows ML, and they aren't in the reg-free WinRT manifest (only Windows ML loads them), so releases leave
+       them out. -->
+  <Target Name="RemoveUnusedWindowsMLRuntimes" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(WindowsAppSDKSelfContained)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)%(Extension)' == 'onnxruntime.dll' or '%(Filename)%(Extension)' == 'DirectML.dll'" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+</Project>

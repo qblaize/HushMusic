@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Shell.AccountButton"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:shell="using:HushMusic.App.Controls.Shell">
+
+    <!--
+        Rail account item: avatar when signed in (click = account flyout), person glyph when signed out
+        (click = sign in), spinner while the sign-in window is open (click = bring it to the front).
+    -->
+    <shell:RailButton
+        x:Name="Item"
+        AutomationProperties.AutomationId="AccountButton"
+        Click="OnClick"
+        Label="{x:Bind ViewModel.RailLabel, Mode=OneWay}"
+        Style="{StaticResource RailButtonStyle}">
+        <Grid Width="30" Height="30">
+            <PersonPicture
+                Width="30"
+                Height="30"
+                helpers:ImageLoader.DecodeWidth="30"
+                helpers:ImageLoader.Url="{x:Bind ViewModel.PhotoUrl, Mode=OneWay}"
+                AutomationProperties.AccessibilityView="Raw"
+                DisplayName="{x:Bind ViewModel.DisplayName, Mode=OneWay}"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.ShowAccount), Mode=OneWay}" />
+            <ProgressRing
+                Width="18"
+                Height="18"
+                Foreground="{ThemeResource TextSecondaryBrush}"
+                IsActive="{x:Bind ViewModel.IsSigningIn, Mode=OneWay}"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsSigningIn), Mode=OneWay}" />
+            <FontIcon
+                FontSize="18"
+                Foreground="{ThemeResource TextSecondaryBrush}"
+                Glyph="&#xE77B;"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.ShowPersonGlyph), Mode=OneWay}" />
+            <!--  Expired session: small accent dot.  -->
+            <Ellipse
+                Width="8"
+                Height="8"
+                Margin="0,1,1,0"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Fill="{StaticResource AccentBrush}"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsExpired), Mode=OneWay}" />
+        </Grid>
+        <FlyoutBase.AttachedFlyout>
+            <Flyout x:Name="AccountFlyout" Placement="RightEdgeAlignedBottom">
+                <StackPanel MinWidth="248" Spacing="16">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <PersonPicture
+                            Width="44"
+                            Height="44"
+                            helpers:ImageLoader.DecodeWidth="44"
+                            helpers:ImageLoader.Url="{x:Bind ViewModel.PhotoUrl, Mode=OneWay}"
+                            DisplayName="{x:Bind ViewModel.DisplayName, Mode=OneWay}" />
+                        <StackPanel VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Style="{StaticResource FootnoteStyle}" Text="Signed in as" />
+                            <TextBlock
+                                MaxWidth="180"
+                                Style="{StaticResource HeadlineStyle}"
+                                Text="{x:Bind ViewModel.DisplayName, Mode=OneWay}" />
+                            <TextBlock
+                                MaxWidth="180"
+                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                Style="{StaticResource FootnoteStyle}"
+                                Text="{x:Bind ViewModel.Handle, Mode=OneWay}"
+                                Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.Handle), Mode=OneWay}" />
+                        </StackPanel>
+                    </StackPanel>
+                    <Button
+                        HorizontalAlignment="Stretch"
+                        Click="OnSignOutClick"
+                        Command="{x:Bind ViewModel.SignOutCommand}"
+                        Content="Sign out"
+                        Style="{StaticResource PillSecondaryButtonStyle}" />
+                </StackPanel>
+            </Flyout>
+        </FlyoutBase.AttachedFlyout>
+    </shell:RailButton>
+</UserControl>

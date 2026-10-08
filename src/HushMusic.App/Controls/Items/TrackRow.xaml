@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.Items.TrackRow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    Loaded="OnLoaded"
+    PointerCanceled="OnPointerExited"
+    PointerEntered="OnPointerEntered"
+    PointerExited="OnPointerExited"
+    SizeChanged="OnSizeChanged"
+    Unloaded="OnUnloaded">
+
+    <Grid Height="{StaticResource RowHeight}" Background="Transparent">
+        <!-- Flat rounded hover fill; the row pads its content by 8 so the fill reaches past the text. -->
+        <Border
+            x:Name="HoverFill"
+            Background="{ThemeResource HoverFillBrush}"
+            CornerRadius="{StaticResource RadiusSmall}"
+            IsHitTestVisible="False"
+            Opacity="0" />
+
+        <Grid
+            Padding="8,0"
+            ColumnSpacing="12"
+            Opacity="{x:Bind items:ItemFormat.AvailabilityOpacity(CurrentTrack), Mode=OneWay}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="40" />
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition x:Name="AlbumColumn" Width="2*" />
+                <ColumnDefinition x:Name="LikeColumn" Width="32" />
+                <ColumnDefinition Width="Auto" MinWidth="36" />
+                <ColumnDefinition Width="32" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Lead: artwork, or the track number on album pages; the equaliser replaces either for the playing track. -->
+            <Grid
+                x:Name="ArtHost"
+                Width="{StaticResource RowArtSize}"
+                Height="{StaticResource RowArtSize}"
+                VerticalAlignment="Center"
+                Background="{ThemeResource Surface2Brush}"
+                CornerRadius="{StaticResource RadiusSmall}">
+                <FontIcon
+                    FontSize="14"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Glyph="&#xE8D6;" />
+                <Image
+                    helpers:ImageLoader.DecodeWidth="40"
+                    helpers:ImageLoader.Url="{x:Bind items:ItemFormat.RowArt(CurrentTrack), Mode=OneWay}"
+                    Stretch="UniformToFill" />
+                <Border
+                    x:Name="ArtScrim"
+                    Background="{StaticResource NowPlayingScrimBrush}"
+                    Visibility="Collapsed" />
+            </Grid>
+            <TextBlock
+                x:Name="NumberText"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Foreground="{ThemeResource TextTertiaryBrush}"
+                Style="{StaticResource SubheadStyle}"
+                Text="{x:Bind items:ItemFormat.Number(Number), Mode=OneWay}"
+                Typography.NumeralAlignment="Tabular"
+                Visibility="Collapsed" />
+            <items:NowPlayingIndicator
+                x:Name="Equalizer"
+                x:Load="False"
+                Foreground="{StaticResource OnArtForegroundBrush}"
+                Visibility="Collapsed" />
+
+            <!-- Title (+ explicit badge right after it) and artist links. -->
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Spacing="1">
+                <items:TrailingPanel Spacing="6">
+                    <TextBlock
+                        x:Name="TitleText"
+                        Style="{StaticResource HeadlineStyle}"
+                        Text="{x:Bind items:ItemFormat.Title(CurrentTrack), Mode=OneWay}" />
+                    <Border
+                        Width="15"
+                        Height="15"
+                        AutomationProperties.Name="Explicit"
+                        Background="{ThemeResource Surface3Brush}"
+                        CornerRadius="3"
+                        ToolTipService.ToolTip="Explicit"
+                        Visibility="{x:Bind items:ItemFormat.ExplicitVisibility(CurrentTrack), Mode=OneWay}">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource AppFontFamily}"
+                            FontSize="9"
+                            FontWeight="Bold"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="E" />
+                    </Border>
+                </items:TrailingPanel>
+                <items:ArtistLinks
+                    Artists="{x:Bind items:ItemFormat.Artists(CurrentTrack), Mode=OneWay}"
+                    IsLinkTabStop="False"
+                    LinkForeground="{ThemeResource TextSecondaryBrush}"
+                    Prefix="{x:Bind items:ItemFormat.KindPrefix(CurrentTrack, ShowNumber), Mode=OneWay}"
+                    TextStyle="{StaticResource SubheadStyle}" />
+            </StackPanel>
+
+            <TextBlock
+                x:Name="AlbumText"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Style="{StaticResource SubheadStyle}">
+                <Hyperlink
+                    Click="OnAlbumClick"
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    IsTabStop="False"
+                    UnderlineStyle="None">
+                    <Run Text="{x:Bind items:ItemFormat.AlbumName(CurrentTrack), Mode=OneWay}" />
+                </Hyperlink>
+            </TextBlock>
+
+            <Button
+                x:Name="LikeButton"
+                Grid.Column="3"
+                AutomationProperties.Name="Like"
+                Click="OnLikeClick"
+                Opacity="0"
+                Style="{StaticResource RowIconButtonStyle}"
+                ToolTipService.ToolTip="Like">
+                <FontIcon x:Name="LikeGlyph" Glyph="&#xEB51;" />
+            </Button>
+
+            <TextBlock
+                Grid.Column="4"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Style="{StaticResource FootnoteStyle}"
+                Text="{x:Bind items:ItemFormat.Duration(CurrentTrack), Mode=OneWay}"
+                Typography.NumeralAlignment="Tabular" />
+
+            <Button
+                x:Name="MoreButton"
+                Grid.Column="5"
+                AutomationProperties.Name="More actions"
+                Click="OnMoreClick"
+                Opacity="0"
+                Style="{StaticResource RowIconButtonStyle}"
+                ToolTipService.ToolTip="More actions">
+                <FontIcon Glyph="&#xE712;" />
+            </Button>
+
+            <!-- Apple-style hairline, inset to the text column; hidden under the hovered row's fill. -->
+            <Rectangle
+                x:Name="Hairline"
+                Grid.Column="1"
+                Grid.ColumnSpan="5"
+                Height="1"
+                VerticalAlignment="Bottom"
+                Fill="{ThemeResource SeparatorBrush}"
+                IsHitTestVisible="False" />
+        </Grid>
+
+        <!-- Colours live here (not in code) so they follow the light/dark theme and the live accent. -->
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="HoverStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="PointerOver">
+                    <VisualState.Setters>
+                        <Setter Target="HoverFill.Opacity" Value="1" />
+                        <Setter Target="MoreButton.Opacity" Value="1" />
+                        <Setter Target="LikeButton.Opacity" Value="1" />
+                        <Setter Target="Hairline.Opacity" Value="0" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+            <VisualStateGroup x:Name="LikeStates">
+                <VisualState x:Name="NotLiked" />
+                <VisualState x:Name="Liked">
+                    <VisualState.Setters>
+                        <Setter Target="LikeGlyph.Glyph" Value="&#xEB52;" />
+                        <Setter Target="LikeGlyph.Foreground" Value="{StaticResource AccentBrush}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+            <VisualStateGroup x:Name="PlayingStates">
+                <VisualState x:Name="NotCurrent" />
+                <!-- Bars on the darkened artwork. -->
+                <VisualState x:Name="CurrentOnArt">
+                    <VisualState.Setters>
+                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="ArtScrim.Visibility" Value="Visible" />
+                        <Setter Target="Equalizer.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+                <!-- Album rows: accent bars in place of the track number. -->
+                <VisualState x:Name="CurrentOnNumber">
+                    <VisualState.Setters>
+                        <Setter Target="TitleText.Foreground" Value="{StaticResource AccentBrush}" />
+                        <Setter Target="NumberText.Opacity" Value="0" />
+                        <Setter Target="Equalizer.Visibility" Value="Visible" />
+                        <Setter Target="Equalizer.Foreground" Value="{StaticResource AccentBrush}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+    </Grid>
+</UserControl>

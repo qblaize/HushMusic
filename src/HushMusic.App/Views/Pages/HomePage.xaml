@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    xmlns:models="using:HushMusic.Core.Models"
+    xmlns:selectors="using:HushMusic.App.Selectors"
+    NavigationCacheMode="Required">
+
+    <Page.Resources>
+        <DataTemplate x:Key="CardShelfTemplate" x:DataType="models:Shelf">
+            <StackPanel Margin="0,36,0,0" Spacing="14">
+                <items:SectionHeader Title="{x:Bind Title}" Eyebrow="{x:Bind Subtitle}" />
+                <items:Carousel ItemClick="OnItemClick" ItemsSource="{x:Bind Items}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- "Quick picks": columns of compact song rows. -->
+        <DataTemplate x:Key="ListShelfTemplate" x:DataType="models:Shelf">
+            <StackPanel Margin="0,36,0,0" Spacing="10">
+                <items:SectionHeader Title="{x:Bind Title}" Eyebrow="{x:Bind Subtitle}" />
+                <items:Carousel
+                    ItemClick="OnItemClick"
+                    ItemsSource="{x:Bind Items}"
+                    ShowAsRows="True" />
+            </StackPanel>
+        </DataTemplate>
+
+        <selectors:ShelfTemplateSelector
+            x:Key="ShelfTemplateSelector"
+            CardsTemplate="{StaticResource CardShelfTemplate}"
+            ListTemplate="{StaticResource ListShelfTemplate}" />
+    </Page.Resources>
+
+    <Grid>
+        <ScrollViewer
+            x:Name="Scroller"
+            SizeChanged="OnLayoutSizeChanged"
+            ViewChanged="OnScrollViewChanged">
+            <StackPanel Padding="{StaticResource PagePadding}">
+                <!-- Greeting: today's date over "Good evening, <first name>". -->
+                <Grid>
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource EyebrowStyle}" Text="{x:Bind ViewModel.DateText, Mode=OneWay}" />
+                        <TextBlock
+                            AutomationProperties.HeadingLevel="Level1"
+                            Style="{StaticResource PageTitleStyle}"
+                            Text="{x:Bind ViewModel.Greeting, Mode=OneWay}" />
+                    </StackPanel>
+                    <Button
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        AutomationProperties.Name="Refresh"
+                        Command="{x:Bind ViewModel.RefreshCommand}"
+                        Style="{StaticResource IconButtonStyle}"
+                        ToolTipService.ToolTip="Refresh (F5)">
+                        <Button.KeyboardAccelerators>
+                            <KeyboardAccelerator Key="F5" />
+                        </Button.KeyboardAccelerators>
+                        <FontIcon Glyph="&#xE72C;" />
+                    </Button>
+                </Grid>
+
+                <!-- First load: placeholder shelves. -->
+                <items:Skeleton Visibility="{x:Bind ViewModel.ShowLoading, Mode=OneWay}">
+                    <StackPanel>
+                        <StackPanel Margin="0,36,0,0" Spacing="16">
+                            <Border
+                                Width="196"
+                                Height="18"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource SkeletonBlockStyle}" />
+                            <items:SkeletonCards />
+                        </StackPanel>
+                        <StackPanel Margin="0,40,0,0" Spacing="16">
+                            <Border
+                                Width="148"
+                                Height="18"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource SkeletonBlockStyle}" />
+                            <items:SkeletonCards />
+                        </StackPanel>
+                        <StackPanel Margin="0,40,0,0" Spacing="16">
+                            <Border
+                                Width="224"
+                                Height="18"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource SkeletonBlockStyle}" />
+                            <items:SkeletonCards />
+                        </StackPanel>
+                    </StackPanel>
+                </items:Skeleton>
+
+                <ItemsRepeater
+                    ItemTemplate="{StaticResource ShelfTemplateSelector}"
+                    ItemsSource="{x:Bind ViewModel.Shelves}"
+                    SizeChanged="OnLayoutSizeChanged"
+                    items:Reveal.IsShown="{x:Bind ViewModel.HasContent, Mode=OneWay}" />
+
+                <!-- More shelves on the way (scrolled near the end). -->
+                <items:Skeleton Visibility="{x:Bind ViewModel.Shelves.IsLoading, Mode=OneWay}">
+                    <StackPanel Margin="0,36,0,0" Spacing="16">
+                        <Border
+                            Width="180"
+                            Height="18"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource SkeletonBlockStyle}" />
+                        <items:SkeletonCards />
+                    </StackPanel>
+                </items:Skeleton>
+            </StackPanel>
+        </ScrollViewer>
+
+        <ProgressBar Style="{StaticResource BusyBarStyle}" Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <items:EmptyState
+            ActionText="Try again"
+            Command="{x:Bind ViewModel.RetryCommand}"
+            Glyph="&#xE783;"
+            Heading="Couldn't load your home feed"
+            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.ShowError, Mode=OneWay}" />
+        <items:EmptyState
+            ActionText="Refresh"
+            Command="{x:Bind ViewModel.RefreshCommand}"
+            Glyph="&#xE80F;"
+            Heading="Nothing here yet"
+            Message="YouTube Music didn't return any recommendations."
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+    </Grid>
+</Page>

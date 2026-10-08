@@ -1,0 +1,775 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Pages: page chrome, item containers, cards, track rows, chips and page dialogs.
+    Built on the Theme.xaml tokens and the Styles.xaml components; keys referenced with StaticResource must be defined above their use.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    xmlns:selectors="using:HushMusic.App.Selectors">
+
+    <!-- ===== Layout ===== -->
+    <x:Double x:Key="HeaderArtSize">232</x:Double>
+    <x:Double x:Key="RowHeight">52</x:Double>
+    <x:Double x:Key="RowArtSize">40</x:Double>
+    <x:Double x:Key="ArtistHeroHeight">320</x:Double>
+    <!-- "Quick picks" shelves: columns of four compact song rows. -->
+    <x:Double x:Key="QuickPickRowHeight">56</x:Double>
+    <x:Double x:Key="QuickPickArtSize">48</x:Double>
+
+    <!--
+        Page-level track lists bleed 8 px into the page padding so a row's hover fill reaches past its text;
+        anything placed in such a list's Header/Footer uses ListHeaderMargin to line up with the page title.
+    -->
+    <Thickness x:Key="ListPagePadding">32,28,32,120</Thickness>
+    <Thickness x:Key="ListHeaderMargin">8,0,8,0</Thickness>
+    <!-- Card grids: every card carries its own 20 px right gap. -->
+    <Thickness x:Key="GridPagePadding">40,12,20,120</Thickness>
+    <!-- All bottom paddings are 120 (like PagePadding): pages scroll under the floating glass player bar. -->
+
+    <!-- ===== Text ===== -->
+    <Style
+        x:Key="PageTitleStyle"
+        BasedOn="{StaticResource LargeTitleStyle}"
+        TargetType="TextBlock" />
+
+    <!-- Footnote one step quieter: list footers ("12 songs, 48 minutes"). -->
+    <Style
+        x:Key="MetaTextStyle"
+        BasedOn="{StaticResource FootnoteStyle}"
+        TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextTertiaryBrush}" />
+    </Style>
+
+    <!-- ===== Progress ===== -->
+
+    <!-- First load: a small grey spinner, centred. -->
+    <Style x:Key="LoadingRingStyle" TargetType="ProgressRing">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Reload while content stays visible (refresh, tab switch): a hairline at the top edge. -->
+    <Style x:Key="BusyBarStyle" TargetType="ProgressBar">
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="IsIndeterminate" Value="True" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="MinHeight" Value="2" />
+    </Style>
+
+    <!--
+        ===== Skeletons =====
+        First loads show placeholder blocks with the page's geometry inside an items:Skeleton (which breathes) instead
+        of a spinner: art on Surface2, primary text lines on Surface3, secondary lines on Surface2.
+    -->
+    <Style x:Key="SkeletonArtStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource Surface2Brush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+    </Style>
+
+    <Style x:Key="SkeletonBlockStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource Surface3Brush}" />
+        <Setter Property="CornerRadius" Value="5" />
+    </Style>
+
+    <Style x:Key="SkeletonFaintBlockStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource Surface2Brush}" />
+        <Setter Property="CornerRadius" Value="5" />
+    </Style>
+
+    <!-- ===== Brushes ===== -->
+
+    <SolidColorBrush x:Key="ArtHoverScrimBrush" Color="#2E000000" />
+    <SolidColorBrush x:Key="NowPlayingScrimBrush" Color="#99000000" />
+    <!-- Glyphs drawn on darkened artwork (play, equaliser): white in both themes. -->
+    <SolidColorBrush x:Key="OnArtForegroundBrush" Color="#FFFFFF" />
+
+    <!-- ===== Buttons ===== -->
+
+    <!-- Round accent play button on card artwork. Content: a FontIcon. -->
+    <Style x:Key="CardPlayButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource AccentForegroundBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Margin="1,0,0,0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.9" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.75" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.35" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Glass circle that floats over a carousel's artwork. -->
+    <Style x:Key="CarouselArrowButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource GlassBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SeparatorBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="CornerRadius" Value="17" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <Border
+                            x:Name="HoverFill"
+                            Background="{ThemeResource HoverFillBrush}"
+                            Opacity="0" />
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="HoverFill.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="HoverFill.Opacity" Value="1" />
+                                        <Setter Target="ContentPresenter.Opacity" Value="0.7" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.35" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Small icon button inside rows (like, more). -->
+    <Style
+        x:Key="RowIconButtonStyle"
+        BasedOn="{StaticResource IconButtonStyle}"
+        TargetType="Button">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="IsTabStop" Value="False" />
+    </Style>
+
+    <!-- Destructive confirmation ("Delete"). -->
+    <Style
+        x:Key="DangerPillButtonStyle"
+        BasedOn="{StaticResource PillButtonStyle}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource DangerBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- Search "Top result": the one place a filled card is used. -->
+    <Style x:Key="TopResultButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource Surface1Brush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="20" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusLarge}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Padding="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface2Brush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface2Brush}" />
+                                        <Setter Target="ContentPresenter.Opacity" Value="0.8" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A list row that is an action ("New playlist…"): flat, rounded hover fill like the item containers. -->
+    <Style x:Key="RowButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="Height" Value="{StaticResource RowHeight}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Padding="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource HoverFillBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource PressedFillBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        ===== Chips and segmented tabs =====
+        ToggleButtons kept mutually exclusive by ToggleGroup (code-behind). Not RadioButtons: a custom-templated RadioButton
+        crashed natively during layout. No implicit transitions inside these templates either (same crash family).
+    -->
+
+    <!-- Search filters: quiet pills; the selected one turns light with dark text. -->
+    <Style x:Key="ChipToggleButtonStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{ThemeResource Surface2Brush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Margin="{TemplateBinding Padding}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                        <Setter Target="ContentPresenter.Opacity" Value="0.75" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource TextPrimaryBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AppBackgroundBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource TextPrimaryBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AppBackgroundBrush}" />
+                                        <Setter Target="Root.Opacity" Value="0.92" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource TextPrimaryBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AppBackgroundBrush}" />
+                                        <Setter Target="Root.Opacity" Value="0.8" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedDisabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource TextPrimaryBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource AppBackgroundBrush}" />
+                                        <Setter Target="Root.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Indeterminate" />
+                                <VisualState x:Name="IndeterminatePointerOver" />
+                                <VisualState x:Name="IndeterminatePressed" />
+                                <VisualState x:Name="IndeterminateDisabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Segmented control: a Surface1 track (SegmentedTrackStyle) with the selected segment raised on Surface3. -->
+    <Style x:Key="SegmentedTrackStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource Surface1Brush}" />
+        <Setter Property="CornerRadius" Value="17" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
+    <Style x:Key="SegmentToggleButtonStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="MinWidth" Value="72" />
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid
+                        x:Name="Root"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Margin="{TemplateBinding Padding}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+                                        <Setter Target="ContentPresenter.Opacity" Value="0.75" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+                                        <Setter Target="ContentPresenter.Opacity" Value="0.75" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedDisabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Root.Background" Value="{ThemeResource Surface3Brush}" />
+                                        <Setter Target="Root.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Indeterminate" />
+                                <VisualState x:Name="IndeterminatePointerOver" />
+                                <VisualState x:Name="IndeterminatePressed" />
+                                <VisualState x:Name="IndeterminateDisabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!--
+        ===== Item containers =====
+        The stock ListViewItemPresenter is kept (ListView/GridView hand it the item template's root directly), with every
+        backplate made transparent: rows draw their own flat rounded hover fill, cards draw a lift instead.
+    -->
+    <ControlTemplate x:Key="PlainListViewItemTemplate" TargetType="ListViewItem">
+        <ListViewItemPresenter
+            x:Name="Root"
+            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+            CheckMode="Overlay"
+            ContentMargin="{TemplateBinding Padding}"
+            ContentTransitions="{TemplateBinding ContentTransitions}"
+            Control.IsTemplateFocusTarget="True"
+            CornerRadius="{TemplateBinding CornerRadius}"
+            DisabledOpacity="0.4"
+            DragOpacity="0.8"
+            FocusVisualMargin="{TemplateBinding FocusVisualMargin}"
+            FocusVisualPrimaryBrush="{TemplateBinding FocusVisualPrimaryBrush}"
+            FocusVisualPrimaryThickness="{TemplateBinding FocusVisualPrimaryThickness}"
+            FocusVisualSecondaryBrush="{TemplateBinding FocusVisualSecondaryBrush}"
+            FocusVisualSecondaryThickness="{TemplateBinding FocusVisualSecondaryThickness}"
+            PlaceholderBackground="Transparent"
+            PointerOverBackground="Transparent"
+            PressedBackground="Transparent"
+            SelectedBackground="Transparent"
+            SelectedPointerOverBackground="Transparent"
+            SelectedPressedBackground="Transparent"
+            SelectionCheckMarkVisualEnabled="False"
+            SelectionIndicatorVisualEnabled="False" />
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="PlainGridViewItemTemplate" TargetType="GridViewItem">
+        <ListViewItemPresenter
+            x:Name="Root"
+            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+            CheckMode="Overlay"
+            ContentMargin="{TemplateBinding Padding}"
+            ContentTransitions="{TemplateBinding ContentTransitions}"
+            Control.IsTemplateFocusTarget="True"
+            CornerRadius="{TemplateBinding CornerRadius}"
+            DisabledOpacity="0.4"
+            DragOpacity="0.8"
+            FocusVisualMargin="{TemplateBinding FocusVisualMargin}"
+            FocusVisualPrimaryBrush="{TemplateBinding FocusVisualPrimaryBrush}"
+            FocusVisualPrimaryThickness="{TemplateBinding FocusVisualPrimaryThickness}"
+            FocusVisualSecondaryBrush="{TemplateBinding FocusVisualSecondaryBrush}"
+            FocusVisualSecondaryThickness="{TemplateBinding FocusVisualSecondaryThickness}"
+            PlaceholderBackground="Transparent"
+            PointerOverBackground="Transparent"
+            PointerOverBorderBrush="Transparent"
+            PressedBackground="Transparent"
+            SelectedBackground="Transparent"
+            SelectedBorderBrush="Transparent"
+            SelectedPointerOverBackground="Transparent"
+            SelectedPointerOverBorderBrush="Transparent"
+            SelectedPressedBackground="Transparent"
+            SelectionCheckMarkVisualEnabled="False" />
+    </ControlTemplate>
+    <!-- Track rows and compact media rows in vertical lists (rows pad themselves by 8 and draw their hover fill). -->
+    <Style x:Key="TrackRowContainerStyle" TargetType="ListViewItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="{StaticResource RowHeight}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="0" />
+        <Setter Property="Template" Value="{StaticResource PlainListViewItemTemplate}" />
+    </Style>
+
+    <!-- Track rows laid out in columns (artist top songs). -->
+    <Style x:Key="GridTrackRowContainerStyle" TargetType="GridViewItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="{StaticResource RowHeight}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="0" />
+        <Setter Property="Template" Value="{StaticResource PlainGridViewItemTemplate}" />
+    </Style>
+
+    <Style x:Key="CarouselItemContainerStyle" TargetType="ListViewItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Margin" Value="0,0,20,0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="CornerRadius" Value="{StaticResource ArtCornerRadius}" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalContentAlignment" Value="Top" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="-4" />
+        <Setter Property="Template" Value="{StaticResource PlainListViewItemTemplate}" />
+    </Style>
+
+    <!-- Quick-picks rows: the row draws its own hover fill; 12 px between columns. -->
+    <Style x:Key="QuickPickItemContainerStyle" TargetType="ListViewItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Margin" Value="0,0,12,0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="0" />
+        <Setter Property="Template" Value="{StaticResource PlainListViewItemTemplate}" />
+    </Style>
+
+    <Style x:Key="CardGridItemContainerStyle" TargetType="GridViewItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Margin" Value="0,0,20,28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="CornerRadius" Value="{StaticResource ArtCornerRadius}" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalContentAlignment" Value="Top" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualMargin" Value="-4" />
+        <Setter Property="Template" Value="{StaticResource PlainGridViewItemTemplate}" />
+    </Style>
+
+    <!-- Group headers (search sections, history days): no stock divider, generous gap above. -->
+    <Style x:Key="GroupHeaderContainerStyle" TargetType="ListViewHeaderItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Padding" Value="8,36,8,10" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Bottom" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListViewHeaderItem">
+                    <Border Background="{TemplateBinding Background}">
+                        <ContentPresenter
+                            x:Name="ContentPresenter"
+                            Margin="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            ContentTransitions="{TemplateBinding ContentTransitions}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Vertical list panel without sticky group headers (headers are transparent, so sticking would overlap rows). -->
+    <ItemsPanelTemplate x:Key="FlatGroupedItemsPanel">
+        <ItemsStackPanel AreStickyGroupHeadersEnabled="False" />
+    </ItemsPanelTemplate>
+
+    <!-- ===== Menus: rounded, compact ===== -->
+    <Style x:Key="AppMenuFlyoutPresenterStyle" TargetType="MenuFlyoutPresenter">
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="MinWidth" Value="200" />
+    </Style>
+
+    <Style x:Key="AppMenuFlyoutItemStyle" TargetType="MenuFlyoutItem">
+        <Setter Property="Padding" Value="10,7,14,7" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+
+    <Style x:Key="AppMenuFlyoutSubItemStyle" TargetType="MenuFlyoutSubItem">
+        <Setter Property="Padding" Value="10,7,14,7" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+
+    <!-- ===== Dialogs (playlist create / edit / add-to / delete) ===== -->
+    <Style
+        x:Key="AppDialogStyle"
+        BasedOn="{StaticResource DefaultContentDialogStyle}"
+        TargetType="ContentDialog">
+        <Setter Property="Background" Value="{ThemeResource Surface1Brush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SeparatorBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusXL}" />
+        <Setter Property="PrimaryButtonStyle" Value="{StaticResource PillButtonStyle}" />
+        <Setter Property="SecondaryButtonStyle" Value="{StaticResource PillSecondaryButtonStyle}" />
+        <Setter Property="CloseButtonStyle" Value="{StaticResource PillSecondaryButtonStyle}" />
+    </Style>
+
+    <!--
+        Item templates. They live in a plain dictionary (no code-behind), so they only pass the item
+        to a control with {Binding}; the controls use compiled x:Bind internally.
+    -->
+    <DataTemplate x:Key="SquareCardTemplate">
+        <items:MediaCard Item="{Binding}" />
+    </DataTemplate>
+
+    <!-- Your playlists (Library, Playlists): songs can be dropped on them. -->
+    <DataTemplate x:Key="PlaylistDropCardTemplate">
+        <items:MediaCard AcceptsTrackDrops="True" Item="{Binding}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="CircleCardTemplate">
+        <items:MediaCard IsCircular="True" Item="{Binding}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="WideCardTemplate">
+        <items:MediaCard IsWide="True" Item="{Binding}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="TrackRowTemplate">
+        <items:TrackRow Item="{Binding}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="NumberedTrackRowTemplate">
+        <items:TrackRow
+            Item="{Binding}"
+            ShowAlbum="False"
+            ShowNumber="True" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="CompactTrackRowTemplate">
+        <items:TrackRow Item="{Binding}" ShowAlbum="False" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="QuickPickRowTemplate">
+        <items:QuickPickRow Item="{Binding}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="MediaRowTemplate">
+        <items:MediaRow Item="{Binding}" />
+    </DataTemplate>
+
+    <!-- Carousels and grids: every kind renders as a card (tracks too). -->
+    <selectors:MediaItemTemplateSelector
+        x:Key="CardTemplateSelector"
+        AlbumTemplate="{StaticResource SquareCardTemplate}"
+        ArtistTemplate="{StaticResource CircleCardTemplate}"
+        PlaylistTemplate="{StaticResource SquareCardTemplate}"
+        TrackTemplate="{StaticResource SquareCardTemplate}"
+        VideoTemplate="{StaticResource WideCardTemplate}" />
+
+    <!-- Vertical lists: tracks as track rows, everything else as compact rows. -->
+    <selectors:MediaItemTemplateSelector
+        x:Key="RowTemplateSelector"
+        AlbumTemplate="{StaticResource MediaRowTemplate}"
+        ArtistTemplate="{StaticResource MediaRowTemplate}"
+        PlaylistTemplate="{StaticResource MediaRowTemplate}"
+        TrackTemplate="{StaticResource TrackRowTemplate}" />
+</ResourceDictionary>

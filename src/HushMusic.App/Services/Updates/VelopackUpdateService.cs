@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Velopack;
 using Velopack.Locators;
 using Velopack.Sources;
+using HushMusic.App.Services.Notifications;
 using HushMusic.App.Services.Shell;
 using HushMusic.Core.Abstractions;
 
@@ -21,11 +22,13 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
     // Late enough not to compete with the first Home load and yt-dlp's own update check.
     private static readonly TimeSpan FirstCheckDelay = TimeSpan.FromSeconds(20);
 
-    // The app often runs for days in the notification area.
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(12);
+    // Often, so a release reaches a copy that runs for days in the notification area within minutes. One small GitHub
+    // request each time (the anonymous limit is 60 an hour).
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
 
     private readonly UpdateManager? _manager;
     private readonly INotificationService _notifications;
+    private readonly TrackNotificationService _windowsNotifications;
     private readonly IUiDispatcher _dispatcher;
     private readonly IWindowModeService _windowModes;
     private readonly ILogger<VelopackUpdateService> _logger;
@@ -34,16 +37,19 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
     private readonly Lock _sync = new();
     private VelopackAsset? _ready;
     private string? _notifiedVersion;
+    private bool _loggedUpToDate;
     private Task? _loop;
 
     public VelopackUpdateService(
         IConfiguration configuration,
         INotificationService notifications,
+        TrackNotificationService windowsNotifications,
         IUiDispatcher dispatcher,
         IWindowModeService windowModes,
         ILogger<VelopackUpdateService> logger)
     {
         _notifications = notifications;
+        _windowsNotifications = windowsNotifications;
         _dispatcher = dispatcher;
         _windowModes = windowModes;
         _logger = logger;
@@ -133,7 +139,12 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
             var update = await _manager.CheckForUpdatesAsync().WaitAsync(ct).ConfigureAwait(false);
             if (update is null)
             {
-                _logger.LogInformation("Updates: {Version} is the latest version", CurrentVersion);
+                // Every five minutes: only the first answer goes to the log at Information.
+                _logger.Log(
+                    _loggedUpToDate ? LogLevel.Debug : LogLevel.Information,
+                    "Updates: {Version} is the latest version",
+                    CurrentVersion);
+                _loggedUpToDate = true;
                 Update(UpdateState.UpToDate, error: null);
                 return State;
             }
@@ -142,7 +153,7 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
             _logger.LogInformation("Updates: downloading {Version}", target.Version);
             Update(UpdateState.Downloading, error: null, available: target.Version.ToString(), progress: 0);
             await _manager.DownloadUpdatesAsync(update, ReportProgress, ct).ConfigureAwait(false);
-            MarkReady(target);
+            MarkReady(target, windowsNotification: true);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _stopping.IsCancellationRequested)
         {
@@ -227,7 +238,7 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
             // would have to stop the running copy), so it asks again.
             if (manager.UpdatePendingRestart is { } pending)
             {
-                MarkReady(pending);
+                MarkReady(pending, windowsNotification: false);
             }
 
             await Task.Delay(FirstCheckDelay, ct).ConfigureAwait(false);
@@ -247,7 +258,9 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
         }
     }
 
-    private void MarkReady(VelopackAsset asset)
+    // The in-app notice, plus a Windows notification (seen while Hush is minimized or in the notification area) when
+    // the download has just finished. One of each per version.
+    private void MarkReady(VelopackAsset asset, bool windowsNotification)
     {
         var version = asset.Version.ToString();
         _ready = asset;
@@ -261,6 +274,10 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
             {
                 Action = new NotificationAction("Restart", RestartToUpdate),
             });
+            if (windowsNotification)
+            {
+                _windowsNotifications.ShowUpdateReady(version, RestartToUpdate);
+            }
         }
     }
 

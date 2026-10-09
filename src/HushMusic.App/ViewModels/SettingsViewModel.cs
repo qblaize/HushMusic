@@ -108,6 +108,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     public partial string NowPlayingArtStyle { get; set; } = CoverFlowViewModel.CoverFlowStyle;
 
     [ObservableProperty]
+    public partial bool AnimateNowPlayingBackground { get; set; } = true;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDesignRestartPending))]
     public partial string DesignSystem { get; set; } = DesignSystems.Hush;
 
@@ -324,6 +327,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         Theme = current.Theme;
         AccentStyle = AccentPresets.Normalize(current.AccentStyle);
         NowPlayingArtStyle = CoverFlowViewModel.IsCoverFlow(current.NowPlayingArtStyle) ? CoverFlowViewModel.CoverFlowStyle : CoverFlowViewModel.SingleStyle;
+        AnimateNowPlayingBackground = current.AnimateNowPlayingBackground;
         DesignSystem = DesignSystems.Normalize(current.DesignSystem);
         PlayerLayout = PlayerLayouts.IsMinimal(current.PlayerLayout) ? PlayerLayouts.Minimal : PlayerLayouts.Standard;
         ReportPlaybackHistory = current.ReportPlaybackHistory;
@@ -564,6 +568,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             Save(s => s.NowPlayingArtStyle = value);
         }
     }
+
+    partial void OnAnimateNowPlayingBackgroundChanged(bool value) => Save(s => s.AnimateNowPlayingBackground = value);
 
     partial void OnReportPlaybackHistoryChanged(bool value) => Save(s => s.ReportPlaybackHistory = value);
 

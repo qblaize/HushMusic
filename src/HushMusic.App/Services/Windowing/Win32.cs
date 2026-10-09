@@ -8,7 +8,10 @@ internal static class Win32
 {
     public const uint WmNull = 0x0000;
     public const uint WmDestroy = 0x0002;
+    public const uint WmSize = 0x0005;
     public const uint WmClose = 0x0010;
+    public const uint WmShowWindow = 0x0018;
+    public const uint WmWindowPosChanged = 0x0047;
     public const uint WmContextMenu = 0x007B;
     public const uint WmNcDestroy = 0x0082;
     public const uint WmCommand = 0x0111;
@@ -250,6 +253,14 @@ internal static class Win32
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool ShowWindow(IntPtr hWnd, int command);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hWnd);

@@ -136,6 +136,13 @@
                                 Options="{x:Bind ViewModel.NowPlayingArtStyleOptions}"
                                 SelectedValue="{x:Bind ViewModel.NowPlayingArtStyle, Mode=TwoWay}" />
                         </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Moving background" Description="Slowly drift the blurred artwork behind Now Playing. Off uses less power.">
+                            <ToggleSwitch
+                                AutomationProperties.AutomationId="AnimateNowPlayingBackgroundToggle"
+                                IsEnabled="{x:Bind ViewModel.IsArtStyleAvailable, Mode=OneWay}"
+                                IsOn="{x:Bind ViewModel.AnimateNowPlayingBackground, Mode=TwoWay}" />
+                        </settings:SettingsRow>
                     </StackPanel>
                 </Border>
 

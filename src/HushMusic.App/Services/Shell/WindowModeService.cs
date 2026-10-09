@@ -5,11 +5,25 @@ using Windows.Graphics;
 using HushMusic.App.Hosting;
 using HushMusic.App.Services.Hotkeys;
 using HushMusic.App.Services.Notifications;
+using HushMusic.App.Services.Performance;
 using HushMusic.App.Services.Windowing;
 using HushMusic.App.Services.Windowing.TaskbarWidget;
 using HushMusic.Core.Abstractions;
 
 namespace HushMusic.App.Services.Shell;
+
+/// <summary>Whether the user can see the main window.</summary>
+public enum MainWindowVisibility
+{
+    /// <summary>On screen, as the normal window or the mini player (possibly covered by other windows).</summary>
+    Shown,
+
+    /// <summary>Minimized to the taskbar.</summary>
+    Minimized,
+
+    /// <summary>Hidden in the notification area: closed to it, or started with Windows.</summary>
+    Hidden,
+}
 
 /// <summary>Main window states: normal, mini player (always-on-top compact overlay), hidden in the notification area.</summary>
 public interface IWindowModeService
@@ -18,6 +32,20 @@ public interface IWindowModeService
 
     /// <summary>Raised on the UI thread when <see cref="IsMiniPlayer"/> changes.</summary>
     event EventHandler? Changed;
+
+    /// <summary>Shown, minimized or hidden in the notification area. Read it on the UI thread.</summary>
+    MainWindowVisibility WindowVisibility { get; }
+
+    /// <summary>True while the main window (or the mini player) is on screen: neither minimized nor hidden.</summary>
+    bool IsWindowVisible { get; }
+
+    /// <summary>
+    /// Raised on the UI thread when <see cref="WindowVisibility"/> changes, after the window has been shown, minimized,
+    /// restored or hidden. A few seconds after the window hides in the notification area (a minute after it is
+    /// minimized), the process gives its unused memory back to Windows (<see cref="ProcessMemory.TrimSoon"/>), so UI
+    /// released here is returned too.
+    /// </summary>
+    event EventHandler? VisibilityChanged;
 
     void EnterMiniPlayer();
 
@@ -37,6 +65,16 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
 {
     private const int MiniSize = 340;
     private const int MiniMargin = 24;
+
+    // Long enough for the UI to release what it showed (VisibilityChanged) and for a quick reopen to cancel it.
+    private static readonly TimeSpan HiddenTrimDelay = TimeSpan.FromSeconds(5);
+
+    // Minimized windows usually come back soon, and the pages a trim drops have to come back with them: only a window
+    // that stays down is trimmed.
+    private static readonly TimeSpan MinimizedTrimDelay = TimeSpan.FromSeconds(60);
+
+    // Started hidden with Windows: the first pages and the restored session load meanwhile.
+    private static readonly TimeSpan BackgroundStartTrimDelay = TimeSpan.FromSeconds(30);
 
     private readonly IPlayer _player;
     private readonly ISettingsService _settings;
@@ -63,6 +101,7 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
     private RectInt32? _miniBounds;
     private bool _quitting;
     private bool _detached;
+    private bool _visibilityCheckQueued;
 
     public WindowModeService(
         IPlayer player,
@@ -90,6 +129,12 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
 
     public event EventHandler? Changed;
 
+    public MainWindowVisibility WindowVisibility { get; private set; } = MainWindowVisibility.Hidden;
+
+    public bool IsWindowVisible => WindowVisibility == MainWindowVisibility.Shown;
+
+    public event EventHandler? VisibilityChanged;
+
     // Monochrome wave: black on a light taskbar, white on a dark one.
     private static string TrayIconPath(bool lightTaskbar) =>
         Path.Combine(AppContext.BaseDirectory, "Assets", lightTaskbar ? "TrayIconLight.ico" : "TrayIconDark.ico");
@@ -116,7 +161,8 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
         _remote = new PlaybackRemote(_player, _notifications);
         _taskbar = new TaskbarButtons(_hwnd, _player, _dispatcher, _remote, _logger);
-        _hook = new WindowMessageHook(_hwnd, _taskbar.HandleMessage, _logger);
+        _hook = new WindowMessageHook(_hwnd, HandleMessage, _logger);
+        WindowVisibility = ReadVisibility();
 
         // Killed test instances would leave ghost icons in the user's notification area.
         if (!_testInstance || Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_TRAY") == "1")
@@ -149,6 +195,7 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         if (_settings.Current.CloseToTray && _tray is not null)
         {
             UpdateTray();
+            ProcessMemory.TrimSoon(BackgroundStartTrimDelay, _logger);
             _logger.LogInformation("Started in the notification area");
             return;
         }
@@ -444,6 +491,62 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         }
     }
 
+    // Main-window messages: the taskbar's, plus the ones sent when the window is shown, hidden, minimized or restored.
+    private bool HandleMessage(uint message, IntPtr wParam, IntPtr lParam)
+    {
+        if (message is Win32.WmShowWindow or Win32.WmSize or Win32.WmWindowPosChanged)
+        {
+            QueueVisibilityCheck();
+        }
+
+        return _taskbar?.HandleMessage(message, wParam, lParam) == true;
+    }
+
+    // Checked once the messages of a change have all been handled (the window's state is final by then), and outside
+    // the window procedure, so VisibilityChanged handlers may do real work.
+    private void QueueVisibilityCheck()
+    {
+        if (!_visibilityCheckQueued && _window is not null)
+        {
+            _visibilityCheckQueued = _window.DispatcherQueue.TryEnqueue(CheckVisibility);
+        }
+    }
+
+    private void CheckVisibility()
+    {
+        _visibilityCheckQueued = false;
+        var visibility = ReadVisibility();
+        if (_detached || visibility == WindowVisibility)
+        {
+            return;
+        }
+
+        WindowVisibility = visibility;
+        _logger.LogDebug("Main window: {Visibility}", visibility);
+
+        // With nothing on screen the process gives its free memory back to Windows, once the UI has let go of what it
+        // showed (VisibilityChanged, below). Back on screen, a pending trim is dropped.
+        switch (visibility)
+        {
+            case MainWindowVisibility.Hidden:
+                ProcessMemory.TrimSoon(HiddenTrimDelay, _logger);
+                break;
+            case MainWindowVisibility.Minimized:
+                ProcessMemory.TrimSoon(MinimizedTrimDelay, _logger);
+                break;
+            default:
+                ProcessMemory.CancelTrim();
+                break;
+        }
+
+        VisibilityChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private MainWindowVisibility ReadVisibility() =>
+        !Win32.IsWindowVisible(_hwnd) ? MainWindowVisibility.Hidden
+        : Win32.IsIconic(_hwnd) ? MainWindowVisibility.Minimized
+        : MainWindowVisibility.Shown;
+
     // The icon exists while close-to-tray is on or the window is hidden.
     private void UpdateTray()
     {
@@ -467,6 +570,7 @@ public sealed class WindowModeService : IWindowModeService, IDisposable
         }
 
         _detached = true;
+        ProcessMemory.CancelTrim();
         _settings.Changed -= OnSettingsChanged;
         _theme.ThemeChanged -= OnThemeChanged;
         _player.TrackChanged -= OnTrackChanged;

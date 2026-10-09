@@ -30,6 +30,24 @@ public sealed partial class UpNextPanel : UserControl
     /// <summary>Songs before the current one are history: drawn quieter.</summary>
     public static double RowOpacity(bool isPlayed) => isPlayed ? 0.5 : 1;
 
+    /// <summary>
+    /// Realizes the queue's rows (true), or lets go of them and their covers (false) while Now Playing is closed. The
+    /// rows are built again, around the current song, when the view opens.
+    /// </summary>
+    public void SetRowsShown(bool shown)
+    {
+        if (shown == (QueueList.ItemsSource is not null))
+        {
+            return;
+        }
+
+        QueueList.ItemsSource = shown ? ViewModel.Items : null;
+        if (shown && _isShown)
+        {
+            DispatcherQueue.TryEnqueue(ScrollToCurrent);
+        }
+    }
+
     /// <summary>The tab became visible (true) or hidden (false); visible brings the current song to the top.</summary>
     public void SetShown(bool shown)
     {

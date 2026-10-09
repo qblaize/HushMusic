@@ -13,6 +13,9 @@ public enum TrackNotificationCommand
 
     /// <summary>The Next button.</summary>
     Next,
+
+    /// <summary>"Restart now" on the update notification.</summary>
+    RestartToUpdate,
 }
 
 /// <summary>The song-change notification's text and cover.</summary>
@@ -50,6 +53,7 @@ public static class TrackNotificationContent
 {
     public const string ShowArgument = "action=show";
     public const string NextArgument = "action=next";
+    public const string RestartToUpdateArgument = "action=restart-to-update";
 
     /// <summary>
     /// The toast: title, subtitle, optional attribution, the cover as the app logo (square, from a local file) and a
@@ -93,10 +97,35 @@ public static class TrackNotificationContent
         return toast.ToString(SaveOptions.DisableFormatting);
     }
 
+    /// <summary>
+    /// The toast for a downloaded update: "Hush {version} is ready" with a "Restart now" button. A click elsewhere on it
+    /// shows the window.
+    /// </summary>
+    public static string BuildUpdateReady(string version)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        var toast = new XElement(
+            "toast",
+            new XAttribute("launch", ShowArgument),
+            new XElement(
+                "visual",
+                new XElement(
+                    "binding",
+                    new XAttribute("template", "ToastGeneric"),
+                    new XElement("text", $"Hush {version} is ready"),
+                    new XElement("text", "Restart Hush to install the update."))),
+            new XElement(
+                "actions",
+                new XElement("action", new XAttribute("content", "Restart now"), new XAttribute("arguments", RestartToUpdateArgument))),
+            new XElement("audio", new XAttribute("silent", "true")));
+        return toast.ToString(SaveOptions.DisableFormatting);
+    }
+
     /// <summary>The command in a notification's activation arguments (the launch or button arguments).</summary>
     public static TrackNotificationCommand Parse(string? arguments) => arguments?.Trim() switch
     {
         NextArgument => TrackNotificationCommand.Next,
+        RestartToUpdateArgument => TrackNotificationCommand.RestartToUpdate,
         ShowArgument or "" or null => TrackNotificationCommand.Show,
         _ => TrackNotificationCommand.None,
     };

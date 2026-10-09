@@ -29,6 +29,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     private readonly INavigationService _navigation;
     private readonly IWindowModeService _windowMode;
     private readonly ISettingsService _settings;
+    private bool _driftsBackdrop;
 
     public NowPlayingViewModel(
         PlayerViewModel player,
@@ -40,7 +41,8 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         RadioHeardViewModel heard,
         INavigationService navigation,
         IWindowModeService windowMode,
-        ISettingsService settings)
+        ISettingsService settings,
+        IUiDispatcher dispatcher)
     {
         Player = player;
         Queue = queue;
@@ -53,6 +55,8 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         _windowMode = windowMode;
         _settings = settings;
         IsPanelHidden = settings.Current.NowPlayingPanelHidden;
+        _driftsBackdrop = DriftsBackdrop;
+        settings.Changed += (_, _) => dispatcher.Run(UpdateDriftsBackdrop);
 
         Player.PropertyChanged += OnPlayerPropertyChanged;
         CoverFlow.PropertyChanged += (_, e) =>
@@ -65,6 +69,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         };
         Related.Navigating += (_, _) => Close();
         _navigation.Navigated += (_, _) => Close();
+        _windowMode.VisibilityChanged += (_, _) => UpdateActiveTabs();
         UpdateTrack();
     }
 
@@ -131,6 +136,9 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     public bool IsMinimal => Player.IsMinimalLayout;
 
     public bool IsStandard => !IsMinimal;
+
+    /// <summary>The blurred backdrop drifts: the Standard layout with the "Moving background" setting on.</summary>
+    public bool DriftsBackdrop => IsStandard && _settings.Current.AnimateNowPlayingBackground;
 
     public string PanelToggleLabel => ShowsPanel ? "Hide Up next and lyrics" : "Show Up next and lyrics";
 
@@ -260,8 +268,9 @@ public sealed partial class NowPlayingViewModel : ObservableObject
 
     private void UpdateActiveTabs()
     {
-        // A hidden panel stops lyrics following the song and related loading.
-        var panel = IsOpen && ShowsPanel;
+        // A hidden panel (or window: minimized, in the notification area) stops lyrics following the song and related
+        // loading.
+        var panel = IsOpen && ShowsPanel && _windowMode.IsWindowVisible;
         Lyrics.SetActive(panel && Tab == NowPlayingTab.Lyrics);
         Related.SetActive(panel && Tab == NowPlayingTab.Related);
     }
@@ -325,7 +334,17 @@ public sealed partial class NowPlayingViewModel : ObservableObject
             IsMinimalPanelShown = false;
             OnPropertyChanged(nameof(IsMinimal));
             OnPropertyChanged(nameof(IsStandard));
+            UpdateDriftsBackdrop();
             OnPanelStateChanged();
+        }
+    }
+
+    private void UpdateDriftsBackdrop()
+    {
+        if (_driftsBackdrop != DriftsBackdrop)
+        {
+            _driftsBackdrop = DriftsBackdrop;
+            OnPropertyChanged(nameof(DriftsBackdrop));
         }
     }
 

@@ -23,7 +23,9 @@
     <Platforms>x64;ARM64</Platforms>
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <!-- Local Visual Studio profiles only (Properties/PublishProfiles is git-ignored): naming one that doesn't exist makes
+         every publish warn NETSDK1198. Releases get their settings below and from build/release.ps1. -->
+    <PublishProfile Condition="Exists('Properties\PublishProfiles\win-$(Platform).pubxml')">win-$(Platform).pubxml</PublishProfile>
     <!-- One output folder whether built from the solution (AnyCPU) or the project (x64): two copies of the app in
          two folders would each count as a separate single instance. -->
     <OutputPath>bin\$(Configuration)\</OutputPath>
@@ -38,6 +40,15 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(WindowsPackageType)' == 'None'">
     <SelfContained>true</SelfContained>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+
+  <!-- Release publishes are precompiled (ReadyToRun: the app's own assemblies and its packages, including the large
+       WinRT projections, start without the JIT; about a quarter faster to the first frame) and never trimmed (WinUI,
+       the DI container and reflection-based JSON aren't trim-safe). -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishSingleFile>false</PublishSingleFile>
   </PropertyGroup>
 
   <!-- Builds get Content through the WinUI layout step; dotnet publish (releases) only copies it when asked to. -->

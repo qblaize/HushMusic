@@ -20,11 +20,15 @@ public sealed partial class ExploreViewModel : PageViewModelBase
     private const int MoodTiles = 12;
     private const int ChartArtists = 20;
 
+    // The page isn't kept for the whole session (see NavigationService), so the chart country picked last outlives it.
+    private static string? s_chartCountry;
+
     private readonly IExploreApi _explore;
     private readonly ISettingsService _settings;
     private IReadOnlyList<Track> _chartTracks = [];
     private CancellationTokenSource? _chartsCts;
     private DateTimeOffset _loadedAt;
+    private AuthStatus _loadedFor;
     private bool _accountChanged;
     private bool _isActive;
     private bool _settingCountry;
@@ -34,16 +38,6 @@ public sealed partial class ExploreViewModel : PageViewModelBase
     {
         _explore = explore;
         _settings = settings;
-
-        // Signing in can add the Premium "Top songs" chart and changes what YouTube Music recommends.
-        services.Auth.StatusChanged += (_, _) => services.Dispatcher.Run(() =>
-        {
-            _accountChanged = true;
-            if (_isActive)
-            {
-                _ = LoadAsync();
-            }
-        });
     }
 
     public ObservableCollection<Album> NewReleases { get; } = [];
@@ -102,7 +96,11 @@ public sealed partial class ExploreViewModel : PageViewModelBase
 
     protected override Task OnNavigatedToCoreAsync(object? parameter)
     {
+        // Signing in can add the Premium "Top songs" chart and changes what YouTube Music recommends. Subscribed only
+        // while shown, so the page can be let go of; a change while away is caught by comparing the status.
         _isActive = true;
+        Services.Auth.StatusChanged += OnAuthStatusChanged;
+        _accountChanged |= HasContent && Services.Auth.Status != _loadedFor;
         IsFreshVisit = !HasContent || !IsBackNavigation || _accountChanged || DateTimeOffset.UtcNow - _loadedAt > MaxAgeOnBack;
         return IsFreshVisit ? LoadAsync() : Task.CompletedTask;
     }
@@ -110,6 +108,7 @@ public sealed partial class ExploreViewModel : PageViewModelBase
     protected override void OnNavigatedFromCore()
     {
         _isActive = false;
+        Services.Auth.StatusChanged -= OnAuthStatusChanged;
         _chartsCts?.Cancel();
     }
 
@@ -117,7 +116,8 @@ public sealed partial class ExploreViewModel : PageViewModelBase
         async ct =>
         {
             // The charts are a separate request, loaded alongside: when they fail the rest of the page still shows.
-            var charts = LoadChartsAsync(SelectedCountry?.Code ?? DefaultCountry(), ct);
+            var charts = LoadChartsAsync(SelectedCountry?.Code ?? s_chartCountry ?? DefaultCountry(), ct);
+            _loadedFor = Services.Auth.Status;
             ShowExplore(await _explore.GetExploreAsync(ct));
             _loadedAt = DateTimeOffset.UtcNow;
             _accountChanged = false;
@@ -171,9 +171,19 @@ public sealed partial class ExploreViewModel : PageViewModelBase
     {
         if (!_settingCountry && HasCharts && SelectedCountry is { } country)
         {
+            s_chartCountry = country.Code;
             _ = ReloadChartsAsync(country.Code);
         }
     }
+
+    private void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e) => Services.Dispatcher.Run(() =>
+    {
+        _accountChanged = true;
+        if (_isActive)
+        {
+            _ = LoadAsync();
+        }
+    });
 
     private bool CanSeeAllChartSongs() => ChartPlaylistId is not null;
 

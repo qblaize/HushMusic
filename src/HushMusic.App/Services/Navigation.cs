@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
+using HushMusic.App.Helpers;
 
 namespace HushMusic.App.Services;
 
@@ -74,8 +75,17 @@ public interface INavigationService
     void GoBack();
 }
 
+/// <summary>
+/// Navigation for the shell's frame. Home stays cached (NavigationCacheMode Required), so Back to Home is instant and
+/// keeps its place; the other tabs (Explore, Radio, Search) are cached only while they are the most recently used one
+/// (NavigationCacheMode Enabled with a cache of <see cref="CachedTabs"/>); detail pages aren't cached. Each cached page
+/// keeps its whole tree, so the cache is kept this small.
+/// </summary>
 public sealed class NavigationService(PageRegistry registry, ILogger<NavigationService> logger) : INavigationService
 {
+    /// <summary>Pages with NavigationCacheMode Enabled kept besides Home: enough for Explore → album → Back.</summary>
+    private const int CachedTabs = 1;
+
     private Frame? _frame;
     private PageKey? _currentKey;
     private object? _currentParameter;
@@ -89,6 +99,8 @@ public sealed class NavigationService(PageRegistry registry, ILogger<NavigationS
     public void Initialize(Frame frame)
     {
         _frame = frame;
+        _frame.CacheSize = CachedTabs;
+        _frame.Navigating += OnNavigating;
         _frame.Navigated += OnNavigated;
         _frame.NavigationFailed += OnNavigationFailed;
     }
@@ -116,6 +128,16 @@ public sealed class NavigationService(PageRegistry registry, ILogger<NavigationS
         if (_frame?.CanGoBack == true)
         {
             _frame.GoBack();
+        }
+    }
+
+    // A page that isn't kept (or may have pushed another out of the cache) is dropped: give its memory back once the
+    // new page has settled.
+    private void OnNavigating(object sender, NavigatingCancelEventArgs e)
+    {
+        if (_frame?.Content is Page { NavigationCacheMode: not NavigationCacheMode.Required })
+        {
+            UiMemory.CollectSoon();
         }
     }
 

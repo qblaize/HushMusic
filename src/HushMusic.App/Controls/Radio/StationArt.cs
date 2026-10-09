@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.UI;
+using HushMusic.App.Helpers;
 using HushMusic.App.Services.Radio;
 
 namespace HushMusic.App.Controls.Radio;
@@ -16,7 +17,8 @@ namespace HushMusic.App.Controls.Radio;
 /// <item>a transparent logo sits on a light or dark plate, whichever it was drawn for;</item>
 /// <item>no logo (or one that fails) shows a generated gradient with the station's initials.</item>
 /// </list>
-/// Logos are never upscaled more than about twice, so small ones stay crisp.
+/// Logos are never upscaled more than about twice, so small ones stay crisp. The decoded logo is let go of while it
+/// can't be seen (off the tree, or the window minimized or hidden) and shown again from the disk cache.
 /// </summary>
 public sealed partial class StationArt : Grid
 {
@@ -48,6 +50,7 @@ public sealed partial class StationArt : Grid
     private StationLogoInfo? _info;
     private double _laidOutSize;
     private int _version;
+    private bool _released;
 
     public StationArt()
     {
@@ -65,6 +68,20 @@ public sealed partial class StationArt : Grid
         _logoFrame.Children.Add(_logo);
         Children.Add(_logoFrame);
         _logo.ImageFailed += (_, _) => ShowFallback();
+        Loaded += (_, _) =>
+        {
+            WindowPresence.Changed -= OnWindowPresenceChanged;
+            WindowPresence.Changed += OnWindowPresenceChanged;
+            ShowAgain();
+        };
+        Unloaded += (_, _) =>
+        {
+            WindowPresence.Changed -= OnWindowPresenceChanged;
+            if (!IsLoaded)
+            {
+                ReleaseLogo();
+            }
+        };
         SizeChanged += (_, e) =>
         {
             _monogram.FontSize = Math.Max(10, Math.Round(e.NewSize.Width * 0.3));
@@ -149,6 +166,7 @@ public sealed partial class StationArt : Grid
     {
         var version = ++_version;
         _info = null;
+        _released = false;
         ShowFallback();
         var url = LogoUrl;
         if (string.IsNullOrWhiteSpace(url) || Logos is not { } logos)
@@ -175,8 +193,41 @@ public sealed partial class StationArt : Grid
         Apply(info);
     }
 
+    private void OnWindowPresenceChanged(object? sender, EventArgs e)
+    {
+        if (WindowPresence.IsShown)
+        {
+            ShowAgain();
+        }
+        else if (WindowPresence.Hides(this))
+        {
+            ReleaseLogo();
+        }
+    }
+
+    // Only while it can't be seen. The logo's details stay, so showing it again needs no lookup.
+    private void ReleaseLogo()
+    {
+        if (_info is not null && !_released)
+        {
+            _released = true;
+            _logo.Source = null;
+            _wash.Source = null;
+        }
+    }
+
+    private void ShowAgain()
+    {
+        if (_released && _info is { } info && WindowPresence.IsShown)
+        {
+            _released = false;
+            Apply(info);
+        }
+    }
+
     private void Apply(StationLogoInfo info)
     {
+        _released = false;
         var size = ActualWidth > 0 ? ActualWidth : Width;
         if (double.IsNaN(size) || size <= 0)
         {

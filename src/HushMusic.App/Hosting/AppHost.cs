@@ -20,13 +20,18 @@ internal static class AppHost
     public static IHost Build(DispatcherQueue dispatcherQueue)
     {
         var paths = new AppPaths();
+        // No defaults: they add configuration sources the app doesn't read (command line, every environment variable),
+        // logging providers it replaces with Serilog, and a file watcher that reloads appsettings.json, which only an
+        // update changes.
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             ApplicationName = "HushMusic",
             ContentRootPath = AppContext.BaseDirectory,
+            DisableDefaults = true,
         });
 
-        // Optional overrides from HUSHMUSIC_ environment variables.
+        // appsettings.json (the update source), with optional overrides from HUSHMUSIC_ environment variables.
+        builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: false);
         builder.Configuration.AddEnvironmentVariables("HUSHMUSIC_");
 
         var levelSwitch = new LoggingLevelSwitch(LogEventLevel.Information);

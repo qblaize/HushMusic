@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using HushMusic.App.Hosting;
+using HushMusic.App.Services.Performance;
 using HushMusic.App.Services.Shell;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Services;
@@ -49,15 +50,22 @@ public partial class App : Application
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+        var startup = StartupTiming.Begin();
         _host = AppHost.Build(DispatcherQueue.GetForCurrentThread());
         Services = _host.Services;
         _logger = Services.GetRequiredService<ILogger<App>>();
         _logger.LogInformation("HushMusic starting, version {Version}", typeof(App).Assembly.GetName().Version);
+        startup.Mark("host");
 
         var settings = Services.GetRequiredService<ISettingsService>();
         await settings.LoadAsync();
         AppHost.ApplyLogLevel(Services, settings.Current.LogLevel);
         ApplyDesignSystem(settings.Current.DesignSystem);
+        startup.Mark("settings");
+
+        // The player sets up Media Foundation (two MediaPlayers and the system media controls), which takes a while:
+        // build it on a worker thread while the window is created. The window's services wait for that same instance.
+        _ = Task.Run(() => Services.GetRequiredService<IPlayer>());
 
         // Restore the saved session before any page loads, or the first Home feed is fetched signed out.
         // Local only (file read + DPAPI), so it doesn't delay the window noticeably.
@@ -70,7 +78,10 @@ public partial class App : Application
             _logger.LogWarning(ex, "Could not restore the saved session");
         }
 
+        startup.Mark("session");
         MainWindow = new MainWindow();
+        startup.Mark("window");
+        startup.LogFirstFrame(_logger);
         MainWindow.Closed += OnMainWindowClosed;
         if (AutoStartCommand.IsBackgroundLaunch(Environment.GetCommandLineArgs()))
         {
@@ -91,6 +102,7 @@ public partial class App : Application
         try
         {
             await _host.StartAsync();
+            startup.Mark("features");
         }
         catch (Exception ex)
         {

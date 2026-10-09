@@ -10,9 +10,14 @@ internal static class TestWindowPlacement
     private const uint SwpNoSize = 0x0001;
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoActivate = 0x0010;
+    private const int SwShowMinNoActive = 7;
+    private const int SwShowNoActivate = 4;
     private static readonly IntPtr HwndBottom = new(1);
     private static Microsoft.UI.Dispatching.DispatcherQueueTimer? _testTimer;
     private static Microsoft.UI.Dispatching.DispatcherQueueTimer? _flyoutTimer;
+
+    // Kept in a field: an unreferenced DispatcherQueueTimer can be collected before it fires.
+    private static readonly List<Microsoft.UI.Dispatching.DispatcherQueueTimer> s_windowTimers = [];
 
     public static void ShowInBackground(Window window)
     {
@@ -33,6 +38,7 @@ internal static class TestWindowPlacement
     public static void RunTestHooks(MainWindow window)
     {
         RunTaskbarTestHooks(window);
+        RunWindowScript(window);
         var mini = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_MINI");
         if (mini is not ("1" or "controls"))
         {
@@ -76,6 +82,76 @@ internal static class TestWindowPlacement
             _flyoutTimer.Start();
         }
     }
+
+    /// <summary>
+    /// HUSHMUSIC_TEST_WINDOW="minimize@30,restore@45,hide@60,show@90" changes the window's state at those seconds after
+    /// startup, without activating it: "hide" hides it as closing to the notification area does (test instances have no
+    /// tray icon), "show" brings it back as the tray icon does, "minimize" / "restore" use the taskbar states. Each step
+    /// is logged, and so is the time from "show" / "restore" to the next rendered frame.
+    /// </summary>
+    private static void RunWindowScript(MainWindow window)
+    {
+        if (Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_WINDOW") is not { Length: > 0 } script)
+        {
+            return;
+        }
+
+        var logger = App.GetService<ILogger<MainWindow>>();
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        foreach (var step in script.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = step.Split('@');
+            if (parts.Length != 2 || !double.TryParse(parts[1], System.Globalization.CultureInfo.InvariantCulture, out var seconds))
+            {
+                continue;
+            }
+
+            var action = parts[0];
+            var timer = window.DispatcherQueue.CreateTimer();
+            timer.Interval = TimeSpan.FromSeconds(seconds);
+            timer.IsRepeating = false;
+            timer.Tick += (_, _) =>
+            {
+                logger.LogInformation("Test window step: {Action}", action);
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                switch (action)
+                {
+                    case "hide":
+                        window.AppWindow.Hide();
+                        break;
+                    case "show":
+                        window.Modes.ShowMainWindow();
+                        LogNextFrame(logger, clock, action);
+                        break;
+                    case "minimize":
+                        ShowWindow(hwnd, SwShowMinNoActive);
+                        break;
+                    case "restore":
+                        ShowWindow(hwnd, SwShowNoActivate);
+                        SendToBack(window);
+                        LogNextFrame(logger, clock, action);
+                        break;
+                }
+            };
+            s_windowTimers.Add(timer);
+            timer.Start();
+        }
+    }
+
+    private static void LogNextFrame(ILogger logger, System.Diagnostics.Stopwatch clock, string action)
+    {
+        void OnRendered(object? sender, Microsoft.UI.Xaml.Media.RenderedEventArgs e)
+        {
+            Microsoft.UI.Xaml.Media.CompositionTarget.Rendered -= OnRendered;
+            logger.LogInformation("Test window step: {Action} rendered after {Milliseconds} ms", action, clock.ElapsedMilliseconds);
+        }
+
+        Microsoft.UI.Xaml.Media.CompositionTarget.Rendered += OnRendered;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hWnd, int command);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

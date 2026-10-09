@@ -406,7 +406,7 @@
                 Grid.Column="1"
                 HorizontalAlignment="Left"
                 Margin="0,0,16,16"
-                Background="{ThemeResource GlassBrush}"
+                Background="{StaticResource NowPlayingPanelBrush}"
                 BorderBrush="{ThemeResource SeparatorBrush}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource RadiusXL}">

@@ -15,6 +15,7 @@ namespace HushMusic.App.Services.Notifications;
 /// Song notifications (Settings → Window → Song notifications): a Windows notification with the cover, title, artist
 /// and a Next button when a new song starts, or the song on a live station changes, while Hush isn't the window in
 /// front. Each one replaces the last (same tag and group) and expires soon, so Notification Center never fills up.
+/// Also shows the "update ready" notification (<see cref="ShowUpdateReady"/>), whatever the song setting.
 /// <para>
 /// Shown with the Windows App SDK's AppNotificationManager. This app is unpackaged, so it registers itself (display
 /// name, icon, activation) the first time the setting is on, unregisters on exit, and the uninstaller removes the
@@ -25,6 +26,8 @@ public sealed class TrackNotificationService : IDisposable
 {
     private const string Tag = "now-playing";
     private const string Group = "playback";
+    private const string UpdateTag = "update-ready";
+    private const string UpdateGroup = "updates";
     private const int CoverPixels = 192;
     private const int TrackThumbnailWidth = 226;
     private const int KeptCovers = 3;
@@ -46,6 +49,7 @@ public sealed class TrackNotificationService : IDisposable
 
     private Action? _showMainWindow;
     private Action? _next;
+    private Action? _restartToUpdate;
     private CancellationTokenSource? _pending;
     private string? _lastKey;
     private bool _registered;
@@ -109,6 +113,41 @@ public sealed class TrackNotificationService : IDisposable
         ApplySetting();
     }
 
+    /// <summary>
+    /// "Hush {version} is ready" with a Restart now button (which calls <paramref name="restart"/> on the UI thread).
+    /// Registers for notifications if the song setting hasn't already. Any thread; never throws.
+    /// </summary>
+    internal void ShowUpdateReady(string version, Action restart)
+    {
+        _restartToUpdate = restart;
+        var payload = TrackNotificationContent.BuildUpdateReady(version);
+        if (_testInstance)
+        {
+            // Automated test instances never put notifications on the user's screen.
+            _logger.LogInformation("Update notification (test instance, not shown): {Payload}", payload);
+            return;
+        }
+
+        _dispatcher.Run(() =>
+        {
+            try
+            {
+                if (_disposed || !EnsureRegistered())
+                {
+                    return;
+                }
+
+                var notification = new WindowsNotification(payload) { Tag = UpdateTag, Group = UpdateGroup, ExpiresOnReboot = true };
+                AppNotificationManager.Default.Show(notification);
+                _logger.LogInformation("Update notification for {Version} (shown: {Shown})", version, notification.Id != 0);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not show the update notification");
+            }
+        });
+    }
+
     /// <summary>A notification was clicked while another copy of the app was starting (it handed the click over). Any thread.</summary>
     internal void OnRedirectedActivation(string? argument) => Run(TrackNotificationContent.Parse(argument));
 
@@ -139,8 +178,9 @@ public sealed class TrackNotificationService : IDisposable
 
         try
         {
-            // The song is over once the app is: don't leave a Next button behind.
+            // The song is over once the app is: don't leave a Next button behind, nor a Restart button nobody answers.
             AppNotificationManager.Default.RemoveByTagAndGroupAsync(Tag, Group).AsTask().Wait(TimeSpan.FromMilliseconds(500));
+            AppNotificationManager.Default.RemoveByTagAndGroupAsync(UpdateTag, UpdateGroup).AsTask().Wait(TimeSpan.FromMilliseconds(500));
             AppNotificationManager.Default.NotificationInvoked -= OnNotificationInvoked;
             AppNotificationManager.Default.Unregister();
         }
@@ -411,6 +451,9 @@ public sealed class TrackNotificationService : IDisposable
                 break;
             case TrackNotificationCommand.Show:
                 _showMainWindow?.Invoke();
+                break;
+            case TrackNotificationCommand.RestartToUpdate:
+                _restartToUpdate?.Invoke();
                 break;
         }
     });

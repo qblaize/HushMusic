@@ -78,6 +78,9 @@ public sealed class AppSettings
     /// <summary>Cover Flow mode only: the Up next / Lyrics / Related panel is hidden so the covers get the whole view.</summary>
     public bool NowPlayingPanelHidden { get; set; }
 
+    /// <summary>The blurred artwork behind Now Playing slowly drifts (Standard player layout). Off holds it still.</summary>
+    public bool AnimateNowPlayingBackground { get; set; } = true;
+
     /// <summary>"Hush" (the app's own design) or "Windows" (stock Windows 11 / Fluent look with Mica). Applied at startup.</summary>
     public string DesignSystem { get; set; } = "Hush";
 

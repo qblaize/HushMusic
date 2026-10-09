@@ -89,7 +89,6 @@
             IsItemClickEnabled="True"
             ItemClick="OnItemClick"
             ItemContainerStyle="{StaticResource ShellListItemStyle}"
-            ItemsSource="{x:Bind ViewModel.Items}"
             KeyDown="OnListKeyDown"
             SelectionMode="None">
             <ListView.ItemTemplate>
@@ -156,14 +155,16 @@
                                     helpers:ImageLoader.DecodeWidth="40"
                                     helpers:ImageLoader.Url="{x:Bind CoverUrl}"
                                     Stretch="UniformToFill" />
+                                <!--  Created only for the rows that need them: a queue can be long.  -->
                                 <radio:StationArt
+                                    x:Name="StationLogo"
+                                    x:Load="{x:Bind IsStation}"
                                     LogoUrl="{x:Bind StationLogoUrl}"
-                                    StationName="{x:Bind StationName}"
-                                    Visibility="{x:Bind IsStation}" />
+                                    StationName="{x:Bind StationName}" />
                                 <!--  Playing: equaliser over a dimmed cover.  -->
-                                <Grid Visibility="{x:Bind helpers:Format.VisibleIf(IsCurrent), Mode=OneWay}">
+                                <Grid x:Name="PlayingOverlay" x:Load="{x:Bind IsCurrent, Mode=OneWay}">
                                     <Border Background="{ThemeResource AppBackgroundBrush}" Opacity="0.55" />
-                                    <items:NowPlayingIndicator Foreground="{ThemeResource TextPrimaryBrush}" IsPlaying="{x:Bind IsPlaying, Mode=OneWay}" />
+                                    <items:NowPlayingIndicator Foreground="{ThemeResource TextPrimaryBrush}" IsAnimated="False" IsPlaying="{x:Bind IsPlaying, Mode=OneWay}" />
                                 </Grid>
                             </Grid>
 

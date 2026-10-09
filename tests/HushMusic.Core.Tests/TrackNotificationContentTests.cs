@@ -120,8 +120,22 @@ public sealed class TrackNotificationContentTests
         Assert.Null(toast.Element("visual")!.Element("binding")!.Element("image"));
     }
 
+    [Fact]
+    public void The_update_notification_names_the_version_and_offers_a_restart()
+    {
+        var toast = XElement.Parse(TrackNotificationContent.BuildUpdateReady("0.3.1"));
+
+        var texts = toast.Element("visual")!.Element("binding")!.Elements("text").Select(t => t.Value).ToList();
+        Assert.Equal("Hush 0.3.1 is ready", texts[0]);
+        var button = Assert.Single(toast.Element("actions")!.Elements("action"));
+        Assert.Equal("Restart now", button.Attribute("content")!.Value);
+        Assert.Equal(TrackNotificationCommand.RestartToUpdate, TrackNotificationContent.Parse(button.Attribute("arguments")!.Value));
+        Assert.Equal(TrackNotificationCommand.Show, TrackNotificationContent.Parse(toast.Attribute("launch")!.Value));
+    }
+
     [Theory]
     [InlineData("action=next", TrackNotificationCommand.Next)]
+    [InlineData("action=restart-to-update", TrackNotificationCommand.RestartToUpdate)]
     [InlineData("action=show", TrackNotificationCommand.Show)]
     [InlineData("", TrackNotificationCommand.Show)]
     [InlineData(null, TrackNotificationCommand.Show)]

@@ -6,7 +6,7 @@
     xmlns:helpers="using:HushMusic.App.Helpers"
     xmlns:items="using:HushMusic.App.Controls.Items"
     xmlns:vm="using:HushMusic.App.ViewModels.Pages"
-    NavigationCacheMode="Required">
+    NavigationCacheMode="Enabled">
 
     <Page.Resources>
         <CollectionViewSource

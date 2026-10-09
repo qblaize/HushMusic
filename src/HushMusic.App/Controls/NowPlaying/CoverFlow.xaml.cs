@@ -64,20 +64,19 @@ public sealed partial class CoverFlow : UserControl
     public ICommand? CloseCommand { get; set; }
 
     /// <summary>
-    /// The view is on screen (true) or hidden (false). Hidden, changes wait (nothing to see, nothing to load) and are
-    /// applied without motion when it shows again.
+    /// The view is on screen (true) or hidden (false). Hidden, no cover exists (nothing to see, nothing to keep in
+    /// memory) and changes wait; the covers are built again, without motion, when it shows again.
     /// </summary>
     public void SetShown(bool shown)
     {
         _isShown = shown;
-        foreach (var card in _cards.Values)
-        {
-            card.SetArtAnimated(shown);
-        }
-
         if (shown)
         {
             Apply(animate: false);
+        }
+        else
+        {
+            ReleaseAll();
         }
     }
 
@@ -317,7 +316,7 @@ public sealed partial class CoverFlow : UserControl
         _pool.Push(card);
     }
 
-    // Single artwork: nothing of the Cover Flow stays realized.
+    // Single artwork, or the view hidden: nothing of the Cover Flow stays realized.
     private void ReleaseAll()
     {
         foreach (var card in _cards.Values.Concat(_pool))

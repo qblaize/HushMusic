@@ -31,6 +31,10 @@ public sealed class ImageCache : IImageCache, IDisposable
     private readonly ILogger<ImageCache> _logger;
     private readonly string _folder;
     private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _inFlight = new(StringComparer.Ordinal);
+
+    // Files this session has already found or downloaded: art shown again (a page or the window coming back) is
+    // answered at once, without a trip to the thread pool and the disk.
+    private readonly ConcurrentDictionary<string, string> _known = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _lifetime = new();
     private int _trimStarted;
 
@@ -50,6 +54,11 @@ public sealed class ImageCache : IImageCache, IDisposable
 
         StartTrimOnce();
         var key = KeyOf(uri);
+        if (_known.TryGetValue(key, out var known))
+        {
+            return known;
+        }
+
         var path = Path.Combine(_folder, key);
 
         // The download is shared, so one caller cancelling must not cancel it for the others.
@@ -64,7 +73,9 @@ public sealed class ImageCache : IImageCache, IDisposable
             return;
         }
 
-        var path = Path.Combine(_folder, KeyOf(uri));
+        var key = KeyOf(uri);
+        _known.TryRemove(key, out _);
+        var path = Path.Combine(_folder, key);
         _ = Task.Run(() =>
         {
             try
@@ -113,6 +124,7 @@ public sealed class ImageCache : IImageCache, IDisposable
         {
             if (File.Exists(path))
             {
+                _known[key] = path;
                 return path;
             }
 
@@ -138,6 +150,7 @@ public sealed class ImageCache : IImageCache, IDisposable
             }
 
             File.Move(temp, path, overwrite: true);
+            _known[key] = path;
             return path;
         }
         catch
@@ -186,6 +199,7 @@ public sealed class ImageCache : IImageCache, IDisposable
 
                 if (TryDelete(file.FullName))
                 {
+                    _known.TryRemove(file.Name, out _);
                     total -= file.Length;
                 }
             }

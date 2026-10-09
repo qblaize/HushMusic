@@ -9,6 +9,7 @@ using Windows.Foundation;
 using Windows.UI.ViewManagement;
 using HushMusic.App.Controls.Items;
 using HushMusic.App.Controls.RadioMatch;
+using HushMusic.App.Helpers;
 using HushMusic.App.ViewModels.NowPlaying;
 
 namespace HushMusic.App.Controls.NowPlaying;
@@ -16,6 +17,8 @@ namespace HushMusic.App.Controls.NowPlaying;
 /// <summary>
 /// The full-window Now Playing sheet. Logic lives in <see cref="NowPlayingViewModel"/>; this is UI glue: the slide
 /// up / down, fitting the artwork to the window, seek drags, focus in and back out.
+/// While it is closed, or the window is minimized or hidden, it lets go of what it showed (the artwork, the backdrop,
+/// the Cover Flow covers and the Up next rows) and builds it again when it is seen.
 /// </summary>
 public sealed partial class NowPlayingView : UserControl
 {
@@ -29,12 +32,17 @@ public sealed partial class NowPlayingView : UserControl
     private readonly UISettings _uiSettings = new();
     private DependencyObject? _restoreFocus;
     private int _version;
+    private bool _contentShown;
 
     public NowPlayingView()
     {
         InitializeComponent();
         Backdrop.Animate = false;
         HeroArt.Animate = false;
+
+        // Closed at first: nothing is loaded until the sheet opens.
+        HeroArt.Release();
+        Backdrop.Release();
 
         // Slider marks pointer events handled, so listen with handledEventsToo to know when a drag starts and ends.
         SeekSlider.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) => ViewModel.Player.BeginSeek()), handledEventsToo: true);
@@ -44,12 +52,17 @@ public sealed partial class NowPlayingView : UserControl
         Loaded += (_, _) =>
         {
             ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+            WindowPresence.Changed += OnWindowPresenceChanged;
             if (ViewModel.IsOpen && Visibility != Visibility.Visible)
             {
                 Show();
             }
         };
-        Unloaded += (_, _) => ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        Unloaded += (_, _) =>
+        {
+            ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            WindowPresence.Changed -= OnWindowPresenceChanged;
+        };
     }
 
     public NowPlayingViewModel ViewModel { get; } = App.GetService<NowPlayingViewModel>();
@@ -85,11 +98,11 @@ public sealed partial class NowPlayingView : UserControl
                 UpdateShownTab();
                 AnimatePanel(ViewModel.ShowsPanel, animate: Visibility == Visibility.Visible);
                 break;
-            case nameof(NowPlayingViewModel.IsMinimal):
-                // Player layout switched while the sheet is open: the backdrop drifts in Standard only.
+            case nameof(NowPlayingViewModel.DriftsBackdrop):
+                // Player layout or "Moving background" changed while the sheet is open.
                 if (ViewModel.IsOpen && Visibility == Visibility.Visible)
                 {
-                    Backdrop.SetDrifting(ViewModel.IsStandard);
+                    Backdrop.SetDrifting(ViewModel.DriftsBackdrop);
                 }
 
                 break;
@@ -109,12 +122,10 @@ public sealed partial class NowPlayingView : UserControl
         SetPose(opacity: 0f, SlideOffset());
         Visibility = Visibility.Visible;
 
-        // Art changes while hidden were applied without decoding; load them properly now, then fade on later changes.
-        HeroArt.Refresh();
-        Backdrop.Refresh();
+        // What was let go of while closed is built again (art without a fade), before the first layout below.
+        ShowContent(true);
         HeroArt.Animate = true;
         Backdrop.Animate = true;
-        Covers.SetShown(true);
         UpdateShownTab();
 
         // The first layout of the sheet is the expensive part. Do it, let it reach the screen, and only then start the
@@ -126,7 +137,7 @@ public sealed partial class NowPlayingView : UserControl
             return;
         }
 
-        Backdrop.SetDrifting(ViewModel.IsStandard);
+        Backdrop.SetDrifting(ViewModel.DriftsBackdrop);
         Animate(opening: true, version);
         PlayPauseButton.Focus(FocusState.Programmatic);
     }
@@ -198,6 +209,9 @@ public sealed partial class NowPlayingView : UserControl
         if (opening)
         {
             CoverChanged?.Invoke(this, true);
+
+            // Building the lists and covers leaves short-lived native objects behind; collect them once it has settled.
+            UiMemory.CollectSoon();
             return;
         }
 
@@ -205,7 +219,51 @@ public sealed partial class NowPlayingView : UserControl
         Backdrop.SetDrifting(false);
         HeroArt.Animate = false;
         Backdrop.Animate = false;
-        Covers.SetShown(false);
+        ShowContent(false);
+        UiMemory.CollectSoon();
+    }
+
+    // Builds (true) or lets go of (false) the artwork, the backdrop, the covers and the Up next rows.
+    private void ShowContent(bool shown)
+    {
+        if (shown == _contentShown)
+        {
+            return;
+        }
+
+        _contentShown = shown;
+        Covers.SetShown(shown);
+        UpNext.SetRowsShown(shown);
+        if (shown)
+        {
+            HeroArt.Refresh();
+            Backdrop.Refresh();
+        }
+        else
+        {
+            HeroArt.Release();
+            Backdrop.Release();
+        }
+    }
+
+    // Minimized or hidden in the notification area with the sheet open: nobody sees it, so it lets go of the same
+    // things as when it closes, and builds them again when the window comes back.
+    private void OnWindowPresenceChanged(object? sender, EventArgs e)
+    {
+        if (!ViewModel.IsOpen || Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        if (WindowPresence.IsShown)
+        {
+            ShowContent(true);
+            UpdateShownTab();
+        }
+        else
+        {
+            ShowContent(false);
+        }
     }
 
     private void UpdateShownTab()

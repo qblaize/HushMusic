@@ -1,8 +1,6 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/hush-lockup-on-dark.png">
-    <img src="docs/images/hush-lockup-on-light.png" height="72" alt="Hush">
-  </picture>
+  <img src="docs/images/hush-lockup-on-light.png#gh-light-mode-only" height="72" alt="Hush">
+  <img src="docs/images/hush-lockup-on-dark.png#gh-dark-mode-only" height="72" alt="Hush">
 </p>
 
 <p align="center">
@@ -115,8 +113,9 @@ Requirements:
 - Playback uses WebM/Opus audio, which needs the Web Media Extensions. They come with Windows 10 and 11, but not with
   the N and LTSC editions, where you can install them from the Microsoft Store.
 
-Hush updates itself from this repository's releases: it checks every 12 hours, downloads the update in the background
-and installs it the next time you restart the app.
+Hush updates itself from this repository's releases: it checks every 5 minutes and downloads the update in the
+background. A Windows notification tells you when it's ready; click Restart now, or it installs the next time you
+restart the app.
 
 To uninstall, use Settings → Apps → Installed apps → Hush. Your settings and sign-in stay in
 `%LOCALAPPDATA%\HushMusic`; sign out first, or delete that folder, to remove everything.

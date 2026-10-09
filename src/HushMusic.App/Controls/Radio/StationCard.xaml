@@ -202,8 +202,11 @@
                         Background="{StaticResource ArtHoverScrimBrush}"
                         IsHitTestVisible="False"
                         Opacity="0" />
-                    <!--  The station that is on: equaliser over a dimmed logo.  -->
-                    <Grid IsHitTestVisible="False" Visibility="{x:Bind helpers:Format.VisibleIf(Item.IsCurrent), Mode=OneWay}">
+                    <!--  The station that is on: equaliser over a dimmed logo (created for that card only).  -->
+                    <Grid
+                        x:Name="PlayingOverlay"
+                        x:Load="{x:Bind Item.IsCurrent, Mode=OneWay}"
+                        IsHitTestVisible="False">
                         <Border Background="{StaticResource NowPlayingScrimBrush}" />
                         <items:NowPlayingIndicator Foreground="{StaticResource OnArtForegroundBrush}" IsPlaying="{x:Bind Item.IsPlaying, Mode=OneWay}" />
                     </Grid>

@@ -24,8 +24,9 @@ public enum UpdateState
 }
 
 /// <summary>
-/// App updates from GitHub Releases (Velopack). Checks shortly after startup and then twice a day, downloads a newer
-/// version in the background and asks before restarting into it. Only does anything in installed builds.
+/// App updates from GitHub Releases (Velopack). Checks shortly after startup and then every five minutes, downloads a
+/// newer version in the background and asks before restarting into it (in the app and with a Windows notification).
+/// Only does anything in installed builds.
 /// </summary>
 public interface IUpdateService
 {

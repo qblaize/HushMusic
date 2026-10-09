@@ -12,13 +12,17 @@ namespace HushMusic.App.ViewModels.Pages;
 /// <summary>
 /// The Radio page: genre chips over the curated stations of the selected genre and more of the genre from the Radio
 /// Browser directory, the user's favourites, and a directory search. Playing a station queues the section it is in, so
-/// Next and Previous switch stations. Cached page: one instance for the app's lifetime.
+/// Next and Previous switch stations. The page is cached only while it is the most recent tab (see NavigationService),
+/// so the genre and the search picked last outlive it, and it follows the player and the favourites only while shown.
 /// </summary>
 public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
 {
     private const int DirectoryLimit = 36;
     private const int SearchLimit = 60;
     private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(350);
+
+    private static string? s_genreId;
+    private static string s_query = string.Empty;
 
     private readonly IRadioDirectory _directory;
     private readonly IRadioFavorites _favorites;
@@ -38,13 +42,9 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         _player = player;
         _logger = logger;
         Genres = CuratedRadio.Genres;
-        SelectedGenre = Genres[0];
+        SelectedGenre = Genres.FirstOrDefault(g => g.Id == s_genreId) ?? Genres[0];
         ShowCurated();
         HasContent = true; // the curated list is built in
-
-        _favorites.Changed += (_, _) => Services.Dispatcher.Run(SyncFavorites);
-        _player.TrackChanged += (_, _) => Services.Dispatcher.Run(SyncPlaying);
-        _player.StatusChanged += (_, _) => Services.Dispatcher.Run(SyncPlaying);
         SyncPlaying();
     }
 
@@ -177,6 +177,15 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
 
     protected override async Task OnNavigatedToCoreAsync(object? parameter)
     {
+        _favorites.Changed += OnFavoritesChanged;
+        _player.TrackChanged += OnPlayerTrackChanged;
+        _player.StatusChanged += OnPlayerStatusChanged;
+        SyncPlaying();
+        if (Query.Length == 0 && s_query.Length > 0)
+        {
+            Query = s_query;
+        }
+
         if (_directoryGenreId != SelectedGenre.Id || HasDirectoryError)
         {
             _ = LoadDirectoryAsync();
@@ -197,6 +206,13 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         SyncFavorites();
     }
 
+    protected override void OnNavigatedFromCore()
+    {
+        _favorites.Changed -= OnFavoritesChanged;
+        _player.TrackChanged -= OnPlayerTrackChanged;
+        _player.StatusChanged -= OnPlayerStatusChanged;
+    }
+
     // Retry on the error states.
     protected override Task LoadAsync() => IsSearching ? SearchAsync(Query) : LoadDirectoryAsync();
 
@@ -206,7 +222,19 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
     [RelayCommand]
     private Task RetrySearchAsync() => SearchAsync(Query);
 
-    partial void OnQueryChanged(string value) => _ = SearchAsync(value);
+    partial void OnQueryChanged(string value)
+    {
+        s_query = value;
+        _ = SearchAsync(value);
+    }
+
+    partial void OnSelectedGenreChanged(RadioGenre value) => s_genreId = value.Id;
+
+    private void OnFavoritesChanged(object? sender, EventArgs e) => Services.Dispatcher.Run(SyncFavorites);
+
+    private void OnPlayerTrackChanged(object? sender, TrackChangedEventArgs e) => Services.Dispatcher.Run(SyncPlaying);
+
+    private void OnPlayerStatusChanged(object? sender, PlaybackStatusChangedEventArgs e) => Services.Dispatcher.Run(SyncPlaying);
 
     private void ShowCurated() => Replace(Curated, SelectedGenre.Stations, StationSection.Curated);
 

@@ -16,6 +16,7 @@ namespace HushMusic.App.Controls.Items;
 /// Artwork that fades to transparent towards the bottom (a Composition gradient mask), so it melts into whatever is
 /// behind the page, including the shell's ambient glow, instead of ending on a solid colour.
 /// A small <see cref="DecodeSize"/> decodes the art at a few pixels and stretches it: a soft, heavily blurred colour wash.
+/// Without one, the art is decoded no bigger than the control (artist banners come much larger than they are shown).
 /// </summary>
 public sealed partial class FadingArtwork : UserControl
 {
@@ -36,19 +37,32 @@ public sealed partial class FadingArtwork : UserControl
 
     private static readonly TimeSpan FadeInDuration = TimeSpan.FromMilliseconds(350);
 
+    // The control's size is rounded up to this many pixels before decoding.
+    private const double DecodeStep = 64;
+
     private readonly Border _host = new();
     private SpriteVisual? _sprite;
     private CompositionSurfaceBrush? _surfaceBrush;
     private LoadedImageSurface? _surface;
     private string? _loadedUrl;
     private int _version;
+    private double _decodedPixels;
 
     public FadingArtwork()
     {
         IsHitTestVisible = false;
         IsTabStop = false;
         Content = _host;
-        _host.SizeChanged += (_, e) => ResizeSprite(e.NewSize);
+        _host.SizeChanged += (_, e) =>
+        {
+            ResizeSprite(e.NewSize);
+
+            // Grown past the size the art was decoded at (the window got bigger): decode it again, sharper.
+            if (_decodedPixels > 0 && LaidOutPixels() > _decodedPixels && _loadedUrl is not null)
+            {
+                _ = LoadAsync(_loadedUrl, keepShown: true);
+            }
+        };
         Loaded += (_, _) =>
         {
             EnsureVisual();
@@ -63,7 +77,7 @@ public sealed partial class FadingArtwork : UserControl
         set => SetValue(UrlProperty, value);
     }
 
-    /// <summary>Decode the image at most this many pixels wide/high (0 = natural size). A few pixels give a blur.</summary>
+    /// <summary>Decode the image at most this many pixels wide/high (0 = the control's size). A few pixels give a blur.</summary>
     public double DecodeSize
     {
         get => (double)GetValue(DecodeSizeProperty);
@@ -141,14 +155,19 @@ public sealed partial class FadingArtwork : UserControl
             return;
         }
 
-        _ = LoadAsync(Url);
+        _ = LoadAsync(Url, keepShown: false);
     }
 
-    private async Task LoadAsync(string? url)
+    // keepShown: the same art again at a bigger size; the current one stays up until it is swapped in.
+    private async Task LoadAsync(string? url, bool keepShown)
     {
         var version = ++_version;
         _loadedUrl = url;
-        ReleaseSurface(keepUrl: true);
+        if (!keepShown)
+        {
+            ReleaseSurface(keepUrl: true);
+        }
+
         if (string.IsNullOrWhiteSpace(url) || _sprite is null || _surfaceBrush is null)
         {
             return;
@@ -162,16 +181,44 @@ public sealed partial class FadingArtwork : UserControl
                 return;
             }
 
-            var surface = DecodeSize > 0
-                ? LoadedImageSurface.StartLoadFromStream(stream, new Size(DecodeSize, DecodeSize))
+            var maxSize = DecodeSize > 0 ? DecodeSize : LaidOutPixels();
+            _decodedPixels = DecodeSize > 0 ? 0 : maxSize;
+            var surface = maxSize > 0
+                ? LoadedImageSurface.StartLoadFromStream(stream, new Size(maxSize, maxSize))
                 : LoadedImageSurface.StartLoadFromStream(stream);
             var loaded = new TaskCompletionSource<bool>();
             surface.LoadCompleted += (_, e) => loaded.TrySetResult(e.Status == LoadedImageSourceLoadStatus.Success);
-            _surface = surface;
-            _surfaceBrush.Surface = surface;
+            if (!keepShown)
+            {
+                _surface = surface;
+                _surfaceBrush.Surface = surface;
+            }
 
             // The stream must stay open until the surface has read it.
-            if (await loaded.Task && version == _version)
+            var success = await loaded.Task;
+            if (version != _version)
+            {
+                if (keepShown)
+                {
+                    surface.Dispose();
+                }
+
+                return;
+            }
+
+            if (keepShown)
+            {
+                if (!success)
+                {
+                    surface.Dispose();
+                    return;
+                }
+
+                _surface?.Dispose();
+                _surface = surface;
+                _surfaceBrush.Surface = surface;
+            }
+            else if (success)
             {
                 FadeIn();
             }
@@ -180,6 +227,13 @@ public sealed partial class FadingArtwork : UserControl
         {
             Logger?.LogDebug(ex, "Artwork wash for {Url} could not be loaded", url);
         }
+    }
+
+    // The longer side of the control in physical pixels (the art is cropped to fill it, so this always covers it).
+    private double LaidOutPixels()
+    {
+        var side = Math.Max(_host.ActualWidth, _host.ActualHeight) * (XamlRoot?.RasterizationScale ?? 1.0);
+        return side > 0 ? Math.Ceiling(side / DecodeStep) * DecodeStep : 0;
     }
 
     private static async Task<IRandomAccessStream?> OpenAsync(string url)

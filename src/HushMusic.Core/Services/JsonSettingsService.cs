@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Logging;
 using HushMusic.Core.Abstractions;
 
@@ -6,7 +8,8 @@ namespace HushMusic.Core.Services;
 
 public sealed class JsonSettingsService(IAppPaths paths, ILogger<JsonSettingsService> logger) : ISettingsService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    // Source-generated: the settings are read before the window opens, and reflection-based metadata is slow to build.
+    private static readonly JsonTypeInfo<AppSettings> SettingsJson = SettingsJsonContext.Default.AppSettings;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -24,7 +27,7 @@ public sealed class JsonSettingsService(IAppPaths paths, ILogger<JsonSettingsSer
         try
         {
             await using var stream = File.OpenRead(paths.SettingsFile);
-            Current = await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken).ConfigureAwait(false) ?? new AppSettings();
+            Current = await JsonSerializer.DeserializeAsync(stream, SettingsJson, cancellationToken).ConfigureAwait(false) ?? new AppSettings();
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {
@@ -42,7 +45,7 @@ public sealed class JsonSettingsService(IAppPaths paths, ILogger<JsonSettingsSer
             var temp = paths.SettingsFile + ".tmp";
             await using (var stream = File.Create(temp))
             {
-                await JsonSerializer.SerializeAsync(stream, Current, JsonOptions, cancellationToken).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(stream, Current, SettingsJson, cancellationToken).ConfigureAwait(false);
             }
 
             File.Move(temp, paths.SettingsFile, overwrite: true);
@@ -55,3 +58,7 @@ public sealed class JsonSettingsService(IAppPaths paths, ILogger<JsonSettingsSer
         Changed?.Invoke(this, EventArgs.Empty);
     }
 }
+
+[JsonSourceGenerationOptions(WriteIndented = true)]
+[JsonSerializable(typeof(AppSettings))]
+internal sealed partial class SettingsJsonContext : JsonSerializerContext;

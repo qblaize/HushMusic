@@ -99,7 +99,7 @@ Hooks available to a feature:
 | `ILastFmService` | Last.fm connection state, user name, pending scrobbles |
 | `IRadioNowPlaying` | the song on air for live radio (ICY metadata) |
 | `INotificationService` | show an InfoBar message |
-| `IThemeService`, `IAccentColorService`, `IWindowModeService` (App) | theme and accent changes; mini player; show the window |
+| `IThemeService`, `IAccentColorService`, `IWindowModeService` (App) | theme and accent changes; mini player; show the window; whether it is shown, minimized or hidden in the notification area (`VisibilityChanged`) |
 
 Events are raised on background threads; marshal to the UI with `IUiDispatcher` in the App. Register a feature with
 `services.AddHostedService<MyFeature>()`, in `AddHushCore()` or in an extension method of its own.
@@ -144,4 +144,6 @@ a blurred backdrop, a floating glass player bar and a full-window Now Playing vi
   window; gesture parsing lives in Core (`GlobalHotkeys`). A gesture another app already holds is reported in Settings.
 - **Song notifications.** `TrackNotificationService` shows a silent Windows App SDK app notification (the payload is
   built in Core by `TrackNotificationContent`) when a new song starts while the window isn't in front.
-- **Updates.** Velopack (`Services/Updates`), with GitHub Releases as the feed.
+- **Updates.** Velopack (`Services/Updates`), with GitHub Releases as the feed. Checks 20 s after start, then every
+  5 minutes; a downloaded update shows an in-app notice and a Windows notification with Restart now (through
+  `TrackNotificationService`, which registers for notifications whatever the song setting).

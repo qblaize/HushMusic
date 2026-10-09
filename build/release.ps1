@@ -121,9 +121,10 @@ finally {
 }
 
 # ----- Publish -----
-# Release turns on WindowsAppSDKSelfContained in the csproj. Everything else is spelled out here rather than taken from
-# the publish profiles (Properties/PublishProfiles is git-ignored, so CI wouldn't have them). No trimming: WinUI, the
-# DI container and reflection-based JSON aren't trim-safe. ReadyToRun for a faster start.
+# Release turns on WindowsAppSDKSelfContained, ReadyToRun and no trimming in the csproj; they are spelled out here too
+# rather than taken from the publish profiles (Properties/PublishProfiles is git-ignored, so CI wouldn't have them).
+# No trimming: WinUI, the DI container and reflection-based JSON aren't trim-safe. ReadyToRun for a faster start
+# (checked after the publish).
 # HushOutputDir moves the app's build output under artifacts/, away from bin/ (a running dev copy may lock files there).
 Invoke-Checked "Publishing $rid (self-contained, Release)" {
     dotnet publish $project -c Release -r $rid --self-contained true -nologo `
@@ -153,6 +154,21 @@ foreach ($file in $required.Keys) {
 $appAssembly = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes((Join-Path $publishDir 'HushMusic.dll')))
 if ($appAssembly.Contains('BootstrapCS') -or -not $appAssembly.Contains('UndockedRegFreeWinRTCS')) {
     throw 'HushMusic.dll initializes the Windows App SDK as framework-dependent: users would need the Windows App Runtime installed.'
+}
+
+# ReadyToRun: precompiled assemblies carry a managed native header. Without it every start JITs the app and the large
+# WinRT projections (about a third slower to the first window).
+foreach ($assembly in 'HushMusic.dll', 'HushMusic.Core.dll', 'Microsoft.WinUI.dll', 'Microsoft.Windows.SDK.NET.dll') {
+    $stream = [IO.File]::OpenRead((Join-Path $publishDir $assembly))
+    try {
+        $headers = [Reflection.PortableExecutable.PEReader]::new($stream).PEHeaders
+        if (-not $headers.CorHeader -or $headers.CorHeader.ManagedNativeHeaderDirectory.Size -eq 0) {
+            throw "$assembly isn't ReadyToRun-compiled."
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
 }
 
 # Installed copies check the repository the release is uploaded to.

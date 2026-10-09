@@ -1,12 +1,13 @@
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Media.Animation;
+using HushMusic.App.Helpers;
 
 namespace HushMusic.App.Controls.Items;
 
 /// <summary>
 /// Loading placeholder host. Its content is made of rounded Surface blocks (<c>SkeletonBlockStyle</c>,
 /// <see cref="SkeletonRows"/>, <see cref="SkeletonCards"/>) and the whole thing gently "breathes" (an opacity pulse)
-/// while it is loaded and visible. Static when "Animation effects" is off in Windows settings.
+/// while it is on screen (<see cref="AnimationGate"/>). Static when "Animation effects" is off in Windows settings.
 /// </summary>
 public sealed partial class Skeleton : ContentControl
 {
@@ -15,6 +16,7 @@ public sealed partial class Skeleton : ContentControl
 
     private static bool? s_animationsEnabled;
 
+    private readonly AnimationGate _gate;
     private Storyboard? _breathe;
     private bool _isRunning;
 
@@ -24,8 +26,8 @@ public sealed partial class Skeleton : ContentControl
         HorizontalContentAlignment = HorizontalAlignment.Stretch;
         VerticalContentAlignment = VerticalAlignment.Top;
         AutomationProperties.SetName(this, "Loading");
+        _gate = new AnimationGate(this, SetBreathing);
         Loaded += (_, _) => Update();
-        Unloaded += (_, _) => Stop();
         RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => Update());
     }
 
@@ -33,26 +35,26 @@ public sealed partial class Skeleton : ContentControl
 
     private void Update()
     {
-        if (IsLoaded && Visibility == Visibility.Visible)
+        if (!AnimationsEnabled)
         {
-            Start();
+            Opacity = 0.8;
+            return;
         }
-        else
-        {
-            Stop();
-        }
+
+        _gate.IsWanted = Visibility == Visibility.Visible;
     }
 
-    private void Start()
+    private void SetBreathing(bool breathe)
     {
-        if (_isRunning)
+        if (breathe == _isRunning)
         {
             return;
         }
 
-        if (!AnimationsEnabled)
+        _isRunning = breathe;
+        if (!breathe)
         {
-            Opacity = 0.8;
+            _breathe?.Stop();
             return;
         }
 
@@ -74,15 +76,5 @@ public sealed partial class Skeleton : ContentControl
         }
 
         _breathe.Begin();
-        _isRunning = true;
-    }
-
-    private void Stop()
-    {
-        if (_isRunning)
-        {
-            _breathe?.Stop();
-            _isRunning = false;
-        }
     }
 }

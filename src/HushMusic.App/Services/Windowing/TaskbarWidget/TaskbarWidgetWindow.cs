@@ -74,6 +74,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
     private int _dibWidth;
     private int _dibHeight;
     private string? _lastProblem;
+    private bool _hadTrack;
 
     private TaskbarWidgetWindow(string? display, TaskbarWidgetState state, ITaskbarWidgetSink sink, ILogger logger)
     {
@@ -373,7 +374,13 @@ internal sealed class TaskbarWidgetWindow : IDisposable
         {
             _overlayVolume = null;
         }
+        else if (!_hadTrack)
+        {
+            // The layout isn't read while there is nothing to show (see OnLayoutTimer): read it fresh.
+            RequestProbe();
+        }
 
+        _hadTrack = state.HasTrack;
         if ((_placed is not null) != state.HasTrack)
         {
             Relayout();
@@ -393,7 +400,13 @@ internal sealed class TaskbarWidgetWindow : IDisposable
             return;
         }
 
-        RequestProbe();
+        // With nothing playing the player stays hidden: keep checking that the taskbar is there (cheap), but leave its
+        // layout, a UI Automation read of Explorer, until there is a track again.
+        if (_state.HasTrack)
+        {
+            RequestProbe();
+        }
+
         Relayout();
     }
 

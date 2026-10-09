@@ -59,8 +59,8 @@ public sealed partial class LyricsViewModel : ObservableObject
         _dispatcher = dispatcher;
         _logger = logger;
         player.TrackChanged += (_, e) => _dispatcher.Run(() => OnTrackChanged(e.Track));
-        player.PositionChanged += (_, e) => Report(e.Position);
-        player.StatusChanged += (_, e) => _isPlaying = e.Status == PlaybackStatus.Playing;
+        player.PositionChanged += (_, e) => OnPositionChanged(e.Position);
+        player.StatusChanged += (_, e) => OnStatusChanged(e.Status);
         _track = player.CurrentTrack;
         _isPlaying = player.Status == PlaybackStatus.Playing;
         Report(player.Position);
@@ -137,6 +137,28 @@ public sealed partial class LyricsViewModel : ObservableObject
     {
         _shownVideoId = null;
         EnsureLoaded();
+    }
+
+    // Player events arrive on background threads.
+    private void OnPositionChanged(TimeSpan position)
+    {
+        Report(position);
+
+        // Playing, the timer follows the position; paused, only a seek moves it.
+        if (!_isPlaying && _isActive)
+        {
+            _dispatcher.Run(Tick);
+        }
+    }
+
+    private void OnStatusChanged(PlaybackStatus status)
+    {
+        _isPlaying = status == PlaybackStatus.Playing;
+        _dispatcher.Run(() =>
+        {
+            UpdateTimer();
+            Tick();
+        });
     }
 
     private void Report(TimeSpan position)
@@ -310,10 +332,10 @@ public sealed partial class LyricsViewModel : ObservableObject
         }
     }
 
-    // The highlight is driven by a short UI timer only while synced lines are on screen.
+    // The highlight is driven by a short UI timer only while synced lines are on screen and the song plays.
     private void UpdateTimer()
     {
-        var run = _isActive && IsSynced;
+        var run = _isActive && IsSynced && _isPlaying;
         if (!run)
         {
             _timer?.Stop();

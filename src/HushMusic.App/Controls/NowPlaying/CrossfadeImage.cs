@@ -12,7 +12,8 @@ namespace HushMusic.App.Controls.NowPlaying;
 /// <summary>
 /// Artwork that cross-fades when <see cref="Url"/> changes. Loads through the disk cache; when <see cref="Url"/> can't be
 /// loaded it tries <see cref="FallbackUrl"/>. A small <see cref="DecodePixelWidth"/> decodes the art at a few pixels and
-/// lets the GPU stretch it: a soft, blurred colour wash.
+/// lets the GPU stretch it: a soft, blurred colour wash. Without one, the art is decoded at the size it is laid out at
+/// (in steps, so resizing the window doesn't decode it again at every pixel), never at the source's full size.
 /// </summary>
 public sealed partial class CrossfadeImage : Grid
 {
@@ -25,11 +26,16 @@ public sealed partial class CrossfadeImage : Grid
     // A load that never reports back must not leave the old art up forever.
     private static readonly TimeSpan OpenTimeout = TimeSpan.FromSeconds(4);
 
+    // Laid-out sizes are rounded up to this many pixels before decoding.
+    private const double DecodeStep = 64;
+
     private readonly Image _a = new() { Stretch = Stretch.UniformToFill, Opacity = 0 };
     private readonly Image _b = new() { Stretch = Stretch.UniformToFill, Opacity = 0 };
     private bool _showsA;
     private int _version;
     private Storyboard? _fade;
+    private bool _released;
+    private double _decodedWidth;
 
     public CrossfadeImage()
     {
@@ -37,6 +43,7 @@ public sealed partial class CrossfadeImage : Grid
         AutomationProperties.SetAccessibilityView(this, AccessibilityView.Raw);
         Children.Add(_a);
         Children.Add(_b);
+        SizeChanged += OnSizeChanged;
     }
 
     public string? Url
@@ -52,7 +59,7 @@ public sealed partial class CrossfadeImage : Grid
         set => SetValue(FallbackUrlProperty, value);
     }
 
-    /// <summary>Physical pixels to decode at (0 = natural size).</summary>
+    /// <summary>Physical pixels to decode at (0 = the laid-out size).</summary>
     public int DecodePixelWidth { get; set; }
 
     public TimeSpan FadeDuration { get; set; } = TimeSpan.FromMilliseconds(450);
@@ -64,16 +71,54 @@ public sealed partial class CrossfadeImage : Grid
 
     private static ILogger? Logger => App.Services?.GetService<ILoggerFactory>()?.CreateLogger(typeof(CrossfadeImage).FullName!);
 
-    /// <summary>Loads <see cref="Url"/> again without a fade (after being hidden, where decoding may have been deferred).</summary>
+    /// <summary>
+    /// Loads <see cref="Url"/> again without a fade: after being hidden, where decoding may have been deferred, or after
+    /// <see cref="Release"/>.
+    /// </summary>
     public void Refresh()
     {
+        _released = false;
         var animate = Animate;
         Animate = false;
         Reload();
         Animate = animate;
     }
 
-    private void Reload() => _ = LoadAsync(Url, FallbackUrl, Animate);
+    /// <summary>
+    /// Lets go of the decoded art while it can't be seen (the view is closed). <see cref="Url"/> changes are only noted
+    /// until <see cref="Refresh"/> loads the art again.
+    /// </summary>
+    public void Release()
+    {
+        _released = true;
+        _version++;
+        _fade?.Stop();
+        _fade = null;
+        foreach (var image in (Image[])[_a, _b])
+        {
+            image.Source = null;
+            image.Opacity = 0;
+        }
+
+        _decodedWidth = 0;
+    }
+
+    private void Reload()
+    {
+        if (!_released)
+        {
+            _ = LoadAsync(Url, FallbackUrl, Animate);
+        }
+    }
+
+    // A bigger slot than the art was decoded for (the window grew) loads it again, sharper.
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (DecodePixelWidth == 0 && _decodedWidth > 0 && e.NewSize.Width > _decodedWidth && !_released)
+        {
+            Refresh();
+        }
+    }
 
     private async Task LoadAsync(string? url, string? fallback, bool animate)
     {
@@ -123,12 +168,20 @@ public sealed partial class CrossfadeImage : Grid
                 bitmap.DecodePixelType = DecodePixelType.Physical;
                 bitmap.DecodePixelWidth = DecodePixelWidth;
             }
+            else if (ActualWidth > 0)
+            {
+                // Logical pixels: the image host scales them by the display's scale factor.
+                _decodedWidth = Math.Ceiling(ActualWidth / DecodeStep) * DecodeStep;
+                bitmap.DecodePixelType = DecodePixelType.Logical;
+                bitmap.DecodePixelWidth = (int)_decodedWidth;
+            }
 
             var opened = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             bitmap.ImageOpened += (_, _) => opened.TrySetResult(true);
             bitmap.ImageFailed += (_, _) => opened.TrySetResult(false);
 
-            // Decoding needs the bitmap on an element in the tree; the hidden image hosts it until the fade.
+            // Decoding needs the bitmap on an element in the tree; the hidden image hosts it until the fade. Attached
+            // before its source is set, so without a decode size it is decoded at the size it is laid out at.
             var host = _showsA ? _b : _a;
             host.Source = bitmap;
             bitmap.UriSource = uri;
@@ -174,6 +227,7 @@ public sealed partial class CrossfadeImage : Grid
             }
 
             outgoing.Opacity = 0;
+            outgoing.Source = null;
             return;
         }
 
@@ -184,6 +238,14 @@ public sealed partial class CrossfadeImage : Grid
         }
 
         storyboard.Children.Add(Fade(outgoing, 0));
+        storyboard.Completed += (_, _) =>
+        {
+            // The outgoing art is invisible now: let go of it (unless a newer load already reuses that image).
+            if (version == _version && ReferenceEquals(_fade, storyboard))
+            {
+                outgoing.Source = null;
+            }
+        };
         _fade = storyboard;
         storyboard.Begin();
 

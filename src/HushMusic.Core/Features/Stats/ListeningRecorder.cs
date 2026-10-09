@@ -16,7 +16,7 @@ public sealed partial class ListeningRecorder : IHostedService, IDisposable
     /// <summary>How often the time of a long play (a radio station, a mix) is written while it goes on.</summary>
     internal static readonly TimeSpan CheckpointInterval = TimeSpan.FromMinutes(5);
 
-    /// <summary>Listening is added up on this beat while playing, and on every player state change.</summary>
+    /// <summary>Listening is added up on this beat while playing (it stops otherwise), and on every player state change.</summary>
     internal static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
 
     /// <summary>
@@ -55,7 +55,8 @@ public sealed partial class ListeningRecorder : IHostedService, IDisposable
         lock (_gate)
         {
             _isPlaying = _player.Status == PlaybackStatus.Playing;
-            _timer = _time.CreateTimer(_ => OnTick(), null, TickInterval, TickInterval);
+            _timer = _time.CreateTimer(_ => OnTick(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            UpdateBeatNoLock();
         }
 
         return Task.CompletedTask;
@@ -112,6 +113,7 @@ public sealed partial class ListeningRecorder : IHostedService, IDisposable
             {
                 _isPlaying = true;
                 _session = new Session(track, e.Item?.Id, _time.GetLocalNow(), _time.GetTimestamp());
+                UpdateBeatNoLock();
             }
         }
     }
@@ -157,6 +159,7 @@ public sealed partial class ListeningRecorder : IHostedService, IDisposable
             // Count up to now before the state flips, so the last stretch of playing time isn't lost.
             TickNoLock();
             _isPlaying = e.Status == PlaybackStatus.Playing;
+            UpdateBeatNoLock();
             if (_session is { } session)
             {
                 session.LastTick = _time.GetTimestamp();
@@ -175,6 +178,13 @@ public sealed partial class ListeningRecorder : IHostedService, IDisposable
         {
             TickNoLock();
         }
+    }
+
+    // Paused or stopped there is nothing to add up, so the beat (a wakeup every second) only runs while playing.
+    private void UpdateBeatNoLock()
+    {
+        var interval = _isPlaying ? TickInterval : Timeout.InfiniteTimeSpan;
+        _timer?.Change(interval, interval);
     }
 
     private void TickNoLock()

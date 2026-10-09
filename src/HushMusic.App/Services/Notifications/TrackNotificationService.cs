@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Windows.AppNotifications;
 using Windows.Graphics.Imaging;
-using WindowsNotification = Microsoft.Windows.AppNotifications.AppNotification;
 using HushMusic.App.Services.Shell;
 using HushMusic.App.Services.Windowing;
 using HushMusic.App.Services.Windowing.TaskbarWidget;
@@ -17,9 +15,9 @@ namespace HushMusic.App.Services.Notifications;
 /// front. Each one replaces the last (same tag and group) and expires soon, so Notification Center never fills up.
 /// Also shows the "update ready" notification (<see cref="ShowUpdateReady"/>), whatever the song setting.
 /// <para>
-/// Shown with the Windows App SDK's AppNotificationManager. This app is unpackaged, so it registers itself (display
-/// name, icon, activation) the first time the setting is on, unregisters on exit, and the uninstaller removes the
-/// registration (<see cref="RemoveRegistration"/>). Test instances never register: they log what they would show.
+/// Shown with <see cref="WindowsToasts"/>, which registers the app ID the first time a notification is due (the
+/// uninstaller removes it: <see cref="RemoveRegistration"/>). Test instances never register: they log what they would
+/// show.
 /// </para>
 /// </summary>
 public sealed class TrackNotificationService : IDisposable
@@ -45,14 +43,15 @@ public sealed class TrackNotificationService : IDisposable
     private readonly INotificationService _notifications;
     private readonly ILogger<TrackNotificationService> _logger;
     private readonly bool _testInstance = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_BACKGROUND") == "1";
+    private readonly WindowsToasts _toasts = new();
     private readonly Lock _gate = new();
+    private readonly Lock _registration = new();
 
     private Action? _showMainWindow;
     private Action? _next;
     private Action? _restartToUpdate;
     private CancellationTokenSource? _pending;
     private string? _lastKey;
-    private bool _registered;
     private bool _registrationFailed;
     private bool _showFailureLogged;
     private bool _attached;
@@ -81,20 +80,10 @@ public sealed class TrackNotificationService : IDisposable
     private bool Enabled => _settings.Current.ShowTrackNotifications && !_disposed;
 
     /// <summary>
-    /// Removes this install's notification registration (uninstall hook). Runs before anything else in the process;
-    /// never throws.
+    /// Removes this install's notifications and their registration (uninstall hook). Runs before anything else in the
+    /// process; never throws.
     /// </summary>
-    public static void RemoveRegistration()
-    {
-        try
-        {
-            AppNotificationManager.Default.UnregisterAll();
-        }
-        catch (Exception)
-        {
-            // Never fail the uninstall over this.
-        }
-    }
+    public static void RemoveRegistration() => WindowsToasts.RemoveRegistration();
 
     /// <summary>Starts following the player and the setting. UI thread, once, after the main window exists.</summary>
     internal void Attach(Action showMainWindow, Action next)
@@ -137,9 +126,8 @@ public sealed class TrackNotificationService : IDisposable
                     return;
                 }
 
-                var notification = new WindowsNotification(payload) { Tag = UpdateTag, Group = UpdateGroup, ExpiresOnReboot = true };
-                AppNotificationManager.Default.Show(notification);
-                _logger.LogInformation("Update notification for {Version} (shown: {Shown})", version, notification.Id != 0);
+                var shown = _toasts.Show(payload, UpdateTag, UpdateGroup, expires: null, OnToastActivated);
+                _logger.LogInformation("Update notification for {Version} (shown: {Shown}, Windows setting: {Setting})", version, shown, _toasts.Setting);
             }
             catch (Exception ex)
             {
@@ -147,9 +135,6 @@ public sealed class TrackNotificationService : IDisposable
             }
         });
     }
-
-    /// <summary>A notification was clicked while another copy of the app was starting (it handed the click over). Any thread.</summary>
-    internal void OnRedirectedActivation(string? argument) => Run(TrackNotificationContent.Parse(argument));
 
     public void Dispose()
     {
@@ -171,7 +156,7 @@ public sealed class TrackNotificationService : IDisposable
             _pending?.Cancel();
         }
 
-        if (!_registered)
+        if (!_toasts.IsRegistered)
         {
             return;
         }
@@ -179,14 +164,12 @@ public sealed class TrackNotificationService : IDisposable
         try
         {
             // The song is over once the app is: don't leave a Next button behind, nor a Restart button nobody answers.
-            AppNotificationManager.Default.RemoveByTagAndGroupAsync(Tag, Group).AsTask().Wait(TimeSpan.FromMilliseconds(500));
-            AppNotificationManager.Default.RemoveByTagAndGroupAsync(UpdateTag, UpdateGroup).AsTask().Wait(TimeSpan.FromMilliseconds(500));
-            AppNotificationManager.Default.NotificationInvoked -= OnNotificationInvoked;
-            AppNotificationManager.Default.Unregister();
+            _toasts.Remove(Tag, Group);
+            _toasts.Remove(UpdateTag, UpdateGroup);
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Could not unregister song notifications");
+            _logger.LogDebug(ex, "Could not remove the notifications");
         }
     }
 
@@ -206,67 +189,46 @@ public sealed class TrackNotificationService : IDisposable
             _lastKey = null;
         }
 
-        if (_registered)
+        if (_toasts.IsRegistered)
         {
-            _ = RemoveShownAsync();
+            try
+            {
+                _toasts.Remove(Tag, Group);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not remove the song notification");
+            }
         }
     }
 
     private bool EnsureRegistered()
     {
-        if (_registered || _testInstance)
-        {
-            return _registered;
-        }
-
-        if (_registrationFailed)
+        if (_testInstance)
         {
             return false;
         }
 
-        try
+        lock (_registration)
         {
-            if (!AppNotificationManager.IsSupported())
+            if (_toasts.IsRegistered || _registrationFailed)
             {
-                throw new NotSupportedException("App notifications aren't supported here.");
+                return _toasts.IsRegistered;
             }
 
-            // The handler must be in place before Register, or a click starts a second copy of the app.
-            var manager = AppNotificationManager.Default;
-            manager.NotificationInvoked += OnNotificationInvoked;
-            if (Win32.IsPackaged())
+            try
             {
-                // MSIX: name, icon and activation come from the package manifest.
-                manager.Register();
+                _toasts.Register();
+                _logger.LogInformation("Notifications registered (Windows setting: {Setting})", _toasts.Setting);
             }
-            else
+            catch (Exception ex)
             {
-                var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "Square44x44Logo.targetsize-48_altform-unplated.png");
-                manager.Register("Hush", new Uri(icon));
+                _registrationFailed = true;
+                _logger.LogWarning(ex, "Could not register for notifications");
+                _notifications.ShowInfo("Notifications aren't available", "Windows didn't let Hush show notifications.");
             }
 
-            _registered = true;
-            _logger.LogInformation("Song notifications registered (Windows setting: {Setting})", manager.Setting);
-        }
-        catch (Exception ex)
-        {
-            _registrationFailed = true;
-            _logger.LogWarning(ex, "Could not register for song notifications");
-            _notifications.ShowInfo("Song notifications aren't available", "Windows didn't let Hush show notifications.");
-        }
-
-        return _registered;
-    }
-
-    private async Task RemoveShownAsync()
-    {
-        try
-        {
-            await AppNotificationManager.Default.RemoveByTagAndGroupAsync(Tag, Group);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Could not remove the song notification");
+            return _toasts.IsRegistered;
         }
     }
 
@@ -363,19 +325,11 @@ public sealed class TrackNotificationService : IDisposable
             return;
         }
 
-        var notification = new WindowsNotification(payload)
+        if (!_toasts.Show(payload, Tag, Group, DateTimeOffset.Now + Lifetime, OnToastActivated) && !_showFailureLogged)
         {
-            Tag = Tag,
-            Group = Group,
-            Expiration = DateTimeOffset.Now + Lifetime,
-            ExpiresOnReboot = true,
-        };
-        AppNotificationManager.Default.Show(notification);
-        if (notification.Id == 0 && !_showFailureLogged)
-        {
-            // Turned off in Windows (Settings → System → Notifications) or by Focus.
+            // Turned off in Windows (Settings → System → Notifications).
             _showFailureLogged = true;
-            _logger.LogInformation("Windows didn't show the song notification (setting: {Setting})", AppNotificationManager.Default.Setting);
+            _logger.LogInformation("Windows didn't show the song notification (setting: {Setting})", _toasts.Setting);
         }
     }
 
@@ -439,8 +393,7 @@ public sealed class TrackNotificationService : IDisposable
     }
 
     // Raised on a background thread when a notification or its button is clicked while the app runs.
-    private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args) =>
-        Run(TrackNotificationContent.Parse(args.Argument));
+    private void OnToastActivated(string? arguments) => Run(TrackNotificationContent.Parse(arguments));
 
     private void Run(TrackNotificationCommand command) => _dispatcher.Run(() =>
     {

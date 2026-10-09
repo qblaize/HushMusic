@@ -47,7 +47,7 @@ public sealed record TrackNotification(string Key, string Title, string Subtitle
 
 /// <summary>
 /// Builds the Windows notification (toast) XML for <see cref="TrackNotification"/> and reads its arguments back. Pure
-/// logic: the App shows it with the Windows App SDK's AppNotificationManager.
+/// logic: the App shows it with the system toast API.
 /// </summary>
 public static class TrackNotificationContent
 {

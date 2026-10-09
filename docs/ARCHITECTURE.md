@@ -142,8 +142,11 @@ a blurred backdrop, a floating glass player bar and a full-window Now Playing vi
   `Shell_SecondaryTrayWnd`s of other displays.
 - **Global shortcuts.** `GlobalHotkeyService` registers the configured gestures with `RegisterHotKey` on a message-only
   window; gesture parsing lives in Core (`GlobalHotkeys`). A gesture another app already holds is reported in Settings.
-- **Song notifications.** `TrackNotificationService` shows a silent Windows App SDK app notification (the payload is
-  built in Core by `TrackNotificationContent`) when a new song starts while the window isn't in front.
+- **Song notifications.** `TrackNotificationService` shows a silent Windows notification (the payload is built in Core
+  by `TrackNotificationContent`) when a new song starts while the window isn't in front. Notifications go through the
+  system toast API (`WindowsToasts`), not the Windows App SDK's `AppNotificationManager`, which needs the Windows App
+  Runtime's Singleton package that a self-contained install doesn't have. The app ID is the one Velopack gives the
+  Start menu shortcut (`velopack.HushMusic.App`), also registered under `HKCU\Software\Classes\AppUserModelId`.
 - **Updates.** Velopack (`Services/Updates`), with GitHub Releases as the feed. Checks 20 s after start, then every
   5 minutes; a downloaded update shows an in-app notice and a Windows notification with Restart now (through
-  `TrackNotificationService`, which registers for notifications whatever the song setting).
+  `TrackNotificationService`, whatever the song setting).

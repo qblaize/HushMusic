@@ -1,9 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 using Microsoft.Windows.AppLifecycle;
-using Microsoft.Windows.AppNotifications;
 using Velopack;
 using HushMusic.App.Services.Notifications;
 using HushMusic.App.Services.Shell;
@@ -55,13 +53,6 @@ public static class Program
 
         mainInstance.Activated += (_, e) =>
         {
-            // A click on a song notification that started a second copy: the notification decides (Next, or show).
-            if (e.Kind == ExtendedActivationKind.AppNotification)
-            {
-                OnNotificationActivation(e);
-                return;
-            }
-
             // The Run entry ("--background") starting while the app already runs changes nothing.
             if (!IsBackgroundActivation(e))
             {
@@ -85,9 +76,6 @@ public static class Program
         var background = AutoStartCommand.IsBackgroundLaunch(Environment.GetCommandLineArgs())
             || Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_BACKGROUND") == "1";
 
-        // A notification click leaves it to the running copy, which comes forward only when the click asks for it
-        // (not for the Next button).
-        var notification = activation.Kind == ExtendedActivationKind.AppNotification;
         if (!background)
         {
             // This process was started by the user, so it may let the running copy take the foreground (its window
@@ -108,7 +96,7 @@ public static class Program
             }
         });
         _ = CoWaitForMultipleObjects(0, 10_000, 1, [redirected.SafeWaitHandle.DangerousGetHandle()], out _);
-        if (background || notification)
+        if (background)
         {
             return;
         }
@@ -122,19 +110,6 @@ public static class Program
         catch (ArgumentException)
         {
             // The running copy exited meanwhile.
-        }
-    }
-
-    private static void OnNotificationActivation(AppActivationArguments activation)
-    {
-        try
-        {
-            var argument = (activation.Data as AppNotificationActivatedEventArgs)?.Argument;
-            App.Services?.GetService<TrackNotificationService>()?.OnRedirectedActivation(argument);
-        }
-        catch (Exception)
-        {
-            // Starting up or shutting down: nothing to do with the click.
         }
     }
 

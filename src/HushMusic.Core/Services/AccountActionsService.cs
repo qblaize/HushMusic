@@ -3,8 +3,11 @@ using HushMusic.Core.Models;
 
 namespace HushMusic.Core.Services;
 
-public sealed class AccountActionsService(IAccountApi api) : IAccountActionsService
+public sealed class AccountActionsService(IAccountApi api, IBrowseApi browse) : IAccountActionsService
 {
+    // Only stops a continuation that never ends; real playlists stay far below it.
+    private const int MaxPlaylistPages = 200;
+
     public event EventHandler<TrackRatedEventArgs>? TrackRated;
 
     public event EventHandler<PlaylistChangedEventArgs>? PlaylistChanged;
@@ -22,10 +25,27 @@ public sealed class AccountActionsService(IAccountApi api) : IAccountActionsServ
         return playlistId;
     }
 
-    public async Task AddToPlaylistAsync(string playlistId, IReadOnlyList<string> videoIds, CancellationToken cancellationToken = default)
+    public async Task AddToPlaylistAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default)
     {
-        await api.AddPlaylistItemsAsync(playlistId, videoIds, allowDuplicates: false, cancellationToken).ConfigureAwait(false);
+        await api.AddPlaylistItemsAsync(playlistId, videoIds, allowDuplicates, cancellationToken).ConfigureAwait(false);
         PlaylistChanged?.Invoke(this, new PlaylistChangedEventArgs(playlistId, PlaylistChangeKind.ItemsAdded, videoIds));
+    }
+
+    public async Task<IReadOnlyList<string>> AddMissingToPlaylistAsync(string playlistId, IReadOnlyList<string> videoIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(videoIds);
+
+        var present = await GetPlaylistVideoIdsAsync(playlistId, cancellationToken).ConfigureAwait(false);
+        List<string> missing = [.. videoIds.Distinct(StringComparer.Ordinal).Where(id => !present.Contains(id))];
+        if (missing.Count == 0)
+        {
+            return [];
+        }
+
+        // Still with the server's duplicate check: the user asked for no duplicates, and the playlist may have changed since
+        // it was read.
+        await AddToPlaylistAsync(playlistId, missing, allowDuplicates: false, cancellationToken).ConfigureAwait(false);
+        return missing;
     }
 
     public async Task RemoveFromPlaylistAsync(string playlistId, IReadOnlyList<Track> tracks, CancellationToken cancellationToken = default)
@@ -125,6 +145,23 @@ public sealed class AccountActionsService(IAccountApi api) : IAccountActionsServ
     {
         await api.DeletePlaylistAsync(playlistId, cancellationToken).ConfigureAwait(false);
         PlaylistChanged?.Invoke(this, new PlaylistChangedEventArgs(playlistId, PlaylistChangeKind.Deleted, []));
+    }
+
+    private async Task<HashSet<string>> GetPlaylistVideoIdsAsync(string playlistId, CancellationToken cancellationToken)
+    {
+        var page = await browse.GetPlaylistAsync(playlistId, cancellationToken).ConfigureAwait(false);
+        var videoIds = new HashSet<string>(StringComparer.Ordinal);
+        var tracks = page.Tracks;
+        for (var pages = 1; ; pages++)
+        {
+            videoIds.UnionWith(tracks.Items.Select(t => t.VideoId));
+            if (tracks.Continuation is not { } continuation || pages >= MaxPlaylistPages)
+            {
+                return videoIds;
+            }
+
+            tracks = await browse.GetPlaylistTracksAsync(continuation, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     // Pairs each entry with the first unused added entry of the same video, so a song listed twice gets two different ids.

@@ -43,6 +43,10 @@ namespace HushMusic.Playback;
 /// There is no crossfade into or out of live radio, with repeat one, before a sleep-timer "end of track" pause, or for
 /// tracks shorter than twice the crossfade.
 /// </para>
+/// <para>
+/// Both players use the chosen audio output (<see cref="AppSettings.AudioOutputDeviceId"/>), or the system default
+/// while it isn't connected. A change moves open media to the new output where it was (see the output part).
+/// </para>
 /// </remarks>
 public sealed partial class MediaPlayerService : IPlayer, IDisposable
 {
@@ -161,6 +165,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         _queue.Changed += OnQueueChanged;
         _settings.Changed += OnSettingsChanged;
         _radio.Changed += OnRadioNowPlayingChanged;
+        OnOutputSettingChanged();
     }
 
     public event EventHandler<PlaybackStatusChangedEventArgs>? StatusChanged;
@@ -191,6 +196,9 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
 
         /// <summary>Live radio: connect to the same stream again (after a drop, or Play after a pause). Keeps the item's state.</summary>
         Reconnect,
+
+        /// <summary>Open the same item again where it was, when its media couldn't be moved to another audio output. Keeps the item's state.</summary>
+        Output,
     }
 
     public PlaybackStatus Status
@@ -659,6 +667,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         _settings.Changed -= OnSettingsChanged;
         _radio.Changed -= OnRadioNowPlayingChanged;
         _radio.Unfollow(forget: true);
+        CloseOutputs();
         _positionTimer.Dispose();
         _volumeSaveTimer.Dispose();
         _transitionTimer.Dispose();
@@ -805,6 +814,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                         break;
                     case LoadKind.Refresh:
                     case LoadKind.Reconnect:
+                    case LoadKind.Output:
                         break;
                     default:
                         _loadKind = kind;
@@ -890,6 +900,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                 source.CustomProperties[LoadIdKey] = loadId;
                 _stream = stream;
                 _source = source;
+                EnsureOutputNoLock(_active);
                 _active.Player.Source = source;
             }
 
@@ -1609,6 +1620,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
 
     private void OnSettingsChanged(object? sender, EventArgs e)
     {
+        OnOutputSettingChanged();
         bool normalizeChanged;
         bool enabled;
         TimeSpan crossfade;

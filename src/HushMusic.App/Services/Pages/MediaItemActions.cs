@@ -39,7 +39,7 @@ public interface IMediaItemActions
 
     Task RateAsync(Track track, LikeStatus status);
 
-    /// <summary>Asks for a playlist (or a new one) and adds the tracks to it.</summary>
+    /// <summary>Asks for a playlist (or a new one) and adds the tracks to it, asking again when some are already in it.</summary>
     Task AddToPlaylistAsync(IReadOnlyList<Track> tracks);
 
     void OpenAlbum(string? browseId);
@@ -57,6 +57,7 @@ internal sealed class MediaItemActions(
     IAuthService auth,
     ILikeStateService likes,
     IPlaylistDialogService playlistDialogs,
+    IPlaylistAdder playlistAdder,
     INavigationService navigation,
     INavigationPreviews previews,
     INotificationService notifications) : IMediaItemActions
@@ -174,8 +175,11 @@ internal sealed class MediaItemActions(
 
                 if (choice.Playlist is { } playlist)
                 {
-                    await account.AddToPlaylistAsync(playlist.PlaylistId, videoIds);
-                    notifications.Show(new AppNotification(NotificationSeverity.Success, "Added to playlist", playlist.Title));
+                    if ((await playlistAdder.AddAsync(playlist, tracks)).Count > 0)
+                    {
+                        notifications.Show(new AppNotification(NotificationSeverity.Success, "Added to playlist", playlist.Title));
+                    }
+
                     return;
                 }
 

@@ -253,6 +253,7 @@ public sealed partial class MediaPlayerService
                 source.CustomProperties[LoadIdKey] = preload.Id;
                 preload.Stream = stream;
                 preload.Source = source;
+                EnsureOutputNoLock(preload.Deck);
                 preload.Deck.Player.Source = source;
             }
         }
@@ -656,6 +657,9 @@ public sealed partial class MediaPlayerService
         public string Name { get; }
 
         public MediaPlayer Player { get; }
+
+        /// <summary>The audio output this player was last set to; null = the system default. Guarded by the owner's lock.</summary>
+        public string? OutputId { get; set; }
 
         public void Dispose()
         {

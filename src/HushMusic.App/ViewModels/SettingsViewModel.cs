@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
 using Serilog.Core;
 using Serilog.Events;
@@ -13,6 +15,7 @@ using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.Shell;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Services;
+using HushMusic.Playback;
 
 namespace HushMusic.App.ViewModels;
 
@@ -29,11 +32,18 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     private readonly IUiDispatcher _dispatcher;
     private readonly IUpdateService _appUpdates;
     private readonly IGlobalHotkeyService _hotkeys;
+    private readonly ILogger<SettingsViewModel> _logger;
     private CancellationTokenSource? _updateCts;
     private CancellationTokenSource? _lastFmCts;
     private Uri? _lastFmApprovalPage;
     private bool _loading;
     private bool _subscribed;
+
+    // The output list, watched while the page is open.
+    private AudioOutputWatcher? _audioOutputs;
+    private CancellationTokenSource? _audioOutputCts;
+    private string? _audioOutput; // the chosen output; null = the system default
+    private int _audioOutputRefresh;
 
     public SettingsViewModel(
         ISettingsService settings,
@@ -46,7 +56,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         IUiDispatcher dispatcher,
         IUpdateService appUpdates,
         IGlobalHotkeyService hotkeys,
-        INotificationService notifications)
+        INotificationService notifications,
+        ILogger<SettingsViewModel> logger)
         : base(notifications)
     {
         _settings = settings;
@@ -58,6 +69,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         _dispatcher = dispatcher;
         _appUpdates = appUpdates;
         _hotkeys = hotkeys;
+        _logger = logger;
         Account = account;
         AccentSwatches = BuildAccentSwatches();
         Hotkeys = [.. GlobalHotkeyMap.Actions.Select(a => new HotkeySettingViewModel(a, OnHotkeyEdited, hotkeys.Pause))];
@@ -133,6 +145,18 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     public partial IReadOnlyList<AccentSwatch> AccentSwatches { get; set; } = [];
 
     // ===== Playback / window =====
+
+    /// <summary>"System default", then each connected audio output by name (and a chosen one that isn't connected).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<SettingsChoice> AudioOutputOptions { get; set; } = [];
+
+    /// <summary>Index into <see cref="AudioOutputOptions"/> (a ComboBox's SelectedIndex).</summary>
+    [ObservableProperty]
+    public partial int AudioOutputIndex { get; set; } = -1;
+
+    /// <summary>Shown under the output row while the chosen output isn't connected.</summary>
+    [ObservableProperty]
+    public partial string? AudioOutputProblem { get; set; }
 
     [ObservableProperty]
     public partial bool ReportPlaybackHistory { get; set; }
@@ -338,6 +362,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         UseAccountForStreams = current.UseAccountForStreams;
         NormalizeVolume = current.NormalizeVolume;
         CrossfadeSeconds = Math.Clamp(Math.Round(current.CrossfadeSeconds), 0, 12);
+        _audioOutput = AudioOutputChoice.Normalize(current.AudioOutputDeviceId);
+        ShowAudioOutputs(null);
         AutoplayWhenQueueEnds = current.AutoplayWhenQueueEnds;
         ShowTrackNotifications = current.ShowTrackNotifications;
         ResumeLastSession = current.ResumeLastSession;
@@ -369,6 +395,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         RefreshHotkeys();
         RefreshLastFm();
         RefreshAppUpdate();
+        StartAudioOutputs();
 
         await RunAsync(
             async ct => YtDlpVersion = await _streamResolver.GetBackendVersionAsync(ct) ?? "Not installed",
@@ -393,6 +420,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             hotkey.EndCapture();
         }
 
+        StopAudioOutputs();
         CancelPendingWork();
         _updateCts?.Cancel();
         _lastFmCts?.Cancel();
@@ -600,6 +628,30 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     partial void OnCrossfadeSecondsChanged(double value) => Save(s => s.CrossfadeSeconds = Math.Clamp(Math.Round(value), 0, 12));
 
+    partial void OnAudioOutputIndexChanged(int value)
+    {
+        if (_loading || value < 0 || value >= AudioOutputOptions.Count)
+        {
+            return;
+        }
+
+        var choice = AudioOutputChoice.Normalize(AudioOutputOptions[value].Value);
+        if (AudioOutputChoice.SameDevice(choice, _audioOutput))
+        {
+            return;
+        }
+
+        _audioOutput = choice;
+        Save(s => s.AudioOutputDeviceId = choice);
+
+        // A chosen output that isn't connected leaves the list once something else is chosen. Not while the ComboBox
+        // is still handling the selection.
+        if (_audioOutputs is { IsEnumerated: true } outputs)
+        {
+            _ = RefreshAudioOutputsAsync(outputs, yieldFirst: true);
+        }
+    }
+
     partial void OnAutoplayWhenQueueEndsChanged(bool value) => Save(s => s.AutoplayWhenQueueEnds = value);
 
     partial void OnShowTrackNotificationsChanged(bool value) => Save(s => s.ShowTrackNotifications = value);
@@ -751,6 +803,117 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
         TaskbarDisplayOptions = options;
         TaskbarDisplayIndex = options.FindIndex(o => TaskbarDisplayChoice.SameDevice(o.Value, saved));
+    }
+
+    private void StartAudioOutputs()
+    {
+        StopAudioOutputs();
+        var outputs = new AudioOutputWatcher(_logger);
+        outputs.Changed += OnAudioOutputsChanged;
+        _audioOutputs = outputs;
+        _audioOutputCts = new CancellationTokenSource();
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                outputs.Start();
+            }
+            catch (Exception ex) when (ex is COMException or UnauthorizedAccessException)
+            {
+                // Without the list, "System default" (and the chosen output) still work.
+                _dispatcher.Run(() => Notifications.ShowError("Couldn't list the audio outputs", ex));
+            }
+        });
+    }
+
+    private void StopAudioOutputs()
+    {
+        _audioOutputCts?.Cancel();
+        _audioOutputCts = null;
+        if (_audioOutputs is { } outputs)
+        {
+            _audioOutputs = null;
+            outputs.Changed -= OnAudioOutputsChanged;
+            _ = Task.Run(outputs.Dispose);
+        }
+    }
+
+    // Raised on a background thread: once the first full list is in, then on every change while the page is open.
+    private void OnAudioOutputsChanged(object? sender, EventArgs e)
+    {
+        if (sender is AudioOutputWatcher { IsEnumerated: true } outputs)
+        {
+            _dispatcher.Run(() => _ = RefreshAudioOutputsAsync(outputs, yieldFirst: false));
+        }
+    }
+
+    private async Task RefreshAudioOutputsAsync(AudioOutputWatcher outputs, bool yieldFirst)
+    {
+        if (yieldFirst)
+        {
+            await Task.Yield();
+        }
+
+        if (!ReferenceEquals(outputs, _audioOutputs) || _audioOutputCts is not { } cts)
+        {
+            return; // the page was left
+        }
+
+        var refresh = ++_audioOutputRefresh;
+        var chosen = _audioOutput;
+        var devices = outputs.Devices;
+        string? chosenName = null;
+        if (chosen is not null && AudioOutputChoice.Effective(chosen, devices.Select(d => d.Id)) is null)
+        {
+            // Not connected: its name from this session, or from Windows, which remembers outputs it has seen.
+            chosenName = outputs.NameOf(chosen);
+            if (chosenName is null)
+            {
+                try
+                {
+                    chosenName = await Task.Run(() => AudioOutputWatcher.FindNameAsync(chosen, cts.Token), cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        }
+
+        // Skipped when a newer list is on its way or the page was left meanwhile.
+        if (refresh == _audioOutputRefresh && !cts.IsCancellationRequested)
+        {
+            ShowAudioOutputs(AudioOutputChoice.ForPicker(devices, chosen, chosenName));
+        }
+    }
+
+    // Null while the outputs are still being listed: just "System default", selected only when it is the choice.
+    private void ShowAudioOutputs(IReadOnlyList<AudioOutputDevice>? outputs)
+    {
+        List<SettingsChoice> options = [new(string.Empty, "System default")];
+        if (outputs is not null)
+        {
+            options.AddRange(outputs.Select(d => new SettingsChoice(
+                d.Id,
+                d.IsConnected ? d.Name : $"{(d.Name.Length > 0 ? d.Name : "Unknown device")} (not connected)")));
+        }
+
+        var loading = _loading;
+        _loading = true;
+        if (!options.SequenceEqual(AudioOutputOptions))
+        {
+            // Cleared first: a new list resets the ComboBox's selection, and the index must be set after that.
+            AudioOutputIndex = -1;
+            AudioOutputOptions = options;
+        }
+
+        AudioOutputIndex = options.FindIndex(o => AudioOutputChoice.SameDevice(o.Value, _audioOutput));
+        _loading = loading;
+
+        // The label says so too, but a long name can hide it in the closed ComboBox.
+        AudioOutputProblem = outputs?.Any(d => !d.IsConnected && AudioOutputChoice.SameDevice(d.Id, _audioOutput)) == true
+            ? "Not connected. Hush plays on the system default until it's back."
+            : null;
     }
 
     // Last.fm events arrive on background threads.

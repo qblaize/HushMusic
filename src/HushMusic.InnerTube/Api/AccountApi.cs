@@ -108,7 +108,22 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
             actions.Add(action);
         }
 
-        var response = await EditPlaylistCoreAsync(playlistId, actions, allowRetry: false, cancellationToken).ConfigureAwait(false);
+        var response = await PostEditPlaylistAsync(playlistId, actions, allowRetry: false, cancellationToken).ConfigureAwait(false);
+        EnsurePerformed(response, EditPlaylistEndpoint);
+
+        // ytmusicapi add_playlist_items(duplicates=False): if a song is already in the playlist, the request fails and nothing
+        // is added. ytmusicapi only documents the failed status (it hands back the raw response), so any status other than
+        // STATUS_SUCCEEDED is taken as that refusal.
+        if (!allowDuplicates && JsonLookup.GetString(response, "status") is { } status && status != StatusSucceeded)
+        {
+            LogAddRefused(logger, videoIds.Count, status);
+            throw new AlreadyInPlaylistException(
+                playlistId,
+                videoIds,
+                new InnerTubeException(EditPlaylistEndpoint, $"YouTube Music did not apply the change (status {status})."));
+        }
+
+        EnsureSucceeded(response, EditPlaylistEndpoint);
         return ParseAddedEntries(response);
     }
 
@@ -253,7 +268,13 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
         return entries;
     }
 
-    private async Task<JsonNode> EditPlaylistCoreAsync(string playlistId, JsonArray actions, bool allowRetry, CancellationToken cancellationToken)
+    private async Task EditPlaylistCoreAsync(string playlistId, JsonArray actions, bool allowRetry, CancellationToken cancellationToken)
+    {
+        var response = await PostEditPlaylistAsync(playlistId, actions, allowRetry, cancellationToken).ConfigureAwait(false);
+        EnsureSucceeded(response, EditPlaylistEndpoint);
+    }
+
+    private Task<JsonNode> PostEditPlaylistAsync(string playlistId, JsonArray actions, bool allowRetry, CancellationToken cancellationToken)
     {
         var body = new JsonObject
         {
@@ -261,11 +282,9 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
             ["actions"] = actions,
         };
 
-        var response = await client.PostAsync(
+        return client.PostAsync(
             new InnerTubeRequest(EditPlaylistEndpoint, body) { RequiresAuth = true, AllowRetry = allowRetry },
-            cancellationToken).ConfigureAwait(false);
-        EnsureSucceeded(response, EditPlaylistEndpoint);
-        return response;
+            cancellationToken);
     }
 
     /// <summary>
@@ -314,4 +333,7 @@ internal sealed partial class AccountApi(IInnerTubeClient client, TimeProvider t
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "InnerTube {Endpoint} response has no status field; assuming success")]
     private static partial void LogMissingStatus(ILogger logger, string endpoint);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Adding {Count} songs to a playlist was refused with status {Status}; treating it as songs already in the playlist")]
+    private static partial void LogAddRefused(ILogger logger, int count, string status);
 }

@@ -60,7 +60,8 @@ Rules that follow from this:
    403 the resolver re-resolves once and retries.
 3. `MediaPlayerService` wraps `Windows.Media.Playback.MediaPlayer` and `SmtcController` drives the system media
    controls.
-4. The queue lives in Core (`QueueService`), not in `MediaPlaybackList`, so features can read and change it.
+4. The queue lives in Core (`QueueService`), not in `MediaPlaybackList`, so features can read and change it. Shuffle
+   uses `ShuffleOrder`, which spreads each artist's songs over the queue.
 5. Crossfade and gapless playback use two `MediaPlayer`s that swap roles. The next item is resolved and opened, paused,
    on the spare player ahead of time (`TransitionPlanner` decides when). With a crossfade the spare starts that many
    seconds before the end and the two blend on equal-power curves; without one it starts the moment the current song

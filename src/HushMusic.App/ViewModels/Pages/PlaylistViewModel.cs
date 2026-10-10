@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HushMusic.App.Controls.Items;
@@ -11,9 +12,12 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
 {
     private const string LikedMusicId = "LM";
 
+    private static readonly PropertyChangedEventArgs ShowProgressArgs = new(nameof(ShowProgress));
+
     private readonly IBrowseApi _browse;
     private readonly IAccountActionsService _account;
     private readonly IPlaylistDialogService _dialogs;
+    private readonly IQueueService _queue;
 
     // Moves go to YouTube Music one at a time, in the order they were made.
     private readonly SemaphoreSlim _moveGate = new(1, 1);
@@ -27,22 +31,38 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
     private TrackItem? _dragItem;
     private int _dragFrom = -1;
 
-    public PlaylistViewModel(IBrowseApi browse, IAccountActionsService account, IPlaylistDialogService dialogs, PageServices services)
+    public PlaylistViewModel(
+        IBrowseApi browse,
+        IAccountActionsService account,
+        IPlaylistDialogService dialogs,
+        IQueueService queue,
+        PageServices services)
         : base(services)
     {
         _browse = browse;
         _account = account;
         _dialogs = dialogs;
+        _queue = queue;
         Tracks = TrackItem.CreateList(
             (continuation, ct) => _browse.GetPlaylistTracksAsync(continuation, ct),
             ex => ReportError("Couldn't load more songs", ex),
             () => NavigationToken);
-        Selection = new TrackSelection(Tracks, services.Actions, CurrentSource, RemoveTracksAsync, () => IsOwned);
+        Filter = new TrackListFilter(Tracks, () => NavigationToken, TrackListOwnOrder.Playlist);
+        Selection = new TrackSelection(Filter.Rows, services.Actions, CurrentSource, RemoveTracksAsync, () => IsOwned);
+        Filter.Arranged += (_, _) => Selection.Forget(Tracks.Except(Filter.Rows));
+        Filter.PropertyChanged += OnFilterPropertyChanged;
     }
 
+    /// <summary>The whole playlist in its own order (what moves, removals and Undo work on).</summary>
     public IncrementalCollection<TrackItem> Tracks { get; }
 
+    /// <summary>The filter and sort above the list; its <see cref="TrackListFilter.Rows"/> are what the list shows (and selects from).</summary>
+    public TrackListFilter Filter { get; }
+
     public TrackSelection Selection { get; }
+
+    /// <summary>The thin progress bar: a reload, or the rest of a long playlist loading for the filter or sort.</summary>
+    public bool ShowProgress => ShowBusyBar || Filter.IsLoadingRest;
 
     [ObservableProperty]
     public partial Playlist? Playlist { get; set; }
@@ -85,16 +105,18 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
     [NotifyPropertyChangedFor(nameof(CanReorder))]
     public partial bool IsOwned { get; set; }
 
-    /// <summary>Songs can be dragged into a new order (your own playlists).</summary>
-    public bool CanReorder => IsOwned && IsSignedIn && _playlistId is not (LikedMusicId or "VL" + LikedMusicId);
+    /// <summary>Songs can be dragged into a new order (your own playlists, shown unfiltered in their own order).</summary>
+    public bool CanReorder => IsReorderable && !Filter.IsActive;
 
-    public Task PlayFromTrackAsync(Track track) => PlayFromIndexAsync(IndexOf(track));
+    private bool IsReorderable => IsOwned && IsSignedIn && _playlistId is not (LikedMusicId or "VL" + LikedMusicId);
+
+    public Task PlayFromTrackAsync(Track track) => PlayRowsAsync(IndexOf(Filter.Rows, track));
 
     public bool CanRemoveFromPlaylist(Track track) => IsOwned && track.SetVideoId is not null;
 
     public Task RemoveFromPlaylistAsync(Track track)
     {
-        var index = IndexOf(track);
+        var index = IndexOf(Tracks, track);
         return index < 0 ? Task.CompletedTask : RemoveTracksAsync([Tracks[index]]);
     }
 
@@ -115,7 +137,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         var from = _dragFrom;
         _dragItem = null;
         _dragFrom = -1;
-        if (!moved || item is null || from < 0 || Playlist is not { } playlist)
+        if (!moved || item is null || from < 0 || Filter.IsActive || Playlist is not { } playlist)
         {
             return;
         }
@@ -204,16 +226,58 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
             "Couldn't load this playlist");
     }
 
+    /// <summary>Plays the playlist, or while it is filtered or sorted the songs shown, in that order.</summary>
     [RelayCommand]
-    private Task PlayAsync() => Playlist is { } playlist ? Actions.PlayPlaylistAsync(playlist.PlaylistId) : Task.CompletedTask;
+    private async Task PlayAsync()
+    {
+        if (Playlist is not { } playlist)
+        {
+            return;
+        }
+
+        if (!Filter.IsActive)
+        {
+            await Actions.PlayPlaylistAsync(playlist.PlaylistId);
+            return;
+        }
+
+        await Filter.WhenCompleteAsync();
+        if (!NavigationToken.IsCancellationRequested)
+        {
+            await PlayRowsAsync(0);
+        }
+    }
 
     [RelayCommand]
-    private Task ShuffleAsync() => Playlist is { } playlist ? Actions.PlayPlaylistAsync(playlist.PlaylistId, shuffle: true) : Task.CompletedTask;
+    private async Task ShuffleAsync()
+    {
+        if (Playlist is not { } playlist)
+        {
+            return;
+        }
+
+        if (!Filter.IsActive)
+        {
+            await Actions.PlayPlaylistAsync(playlist.PlaylistId, shuffle: true);
+            return;
+        }
+
+        await Filter.WhenCompleteAsync();
+        if (AvailableTracks() is { Count: > 0 } tracks && !NavigationToken.IsCancellationRequested)
+        {
+            var source = CurrentSource();
+            await Actions.PlayTracksAsync(tracks, Random.Shared.Next(tracks.Count), source);
+            if (_queue.Source == source && !_queue.IsShuffled)
+            {
+                _queue.SetShuffle(true);
+            }
+        }
+    }
 
     [RelayCommand]
-    private Task PlayTrackAsync(TrackItem? item) => item is null ? Task.CompletedTask : PlayFromIndexAsync(Tracks.IndexOf(item));
+    private Task PlayTrackAsync(TrackItem? item) => item is null ? Task.CompletedTask : PlayRowsAsync(Filter.Rows.IndexOf(item));
 
-    /// <summary>"Play next" / "Add to queue" from the header menu use the songs loaded so far.</summary>
+    /// <summary>"Play next" / "Add to queue" from the header menu use the songs shown (loaded so far, when unfiltered).</summary>
     [RelayCommand]
     private void PlayNext()
     {
@@ -480,14 +544,15 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         ? new QueueSource(playlist.PlaylistId == LikedMusicId ? QueueSourceKind.LikedSongs : QueueSourceKind.Playlist, playlist.PlaylistId, playlist.Title)
         : new QueueSource(QueueSourceKind.Manual, null, Title);
 
-    private Task PlayFromIndexAsync(int index)
+    // The songs shown, from the one at index (a row of Filter.Rows).
+    private Task PlayRowsAsync(int index)
     {
         if (index < 0 || Playlist is null)
         {
             return Task.CompletedTask;
         }
 
-        return Actions.PlayTracksAsync([.. Tracks.Select(t => t.Track)], index, CurrentSource());
+        return Actions.PlayTracksAsync([.. Filter.Rows.Select(t => t.Track)], index, CurrentSource());
     }
 
     private void AdjustTrackCount(int delta)
@@ -506,19 +571,44 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
 
     private void UpdateStats() => Stats = ItemFormat.Join(ItemFormat.TrackCount(_trackCount), _durationText, _year);
 
-    private List<Track> AvailableTracks() => [.. Tracks.Select(t => t.Track).Where(t => t.IsAvailable)];
+    private List<Track> AvailableTracks() => [.. Filter.Rows.Select(t => t.Track).Where(t => t.IsAvailable)];
 
-    private int IndexOf(Track track)
+    private static int IndexOf(IList<TrackItem> rows, Track track)
     {
-        for (var i = 0; i < Tracks.Count; i++)
+        for (var i = 0; i < rows.Count; i++)
         {
-            if (ReferenceEquals(Tracks[i].Track, track))
+            if (ReferenceEquals(rows[i].Track, track))
             {
                 return i;
             }
         }
 
         return -1;
+    }
+
+    partial void OnIsOwnedChanged(bool value) => Filter.OffersReorder = IsReorderable;
+
+    partial void OnIsSignedInChanged(bool value) => Filter.OffersReorder = IsReorderable;
+
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName is nameof(IsBusy) or nameof(HasContent))
+        {
+            base.OnPropertyChanged(ShowProgressArgs);
+        }
+    }
+
+    private void OnFilterPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TrackListFilter.IsActive))
+        {
+            OnPropertyChanged(nameof(CanReorder));
+        }
+        else if (e.PropertyName == nameof(TrackListFilter.IsLoadingRest))
+        {
+            OnPropertyChanged(ShowProgressArgs);
+        }
     }
 
     // Songs added from elsewhere (track menus, player bar) while this playlist is open: reload to show them. This page's

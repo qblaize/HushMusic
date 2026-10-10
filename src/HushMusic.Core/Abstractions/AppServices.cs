@@ -96,6 +96,9 @@ public sealed class AppSettings
     /// <summary>Crossfade between songs in seconds: 0 (off: the next song is preloaded for a gapless start) to 12.</summary>
     public double CrossfadeSeconds { get; set; }
 
+    /// <summary>Windows device id of the audio output to play on. Null follows the Windows default output.</summary>
+    public string? AudioOutputDeviceId { get; set; }
+
     /// <summary>When an album or playlist ends, keep playing similar songs (a radio from the last track).</summary>
     public bool AutoplayWhenQueueEnds { get; set; } = true;
 

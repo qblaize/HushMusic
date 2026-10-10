@@ -336,8 +336,11 @@ public sealed class QueueService : IQueueService
             if (enabled)
             {
                 _unshuffled = [.. _items];
-                var rest = _items.Where(i => i.Id != current?.Id).ToArray();
-                Random.Shared.Shuffle(rest);
+                var rest = ShuffleOrder.Spread(
+                    [.. _items.Where(i => i.Id != current?.Id)],
+                    i => LeadArtist(i.Track),
+                    Random.Shared,
+                    current is null ? null : LeadArtist(current.Track));
                 _items.Clear();
                 if (current is not null)
                 {
@@ -458,6 +461,8 @@ public sealed class QueueService : IQueueService
         // At the end: any repeat mode wraps around (a user "next" with RepeatMode.One behaves like All).
         return _repeatMode == RepeatMode.Off ? -1 : 0;
     }
+
+    private static string? LeadArtist(Track track) => track.Artists.Count > 0 ? track.Artists[0].Name : null;
 
     private static bool SameItems(IReadOnlyList<QueueItem> a, IReadOnlyList<QueueItem> b) =>
         a.Count == b.Count && a.Select(i => i?.Id).ToHashSet().SetEquals(b.Select(i => (Guid?)i.Id));

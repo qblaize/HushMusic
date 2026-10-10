@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HushMusic.App.Services.Pages;
 using HushMusic.Core.Abstractions;
@@ -10,19 +11,33 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
     // YouTube Music's id for the "Liked music" auto playlist.
     private const string LikedMusicPlaylistId = "LM";
 
-    private readonly ILibraryApi _library;
+    private static readonly PropertyChangedEventArgs ShowProgressArgs = new(nameof(ShowProgress));
 
-    public LikedSongsViewModel(ILibraryApi library, PageServices services)
+    private readonly ILibraryApi _library;
+    private readonly IQueueService _queue;
+
+    public LikedSongsViewModel(ILibraryApi library, IQueueService queue, PageServices services)
         : base(services)
     {
         _library = library;
+        _queue = queue;
         Tracks = TrackItem.CreateList((c, ct) => _library.GetLikedSongsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
-        Selection = new TrackSelection(Tracks, services.Actions, () => Source);
+        Filter = new TrackListFilter(Tracks, () => NavigationToken, TrackListOwnOrder.LikedSongs);
+        Selection = new TrackSelection(Filter.Rows, services.Actions, () => Source);
+        Filter.Arranged += (_, _) => Selection.Forget(Tracks.Except(Filter.Rows));
+        Filter.PropertyChanged += OnFilterPropertyChanged;
     }
 
+    /// <summary>Every liked song, newest first.</summary>
     public IncrementalCollection<TrackItem> Tracks { get; }
 
+    /// <summary>The filter and sort above the list; its <see cref="TrackListFilter.Rows"/> are what the list shows.</summary>
+    public TrackListFilter Filter { get; }
+
     public TrackSelection Selection { get; }
+
+    /// <summary>The thin progress bar: a reload, or the rest of the list loading for the filter or sort.</summary>
+    public bool ShowProgress => ShowBusyBar || Filter.IsLoadingRest;
 
     private static QueueSource Source => new(QueueSourceKind.LikedSongs, LikedMusicPlaylistId, "Liked songs");
 
@@ -30,7 +45,7 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
 
     public Task PlayFromTrackAsync(Track track)
     {
-        var tracks = Tracks.Select(t => t.Track).ToList();
+        var tracks = Filter.Rows.Select(t => t.Track).ToList();
         var index = tracks.FindIndex(t => ReferenceEquals(t, track));
         return index < 0
             ? Task.CompletedTask
@@ -64,14 +79,63 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
 
     protected override void ClearContent() => Tracks.Reset([], null);
 
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName is nameof(IsBusy) or nameof(HasContent))
+        {
+            base.OnPropertyChanged(ShowProgressArgs);
+        }
+    }
+
+    /// <summary>Plays all liked songs, or while they are filtered or sorted the songs shown, in that order.</summary>
     [RelayCommand]
-    private Task PlayAsync() => Actions.PlayPlaylistAsync(LikedMusicPlaylistId);
+    private async Task PlayAsync()
+    {
+        if (!Filter.IsActive)
+        {
+            await Actions.PlayPlaylistAsync(LikedMusicPlaylistId);
+            return;
+        }
+
+        await Filter.WhenCompleteAsync();
+        if (Filter.Rows.Count > 0 && !NavigationToken.IsCancellationRequested)
+        {
+            await Actions.PlayTracksAsync([.. Filter.Rows.Select(t => t.Track)], 0, Source);
+        }
+    }
 
     [RelayCommand]
-    private Task ShuffleAsync() => Actions.PlayPlaylistAsync(LikedMusicPlaylistId, shuffle: true);
+    private async Task ShuffleAsync()
+    {
+        if (!Filter.IsActive)
+        {
+            await Actions.PlayPlaylistAsync(LikedMusicPlaylistId, shuffle: true);
+            return;
+        }
+
+        await Filter.WhenCompleteAsync();
+        List<Track> tracks = [.. Filter.Rows.Select(t => t.Track).Where(t => t.IsAvailable)];
+        if (tracks.Count > 0 && !NavigationToken.IsCancellationRequested)
+        {
+            await Actions.PlayTracksAsync(tracks, Random.Shared.Next(tracks.Count), Source);
+            if (_queue.Source == Source && !_queue.IsShuffled)
+            {
+                _queue.SetShuffle(true);
+            }
+        }
+    }
 
     [RelayCommand]
     private Task PlayTrackAsync(TrackItem? item) => item is null ? Task.CompletedTask : PlayFromTrackAsync(item.Track);
+
+    private void OnFilterPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TrackListFilter.IsLoadingRest))
+        {
+            OnPropertyChanged(ShowProgressArgs);
+        }
+    }
 
     // Unliking a song anywhere in the app removes it from this list right away.
     private void OnTrackRated(object? sender, TrackRatedEventArgs e)

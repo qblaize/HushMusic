@@ -14,7 +14,7 @@ public sealed class PlaylistEditingTests
 
     public PlaylistEditingTests()
     {
-        _service = new AccountActionsService(_api);
+        _service = new AccountActionsService(_api, new FakeBrowseApi());
         _service.PlaylistChanged += (_, e) => _changes.Add(e);
     }
 

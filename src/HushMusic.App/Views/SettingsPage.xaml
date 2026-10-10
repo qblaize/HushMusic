@@ -153,6 +153,43 @@
                     Text="{x:Bind helpers:Format.SectionHeader('Playback')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
                     <StackPanel>
+                        <!--  A SettingsRow with a warning line for a chosen device that isn't connected.  -->
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="Output device" />
+                                <TextBlock Style="{StaticResource SettingsRowDescriptionStyle}" Text="System default follows the output set in Windows." />
+                                <TextBlock
+                                    AutomationProperties.LiveSetting="Polite"
+                                    Foreground="{ThemeResource WarningBrush}"
+                                    Style="{StaticResource SettingsRowDescriptionStyle}"
+                                    Text="{x:Bind ViewModel.AudioOutputProblem, Mode=OneWay}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.AudioOutputProblem), Mode=OneWay}" />
+                            </StackPanel>
+                            <ComboBox
+                                Grid.Column="1"
+                                MinWidth="200"
+                                MaxWidth="{StaticResource SettingsInputWidth}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="AudioOutputCombo"
+                                AutomationProperties.Name="Output device"
+                                ItemsSource="{x:Bind ViewModel.AudioOutputOptions, Mode=OneWay}"
+                                SelectedIndex="{x:Bind ViewModel.AudioOutputIndex, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:SettingsChoice">
+                                        <TextBlock
+                                            Text="{x:Bind Label}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTipService.ToolTip="{x:Bind Label}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Normalize volume" Description="Evens out loud and quiet songs, so you don't have to keep reaching for the volume.">
                             <ToggleSwitch IsOn="{x:Bind ViewModel.NormalizeVolume, Mode=TwoWay}" />
                         </settings:SettingsRow>

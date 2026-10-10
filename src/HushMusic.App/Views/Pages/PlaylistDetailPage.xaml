@@ -7,7 +7,10 @@
     xmlns:items="using:HushMusic.App.Controls.Items">
 
     <Grid items:TrackMenu.Host="{x:Bind ViewModel}">
-        <!-- Your own playlists: drag a song to reorder it (saved to the playlist right away). -->
+        <!--
+            Your own playlists: drag a song to reorder it (saved to the playlist right away); not while the songs are
+            filtered or sorted.
+        -->
         <ListView
             Padding="{StaticResource ListPagePadding}"
             AllowDrop="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
@@ -18,13 +21,24 @@
             ItemClick="OnTrackClick"
             ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
             ItemTemplate="{StaticResource TrackRowTemplate}"
-            ItemsSource="{x:Bind ViewModel.Tracks}"
+            ItemsSource="{x:Bind ViewModel.Filter.Rows}"
             SelectionMode="None"
             Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.ShowError), Mode=OneWay}"
             items:ListFooter.FollowsItems="True"
             items:TrackDrag.IsEnabled="True"
             items:TrackMenu.IsEnabled="True"
             items:TrackSelectionList.Selection="{x:Bind ViewModel.Selection}">
+            <!--
+                The stock transitions without add/delete: filtering and sorting change many rows at once, and fading them
+                out and back in left the list blank for a moment.
+            -->
+            <ListView.ItemContainerTransitions>
+                <TransitionCollection>
+                    <ContentThemeTransition />
+                    <ReorderThemeTransition />
+                    <EntranceThemeTransition IsStaggeringEnabled="False" />
+                </TransitionCollection>
+            </ListView.ItemContainerTransitions>
             <ListView.Header>
                 <!-- Reaches the page edges (undoes the list padding) so the artwork wash spans the whole width. -->
                 <StackPanel>
@@ -132,6 +146,10 @@
                             </StackPanel>
                         </items:DetailHeader.Actions>
                     </items:DetailHeader>
+                    <items:TrackListToolbar
+                        Margin="8,0,8,16"
+                        Filter="{x:Bind ViewModel.Filter}"
+                        Visibility="{x:Bind helpers:Format.VisibleIfAndNot(ViewModel.HasContent, ViewModel.IsEmpty), Mode=OneWay}" />
                     <!-- First load (a ListView keeps its Footer at the bottom of the window, so not there). -->
                     <items:Skeleton Visibility="{x:Bind ViewModel.ShowLoading, Mode=OneWay}">
                         <items:SkeletonRows Count="10" />
@@ -141,25 +159,33 @@
             <ListView.Footer>
                 <StackPanel Spacing="12">
                     <!-- Later pages of a long playlist. -->
-                    <items:Skeleton Visibility="{x:Bind ViewModel.Tracks.IsLoading, Mode=OneWay}">
+                    <items:Skeleton Visibility="{x:Bind ViewModel.Filter.ShowLoadingRows, Mode=OneWay}">
                         <items:SkeletonRows Count="3" />
                     </items:Skeleton>
+                    <items:EmptyState
+                        ActionText="Clear filter"
+                        Command="{x:Bind ViewModel.Filter.ClearFilterCommand}"
+                        Glyph="&#xE721;"
+                        Heading="{x:Bind ViewModel.Filter.NoMatchesText, Mode=OneWay}"
+                        Message="Try another title, artist or album."
+                        Visibility="{x:Bind ViewModel.Filter.ShowNoMatches, Mode=OneWay}" />
                     <TextBlock
                         Margin="8,24,8,0"
                         HorizontalAlignment="Center"
                         Style="{StaticResource SubheadStyle}"
                         Text="This playlist is empty."
                         Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+                    <!-- The whole playlist's numbers: not under a filtered list. -->
                     <TextBlock
                         Margin="8,4,8,0"
                         Style="{StaticResource MetaTextStyle}"
                         Text="{x:Bind ViewModel.Stats, Mode=OneWay}"
-                        Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.Tracks.HasMoreItems), Mode=OneWay}" />
+                        Visibility="{x:Bind helpers:Format.CollapsedIfAny(ViewModel.Tracks.HasMoreItems, ViewModel.Filter.IsFiltered), Mode=OneWay}" />
                 </StackPanel>
             </ListView.Footer>
         </ListView>
 
-        <ProgressBar Style="{StaticResource BusyBarStyle}" Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <ProgressBar Style="{StaticResource BusyBarStyle}" Visibility="{x:Bind ViewModel.ShowProgress, Mode=OneWay}" />
         <items:SelectionBar Selection="{x:Bind ViewModel.Selection}" />
         <items:EmptyState
             ActionText="Try again"

@@ -622,6 +622,7 @@ Several actions can be sent in one request; `edit_playlist` batches them.
 
 - `duplicates=True` → `dedupeOption: DEDUPE_OPTION_SKIP`, meaning the server's duplicate check is skipped and duplicates **are** added. The tests add the same video 101 times and expect 101 tracks.
 - `duplicates=False` (no dedupeOption) → per the docstring, if any video is already in the playlist, an error is returned and **nothing** is added. The exact response shape of that error is **[uncertain]**; it is not in the source. Capture a fixture.
+- The app reads any status other than `STATUS_SUCCEEDED` on such an add as that refusal (`AlreadyInPlaylistException`), then asks whether to add the songs anyway (`DEDUPE_OPTION_SKIP`) or only the ones missing from the playlist.
 
 **Success response:** `"status": "STATUS_SUCCEEDED"` (`enums.py:ResponseStatus`). For adds, `playlistEditResults[].playlistEditVideoAddedResultData` maps `videoId` → new `setVideoId`. `setVideoId` is the unique id of a playlist **entry**; it is needed to remove or move that entry. Get it from `get_playlist` tracks.
 

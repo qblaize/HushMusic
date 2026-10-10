@@ -14,6 +14,7 @@ internal static class PageServiceRegistration
         services.AddSingleton<ILikeStateService, LikeStateService>();
         services.AddSingleton<INowPlayingService, NowPlayingService>();
         services.AddSingleton<IPlaylistDialogService, PlaylistDialogService>();
+        services.AddSingleton<IPlaylistAdder, PlaylistAdder>();
         services.AddSingleton<IMediaItemActions, MediaItemActions>();
         services.AddSingleton<IStreamWarmup, StreamWarmup>();
         services.AddSingleton<INavigationPreviews, NavigationPreviews>();

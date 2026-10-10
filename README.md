@@ -49,6 +49,9 @@ Windows taskbar.
 - Save the current queue as a playlist.
 - Edit your playlists: drag songs to reorder them, or select several (**Select**, or Ctrl/Shift-click) to play, queue,
   add to another playlist or remove them, with Undo.
+- Filter any playlist or Liked songs as you type, or sort it by title, artist, album or length.
+- Adding a song that's already in the playlist asks first: add it anyway, or (for several songs) skip the ones already
+  there.
 - **Your stats** (Library → Your stats): top artists, songs and albums, listening time and when you listen, by week,
   month, year or all time. Kept only on this PC.
 - Songs you play show up in your YouTube Music history, as they would in the official app (you can turn this off).
@@ -66,6 +69,9 @@ Windows taskbar.
 
 - **Crossfade** (up to 12 seconds) between songs; with crossfade off, the next song is preloaded so it starts without a gap.
 - Volume normalization from YouTube's per-track loudness data.
+- Shuffle spreads each artist's songs over the queue, so the same artist doesn't play twice in a row.
+- Choose the output device (Settings → Playback), or follow the Windows default. If the chosen device isn't
+  connected, Hush plays on the default and switches back when it returns.
 - Resume where you left off: the queue, song and position come back, paused.
 - Sleep timer (15 to 60 minutes, or the end of the song) with a fade-out.
 - [Last.fm](https://www.last.fm) scrobbling with your own API key ([setup](#lastfm)).

@@ -26,6 +26,21 @@ public sealed class InnerTubeException(string endpoint, string message, int? sta
     public int? StatusCode { get; } = statusCode;
 }
 
+/// <summary>
+/// YouTube Music refused to add songs to a playlist because at least one of them is already in it. Nothing was added;
+/// adding them again with duplicates allowed puts them in anyway.
+/// </summary>
+public sealed class AlreadyInPlaylistException(string playlistId, IReadOnlyList<string> videoIds, Exception? innerException = null)
+    : HushException(
+        videoIds.Count == 1 ? "This song is already in the playlist." : "Some of these songs are already in the playlist.",
+        innerException)
+{
+    public string PlaylistId { get; } = playlistId;
+
+    /// <summary>Every song of the refused request; YouTube Music doesn't say which ones are duplicates.</summary>
+    public IReadOnlyList<string> VideoIds { get; } = videoIds;
+}
+
 /// <summary>No playable stream could be resolved for a track.</summary>
 public sealed class StreamResolutionException(string videoId, string message, Exception? innerException = null)
     : HushException(message, innerException)

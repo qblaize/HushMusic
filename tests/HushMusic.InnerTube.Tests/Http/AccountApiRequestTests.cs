@@ -143,7 +143,8 @@ public sealed class AccountApiRequestTests : IDisposable
         _host.SignIn();
         _host.Handler.EnqueueJson("""{"status":"STATUS_FAILED"}""");
 
-        var ex = await Assert.ThrowsAsync<InnerTubeException>(() => _host.Account.AddPlaylistItemsAsync("PL1", ["a1"], false, Ct));
+        // Without allowDuplicates a failed status means "already in the playlist" (PlaylistDuplicateTests).
+        var ex = await Assert.ThrowsAsync<InnerTubeException>(() => _host.Account.AddPlaylistItemsAsync("PL1", ["a1"], allowDuplicates: true, Ct));
 
         Assert.Contains("STATUS_FAILED", ex.Message);
     }

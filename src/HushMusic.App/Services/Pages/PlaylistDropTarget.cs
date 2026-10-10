@@ -23,7 +23,7 @@ public interface IPlaylistDropTarget
     /// <summary>Cheap enough for DragOver. Starts the ownership check when it isn't known yet.</summary>
     PlaylistDropState GetState(Playlist playlist);
 
-    /// <summary>Adds the songs and shows "Added to …". Never throws.</summary>
+    /// <summary>Adds the songs and shows "Added to …", asking first when some are already in the playlist. Never throws.</summary>
     Task AddAsync(Playlist playlist, IReadOnlyList<Track> tracks);
 }
 
@@ -34,6 +34,7 @@ internal sealed class PlaylistDropTarget : IPlaylistDropTarget
 
     private readonly IBrowseApi _browse;
     private readonly IAccountActionsService _account;
+    private readonly IPlaylistAdder _adder;
     private readonly IAuthService _auth;
     private readonly INotificationService _notifications;
     private readonly ILogger<PlaylistDropTarget> _logger;
@@ -42,12 +43,14 @@ internal sealed class PlaylistDropTarget : IPlaylistDropTarget
     public PlaylistDropTarget(
         IBrowseApi browse,
         IAccountActionsService account,
+        IPlaylistAdder adder,
         IAuthService auth,
         INotificationService notifications,
         ILogger<PlaylistDropTarget> logger)
     {
         _browse = browse;
         _account = account;
+        _adder = adder;
         _auth = auth;
         _notifications = notifications;
         _logger = logger;
@@ -86,17 +89,20 @@ internal sealed class PlaylistDropTarget : IPlaylistDropTarget
 
     public async Task AddAsync(Playlist playlist, IReadOnlyList<Track> tracks)
     {
-        var videoIds = tracks.Where(t => t.IsAvailable).Select(t => t.VideoId).Distinct(StringComparer.Ordinal).ToList();
-        if (videoIds.Count == 0)
+        var songs = tracks.Where(t => t.IsAvailable).ToList();
+        if (songs.Count == 0)
         {
             return;
         }
 
         try
         {
-            await _account.AddToPlaylistAsync(playlist.PlaylistId, videoIds);
-            var what = tracks.Count == 1 ? tracks[0].Title : $"{videoIds.Count} songs";
-            _notifications.Show(new AppNotification(NotificationSeverity.Success, $"Added to {playlist.Title}", what));
+            var added = await _adder.AddAsync(playlist, songs);
+            if (added.Count > 0)
+            {
+                var what = added.Count == 1 ? added[0].Title : $"{added.Count} songs";
+                _notifications.Show(new AppNotification(NotificationSeverity.Success, $"Added to {playlist.Title}", what));
+            }
         }
         catch (Exception ex)
         {

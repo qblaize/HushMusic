@@ -113,7 +113,8 @@ public interface IAccountApi
 
     /// <summary>
     /// Returns the new entries with their <see cref="Track.SetVideoId"/>, in the order YouTube Music reports them (empty when
-    /// the response doesn't say).
+    /// the response doesn't say). Without <paramref name="allowDuplicates"/> YouTube Music refuses the whole request when any
+    /// of the songs is already in the playlist: that throws <see cref="AlreadyInPlaylistException"/> and nothing is added.
     /// </summary>
     Task<IReadOnlyList<PlaylistEntryRef>> AddPlaylistItemsAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default);
 

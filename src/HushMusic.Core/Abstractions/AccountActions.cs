@@ -54,7 +54,18 @@ public interface IAccountActionsService
 
     Task<string> CreatePlaylistAsync(string title, string? description, PrivacyStatus privacy, IReadOnlyList<string>? videoIds = null, CancellationToken cancellationToken = default);
 
-    Task AddToPlaylistAsync(string playlistId, IReadOnlyList<string> videoIds, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Adds the songs to the end of the playlist. Without <paramref name="allowDuplicates"/> YouTube Music refuses the whole
+    /// request when any of them is already in the playlist: that throws <see cref="AlreadyInPlaylistException"/>, nothing is
+    /// added and no event is raised.
+    /// </summary>
+    Task AddToPlaylistAsync(string playlistId, IReadOnlyList<string> videoIds, bool allowDuplicates = false, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the whole playlist and adds only the songs that aren't in it yet. Returns those songs in the order given; empty,
+    /// with nothing sent and no event, when every song is already there.
+    /// </summary>
+    Task<IReadOnlyList<string>> AddMissingToPlaylistAsync(string playlistId, IReadOnlyList<string> videoIds, CancellationToken cancellationToken = default);
 
     Task RemoveFromPlaylistAsync(string playlistId, IReadOnlyList<Track> tracks, CancellationToken cancellationToken = default);
 

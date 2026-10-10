@@ -175,12 +175,21 @@
                                     Text="{x:Bind Message}"
                                     TextWrapping="Wrap"
                                     Visibility="{x:Bind helpers:Format.VisibleIf(HasMessage)}" />
-                                <Button
+                                <StackPanel
                                     Margin="0,8,0,0"
-                                    Click="{x:Bind InvokeAction}"
-                                    Content="{x:Bind ActionLabel}"
-                                    Style="{StaticResource PillButtonStyle}"
-                                    Visibility="{x:Bind helpers:Format.VisibleIf(HasAction)}" />
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(HasAction)}">
+                                    <Button
+                                        Click="{x:Bind InvokeAction}"
+                                        Content="{x:Bind ActionLabel}"
+                                        Style="{StaticResource PillButtonStyle}" />
+                                    <Button
+                                        Click="{x:Bind InvokeSecondaryAction}"
+                                        Content="{x:Bind SecondaryActionLabel}"
+                                        Style="{StaticResource PillSecondaryButtonStyle}"
+                                        Visibility="{x:Bind helpers:Format.VisibleIf(HasSecondaryAction)}" />
+                                </StackPanel>
                             </StackPanel>
                             <Button
                                 Grid.Column="2"

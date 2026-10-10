@@ -620,6 +620,14 @@
                             <Button
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="DownloadAppUpdateButton"
+                                Command="{x:Bind ViewModel.DownloadAppUpdateCommand}"
+                                Content="Download"
+                                Style="{StaticResource PillButtonStyle}"
+                                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsAppUpdateAvailable), Mode=OneWay}" />
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
                                 AutomationProperties.AutomationId="RestartToUpdateButton"
                                 Command="{x:Bind ViewModel.RestartToUpdateCommand}"
                                 Content="Restart to update"

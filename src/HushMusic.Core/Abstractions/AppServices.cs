@@ -12,6 +12,9 @@ public sealed record AppNotification(NotificationSeverity Severity, string Title
 {
     /// <summary>An optional button on the notification (e.g. "Restart"). A notification with an action stays until it is used or closed.</summary>
     public NotificationAction? Action { get; init; }
+
+    /// <summary>An optional second, quieter button next to <see cref="Action"/> (e.g. "Skip").</summary>
+    public NotificationAction? SecondaryAction { get; init; }
 }
 
 /// <summary>A notification's button. <see cref="Invoke"/> runs on the UI thread.</summary>
@@ -39,6 +42,9 @@ public sealed class AppSettings
     public string? YtDlpPath { get; set; }
 
     public bool CheckYtDlpUpdatesOnStartup { get; set; } = true;
+
+    /// <summary>An app version the user chose to skip: it isn't announced again (Settings still offers it).</summary>
+    public string? SkippedUpdateVersion { get; set; }
 
     /// <summary>
     /// The JavaScript runtime yt-dlp uses to solve YouTube's playback challenges. "auto" (or empty): the app's own Deno,

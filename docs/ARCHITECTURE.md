@@ -148,5 +148,7 @@ a blurred backdrop, a floating glass player bar and a full-window Now Playing vi
   Runtime's Singleton package that a self-contained install doesn't have. The app ID is the one Velopack gives the
   Start menu shortcut (`velopack.HushMusic.App`), also registered under `HKCU\Software\Classes\AppUserModelId`.
 - **Updates.** Velopack (`Services/Updates`), with GitHub Releases as the feed. Checks 20 s after start, then every
-  5 minutes; a downloaded update shows an in-app notice and a Windows notification with Restart now (through
-  `TrackNotificationService`, whatever the song setting).
+  5 minutes, but never downloads on its own: a new version is announced once per session (in-app notice and Windows
+  notification, through `TrackNotificationService`, whatever the song setting) with Download and Skip. A skipped
+  version (`AppSettings.SkippedUpdateVersion`) isn't announced again but stays in Settings. A finished download asks
+  for a restart the same way.

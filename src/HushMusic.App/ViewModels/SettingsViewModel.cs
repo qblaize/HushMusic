@@ -251,6 +251,10 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     public partial bool IsAppUpdateReady { get; set; }
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DownloadAppUpdateCommand))]
+    public partial bool IsAppUpdateAvailable { get; set; }
+
     /// <summary>"Check for updates" is shown in installed builds that have an update source, until an update is ready.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CheckForAppUpdateCommand))]
@@ -450,6 +454,23 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             if (await _appUpdates.CheckAsync() == UpdateState.Failed)
             {
                 Notifications.Show(new AppNotification(NotificationSeverity.Error, "Couldn't update Hush", _appUpdates.ErrorMessage ?? string.Empty));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The app is shutting down.
+        }
+    }
+
+    // Like the check: leaving Settings doesn't stop the download.
+    [RelayCommand(CanExecute = nameof(IsAppUpdateAvailable))]
+    private async Task DownloadAppUpdateAsync()
+    {
+        try
+        {
+            if (await _appUpdates.DownloadAsync() == UpdateState.Failed)
+            {
+                Notifications.Show(new AppNotification(NotificationSeverity.Error, "Couldn't download the update", _appUpdates.ErrorMessage ?? string.Empty));
             }
         }
         catch (OperationCanceledException)
@@ -748,6 +769,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             UpdateState.Disabled => "This build doesn't check for updates.",
             UpdateState.Checking => "Checking for updates…",
             UpdateState.UpToDate => "Hush is up to date.",
+            UpdateState.Available => $"Version {version} is available.",
             UpdateState.Downloading when _appUpdates.DownloadProgress > 0 => $"Downloading version {version}… {_appUpdates.DownloadProgress}%",
             UpdateState.Downloading => $"Downloading version {version}…",
             UpdateState.ReadyToRestart => $"Version {version} is ready. Restart to update.",
@@ -757,7 +779,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         };
         IsAppUpdateBusy = state is UpdateState.Checking or UpdateState.Downloading;
         IsAppUpdateReady = state == UpdateState.ReadyToRestart;
-        ShowCheckForAppUpdate = _appUpdates.CanCheck && state != UpdateState.ReadyToRestart;
+        IsAppUpdateAvailable = state == UpdateState.Available;
+        ShowCheckForAppUpdate = _appUpdates.CanCheck && state is not (UpdateState.ReadyToRestart or UpdateState.Available);
         CheckForAppUpdateCommand.NotifyCanExecuteChanged();
     }
 

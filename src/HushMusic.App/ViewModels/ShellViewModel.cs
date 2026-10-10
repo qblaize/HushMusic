@@ -256,11 +256,21 @@ public sealed class NotificationViewModel(AppNotification notification, Action<N
 
     public string ActionLabel { get; } = notification.Action?.Label ?? string.Empty;
 
+    public bool HasSecondaryAction => notification.SecondaryAction is not null;
+
+    public string SecondaryActionLabel { get; } = notification.SecondaryAction?.Label ?? string.Empty;
+
     public void Dismiss() => onDismiss(this);
 
     public void InvokeAction()
     {
         Dismiss();
         notification.Action?.Invoke();
+    }
+
+    public void InvokeSecondaryAction()
+    {
+        Dismiss();
+        notification.SecondaryAction?.Invoke();
     }
 }

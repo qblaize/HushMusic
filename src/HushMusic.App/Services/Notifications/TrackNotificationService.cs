@@ -13,7 +13,8 @@ namespace HushMusic.App.Services.Notifications;
 /// Song notifications (Settings → Window → Song notifications): a Windows notification with the cover, title, artist
 /// and a Next button when a new song starts, or the song on a live station changes, while Hush isn't the window in
 /// front. Each one replaces the last (same tag and group) and expires soon, so Notification Center never fills up.
-/// Also shows the "update ready" notification (<see cref="ShowUpdateReady"/>), whatever the song setting.
+/// Also shows the app update notifications (<see cref="ShowUpdateAvailable"/>, <see cref="ShowUpdateReady"/>), whatever
+/// the song setting.
 /// <para>
 /// Shown with <see cref="WindowsToasts"/>, which registers the app ID the first time a notification is due (the
 /// uninstaller removes it: <see cref="RemoveRegistration"/>). Test instances never register: they log what they would
@@ -50,6 +51,8 @@ public sealed class TrackNotificationService : IDisposable
     private Action? _showMainWindow;
     private Action? _next;
     private Action? _restartToUpdate;
+    private Action? _downloadUpdate;
+    private Action? _skipUpdate;
     private CancellationTokenSource? _pending;
     private string? _lastKey;
     private bool _registrationFailed;
@@ -103,13 +106,45 @@ public sealed class TrackNotificationService : IDisposable
     }
 
     /// <summary>
+    /// "New update available" with Download and Skip buttons (which call <paramref name="download"/> and
+    /// <paramref name="skip"/> on the UI thread). Any thread; never throws.
+    /// </summary>
+    internal void ShowUpdateAvailable(string version, Action download, Action skip)
+    {
+        _downloadUpdate = download;
+        _skipUpdate = skip;
+        ShowUpdate(TrackNotificationContent.BuildUpdateAvailable(version), version);
+    }
+
+    /// <summary>
     /// "Hush {version} is ready" with a Restart now button (which calls <paramref name="restart"/> on the UI thread).
-    /// Registers for notifications if the song setting hasn't already. Any thread; never throws.
+    /// Replaces the new-version notification. Any thread; never throws.
     /// </summary>
     internal void ShowUpdateReady(string version, Action restart)
     {
         _restartToUpdate = restart;
-        var payload = TrackNotificationContent.BuildUpdateReady(version);
+        ShowUpdate(TrackNotificationContent.BuildUpdateReady(version), version);
+    }
+
+    /// <summary>Takes the update notification away (the update was skipped, or its download started). Any thread.</summary>
+    internal void RemoveUpdateNotification() => _dispatcher.Run(() =>
+    {
+        try
+        {
+            if (_toasts.IsRegistered)
+            {
+                _toasts.Remove(UpdateTag, UpdateGroup);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not remove the update notification");
+        }
+    });
+
+    // Registers for notifications if the song setting hasn't already.
+    private void ShowUpdate(string payload, string version)
+    {
         if (_testInstance)
         {
             // Automated test instances never put notifications on the user's screen.
@@ -407,6 +442,12 @@ public sealed class TrackNotificationService : IDisposable
                 break;
             case TrackNotificationCommand.RestartToUpdate:
                 _restartToUpdate?.Invoke();
+                break;
+            case TrackNotificationCommand.DownloadUpdate:
+                _downloadUpdate?.Invoke();
+                break;
+            case TrackNotificationCommand.SkipUpdate:
+                _skipUpdate?.Invoke();
                 break;
         }
     });

@@ -113,9 +113,9 @@ Requirements:
 - Playback uses WebM/Opus audio, which needs the Web Media Extensions. They come with Windows 10 and 11, but not with
   the N and LTSC editions, where you can install them from the Microsoft Store.
 
-Hush updates itself from this repository's releases: it checks every 5 minutes and downloads the update in the
-background. A Windows notification tells you when it's ready; click Restart now, or it installs the next time you
-restart the app.
+Hush checks this repository's releases every 5 minutes. When a new version is out, a notification asks whether to
+download it or skip it (a skipped version stays available in Settings → About). Nothing downloads until you say so;
+once it has, click Restart now, or it installs the next time you restart the app.
 
 To uninstall, use Settings → Apps → Installed apps → Hush. Your settings and sign-in stay in
 `%LOCALAPPDATA%\HushMusic`; sign out first, or delete that folder, to remove everything.

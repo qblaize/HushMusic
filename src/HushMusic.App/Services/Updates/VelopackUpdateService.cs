@@ -29,14 +29,17 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
     private readonly UpdateManager? _manager;
     private readonly INotificationService _notifications;
     private readonly TrackNotificationService _windowsNotifications;
+    private readonly ISettingsService _settings;
     private readonly IUiDispatcher _dispatcher;
     private readonly IWindowModeService _windowModes;
     private readonly ILogger<VelopackUpdateService> _logger;
-    private readonly SemaphoreSlim _checking = new(1, 1);
+    private readonly SemaphoreSlim _busy = new(1, 1);
     private readonly CancellationTokenSource _stopping = new();
     private readonly Lock _sync = new();
+    private UpdateInfo? _available;
     private VelopackAsset? _ready;
-    private string? _notifiedVersion;
+    private string? _offeredVersion;
+    private string? _readyNoticeVersion;
     private bool _loggedUpToDate;
     private Task? _loop;
 
@@ -44,12 +47,14 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
         IConfiguration configuration,
         INotificationService notifications,
         TrackNotificationService windowsNotifications,
+        ISettingsService settings,
         IUiDispatcher dispatcher,
         IWindowModeService windowModes,
         ILogger<VelopackUpdateService> logger)
     {
         _notifications = notifications;
         _windowsNotifications = windowsNotifications;
+        _settings = settings;
         _dispatcher = dispatcher;
         _windowModes = windowModes;
         _logger = logger;
@@ -117,60 +122,64 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
 
     public void Dispose() => _stopping.Dispose();
 
-    public async Task<UpdateState> CheckAsync(CancellationToken cancellationToken = default)
+    public Task<UpdateState> CheckAsync(CancellationToken cancellationToken = default) =>
+        CheckAsync(background: false, cancellationToken);
+
+    public async Task<UpdateState> DownloadAsync(CancellationToken cancellationToken = default)
     {
-        // One check at a time, and nothing more to do once an update waits for a restart.
-        if (_manager is null || State == UpdateState.ReadyToRestart || !_checking.Wait(0))
+        if (_manager is null)
         {
             return State;
         }
 
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
+        var ct = linked.Token;
+
+        // Waits for a check that is running right now (the button stays on screen during a background check).
+        await _busy.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
-            var ct = linked.Token;
-            lock (_sync)
+            if (State != UpdateState.Available || _available is not { } update)
             {
-                AvailableVersion = null;
-                DownloadProgress = 0;
-            }
-
-            Update(UpdateState.Checking, error: null);
-            var update = await _manager.CheckForUpdatesAsync().WaitAsync(ct).ConfigureAwait(false);
-            if (update is null)
-            {
-                // Every five minutes: only the first answer goes to the log at Information.
-                _logger.Log(
-                    _loggedUpToDate ? LogLevel.Debug : LogLevel.Information,
-                    "Updates: {Version} is the latest version",
-                    CurrentVersion);
-                _loggedUpToDate = true;
-                Update(UpdateState.UpToDate, error: null);
                 return State;
             }
 
+            _windowsNotifications.RemoveUpdateNotification();
             var target = update.TargetFullRelease;
             _logger.LogInformation("Updates: downloading {Version}", target.Version);
-            Update(UpdateState.Downloading, error: null, available: target.Version.ToString(), progress: 0);
+            Update(UpdateState.Downloading, error: null, progress: 0);
             await _manager.DownloadUpdatesAsync(update, ReportProgress, ct).ConfigureAwait(false);
             MarkReady(target, windowsNotification: true);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _stopping.IsCancellationRequested)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            Update(UpdateState.Idle, error: null);
+            Update(UpdateState.Available, error: null);
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Updates: check or download failed");
+            _logger.LogWarning(ex, "Updates: download failed");
             Update(UpdateState.Failed, error: Describe(ex));
         }
         finally
         {
-            _checking.Release();
+            _busy.Release();
         }
 
         return State;
+    }
+
+    public void SkipAvailableVersion()
+    {
+        var version = AvailableVersion;
+        if (State != UpdateState.Available || version is null)
+        {
+            return;
+        }
+
+        _logger.LogInformation("Updates: skipping {Version}", version);
+        _windowsNotifications.RemoveUpdateNotification();
+        _ = SaveSkippedAsync(version);
     }
 
     public void RestartToUpdate()
@@ -245,7 +254,7 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
             using var timer = new PeriodicTimer(CheckInterval);
             do
             {
-                await CheckAsync(ct).ConfigureAwait(false);
+                await CheckAsync(background: true, ct).ConfigureAwait(false);
             }
             while (State != UpdateState.ReadyToRestart && await timer.WaitForNextTickAsync(ct).ConfigureAwait(false));
         }
@@ -258,8 +267,126 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
         }
     }
 
+    // Finds out whether a newer version is out; never downloads it (DownloadAsync does, when asked).
+    private async Task<UpdateState> CheckAsync(bool background, CancellationToken cancellationToken)
+    {
+        // One check or download at a time, and nothing to look for while one waits for a restart.
+        if (_manager is null || State is UpdateState.ReadyToRestart or UpdateState.Downloading || !_busy.Wait(0))
+        {
+            return State;
+        }
+
+        // A background check while an update is on offer keeps the offer on screen; it only changes when a newer
+        // version comes out (or none is left).
+        var quiet = background && State == UpdateState.Available;
+        try
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
+            if (!quiet)
+            {
+                Update(UpdateState.Checking, error: null);
+            }
+
+            var update = await _manager.CheckForUpdatesAsync().WaitAsync(linked.Token).ConfigureAwait(false);
+            if (update is null)
+            {
+                // Every five minutes: only the first answer goes to the log at Information.
+                _logger.Log(
+                    _loggedUpToDate ? LogLevel.Debug : LogLevel.Information,
+                    "Updates: {Version} is the latest version",
+                    CurrentVersion);
+                _loggedUpToDate = true;
+                _available = null;
+                Update(UpdateState.UpToDate, error: null, available: string.Empty);
+                return State;
+            }
+
+            Offer(update, notify: background);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _stopping.IsCancellationRequested)
+        {
+            if (!quiet)
+            {
+                Update(UpdateState.Idle, error: null);
+            }
+
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Updates: check failed");
+            if (!quiet)
+            {
+                Update(UpdateState.Failed, error: Describe(ex), available: string.Empty);
+            }
+        }
+        finally
+        {
+            _busy.Release();
+        }
+
+        return State;
+    }
+
+    // A newer version is out: Settings offers it, and the first time this session (unless it was skipped) an in-app
+    // notice and a Windows notification ask whether to download it.
+    private void Offer(UpdateInfo update, bool notify)
+    {
+        var version = update.TargetFullRelease.Version.ToString();
+        _available = update;
+        var isNew = _offeredVersion != version;
+        _offeredVersion = version;
+        Update(UpdateState.Available, error: null, available: version);
+        if (!isNew)
+        {
+            return;
+        }
+
+        var skipped = string.Equals(_settings.Current.SkippedUpdateVersion, version, StringComparison.OrdinalIgnoreCase);
+        _logger.LogInformation("Updates: {Version} is available{Skipped}", version, skipped ? " (skipped)" : string.Empty);
+        if (!notify || skipped)
+        {
+            return;
+        }
+
+        _notifications.Show(new AppNotification(NotificationSeverity.Informational, "New update available", $"Hush {version} is out. Download it now, or skip this version.")
+        {
+            Action = new NotificationAction("Download", StartDownload),
+            SecondaryAction = new NotificationAction("Skip", SkipAvailableVersion),
+        });
+        _windowsNotifications.ShowUpdateAvailable(version, StartDownload, SkipAvailableVersion);
+    }
+
+    // From a notification button: errors are shown by the state (Settings) and a notice.
+    private void StartDownload() => _ = Task.Run(async () =>
+    {
+        try
+        {
+            if (await DownloadAsync().ConfigureAwait(false) == UpdateState.Failed)
+            {
+                _notifications.Show(new AppNotification(NotificationSeverity.Error, "Couldn't download the update", ErrorMessage ?? string.Empty));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The app is shutting down.
+        }
+    });
+
+    private async Task SaveSkippedAsync(string version)
+    {
+        try
+        {
+            await _settings.UpdateAsync(s => s.SkippedUpdateVersion = version).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Updates: could not save the skipped version");
+        }
+    }
+
     // The in-app notice, plus a Windows notification (seen while Hush is minimized or in the notification area) when
-    // the download has just finished. One of each per version.
+    // the download has just finished. Once per version.
     private void MarkReady(VelopackAsset asset, bool windowsNotification)
     {
         var version = asset.Version.ToString();
@@ -267,9 +394,9 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
         Update(UpdateState.ReadyToRestart, error: null, available: version, progress: 100);
         _logger.LogInformation("Updates: {Version} is ready to install", version);
 
-        if (_notifiedVersion != version)
+        if (_readyNoticeVersion != version)
         {
-            _notifiedVersion = version;
+            _readyNoticeVersion = version;
             _notifications.Show(new AppNotification(NotificationSeverity.Success, "Update ready — restart to install", $"Hush {version} has been downloaded.")
             {
                 Action = new NotificationAction("Restart", RestartToUpdate),
@@ -296,13 +423,14 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    // available: null keeps the current version, empty clears it.
     private void Update(UpdateState state, string? error, string? available = null, int? progress = null)
     {
         lock (_sync)
         {
             State = state;
             ErrorMessage = error;
-            AvailableVersion = available ?? AvailableVersion;
+            AvailableVersion = available is null ? AvailableVersion : available.Length == 0 ? null : available;
             DownloadProgress = progress ?? DownloadProgress;
         }
 

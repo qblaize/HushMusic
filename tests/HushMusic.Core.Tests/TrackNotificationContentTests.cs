@@ -133,9 +133,26 @@ public sealed class TrackNotificationContentTests
         Assert.Equal(TrackNotificationCommand.Show, TrackNotificationContent.Parse(toast.Attribute("launch")!.Value));
     }
 
+    [Fact]
+    public void The_new_version_notification_offers_download_and_skip()
+    {
+        var toast = XElement.Parse(TrackNotificationContent.BuildUpdateAvailable("0.3.3"));
+
+        var texts = toast.Element("visual")!.Element("binding")!.Elements("text").Select(t => t.Value).ToList();
+        Assert.Equal("New update available", texts[0]);
+        Assert.Contains("0.3.3", texts[1], StringComparison.Ordinal);
+        var buttons = toast.Element("actions")!.Elements("action").ToList();
+        Assert.Equal(["Download", "Skip"], buttons.Select(b => b.Attribute("content")!.Value));
+        Assert.Equal(
+            [TrackNotificationCommand.DownloadUpdate, TrackNotificationCommand.SkipUpdate],
+            buttons.Select(b => TrackNotificationContent.Parse(b.Attribute("arguments")!.Value)));
+    }
+
     [Theory]
     [InlineData("action=next", TrackNotificationCommand.Next)]
     [InlineData("action=restart-to-update", TrackNotificationCommand.RestartToUpdate)]
+    [InlineData("action=download-update", TrackNotificationCommand.DownloadUpdate)]
+    [InlineData("action=skip-update", TrackNotificationCommand.SkipUpdate)]
     [InlineData("action=show", TrackNotificationCommand.Show)]
     [InlineData("", TrackNotificationCommand.Show)]
     [InlineData(null, TrackNotificationCommand.Show)]

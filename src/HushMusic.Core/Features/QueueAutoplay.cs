@@ -20,6 +20,7 @@ namespace HushMusic.Core.Features;
 /// <item>Removing everything after the current song means "stop after this one": autoplay stays quiet for that queue
 /// until songs are added to it again.</item>
 /// <item>Turning the setting off removes the suggestions that haven't played yet.</item>
+/// <item>Songs the user keeps skipping (<see cref="ISmartSkip"/>) are left out.</item>
 /// </list>
 /// </remarks>
 public sealed class QueueAutoplay(
@@ -27,7 +28,8 @@ public sealed class QueueAutoplay(
     IPlayer player,
     IWatchApi watchApi,
     ISettingsService settings,
-    ILogger<QueueAutoplay> logger) : IQueueAutoplay, IHostedService, IDisposable
+    ILogger<QueueAutoplay> logger,
+    ISmartSkip? smartSkip = null) : IQueueAutoplay, IHostedService, IDisposable
 {
     private const long RetryDelayMs = 30_000;
 
@@ -430,7 +432,7 @@ public sealed class QueueAutoplay(
     private int Append(IReadOnlyList<Track> tracks, QueueSnapshot before, int generation)
     {
         var queued = new HashSet<string>(before.Items.Select(i => i.Track.VideoId), StringComparer.Ordinal);
-        List<Track> fresh = [.. tracks.Where(t => t.IsAvailable && !t.IsLiveRadio && queued.Add(t.VideoId))];
+        var fresh = smartSkip.WithoutLeftOut(tracks.Where(t => t.IsAvailable && !t.IsLiveRadio && queued.Add(t.VideoId)));
         if (fresh.Count == 0)
         {
             return 0;

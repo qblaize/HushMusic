@@ -5,6 +5,7 @@ using HushMusic.App.Services.Shell;
 using HushMusic.App.ViewModels.Shell;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Models;
+using HushMusic.Playback.Pulse;
 
 namespace HushMusic.App.ViewModels.NowPlaying;
 
@@ -23,13 +24,19 @@ public enum NowPlayingTab
 /// come from <see cref="PlayerViewModel"/>, shared with the player bar. Any navigation closes the view. Singleton.
 /// In the Minimal player layout the view keeps to the single artwork and the essential controls, and the side panel
 /// stays hidden until it is asked for (its toggle, or the bar's Lyrics / Up next).
+/// Video mode (<see cref="IsVideoMode"/>, remembered) shows a playing music video in place of the cover, in the Standard
+/// layout; for a song whose music video YouTube Music names, it offers to play that video instead.
 /// </summary>
 public sealed partial class NowPlayingViewModel : ObservableObject
 {
     private readonly INavigationService _navigation;
     private readonly IWindowModeService _windowMode;
     private readonly ISettingsService _settings;
+    private readonly IQueueService _queue;
+    private readonly IPlayer _player;
+    private readonly INotificationService _notifications;
     private bool _driftsBackdrop;
+    private bool _pulsesToMusic;
 
     public NowPlayingViewModel(
         PlayerViewModel player,
@@ -42,6 +49,10 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         INavigationService navigation,
         IWindowModeService windowMode,
         ISettingsService settings,
+        IMusicPulse pulse,
+        IQueueService queueService,
+        IPlayer audioPlayer,
+        INotificationService notifications,
         IUiDispatcher dispatcher)
     {
         Player = player;
@@ -54,9 +65,20 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         _navigation = navigation;
         _windowMode = windowMode;
         _settings = settings;
+        _queue = queueService;
+        _player = audioPlayer;
+        _notifications = notifications;
+        Pulse = pulse;
         IsPanelHidden = settings.Current.NowPlayingPanelHidden;
+        IsVideoMode = settings.Current.NowPlayingVideo;
         _driftsBackdrop = DriftsBackdrop;
-        settings.Changed += (_, _) => dispatcher.Run(UpdateDriftsBackdrop);
+        _pulsesToMusic = PulsesToMusic;
+        settings.Changed += (_, _) => dispatcher.Run(() =>
+        {
+            UpdateBackdropEffects();
+            IsVideoMode = _settings.Current.NowPlayingVideo;
+        });
+        pulse.AvailabilityChanged += (_, _) => dispatcher.Run(UpdateBackdropEffects);
 
         Player.PropertyChanged += OnPlayerPropertyChanged;
         CoverFlow.PropertyChanged += (_, e) =>
@@ -127,6 +149,11 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowsPanel), nameof(PanelToggleLabel))]
     public partial bool IsPanelHidden { get; set; }
 
+    /// <summary>Video mode (<c>AppSettings.NowPlayingVideo</c>): a playing music video shows in place of the cover.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsVideo), nameof(VideoVersion), nameof(HasVideoVersion), nameof(VideoToggleLabel))]
+    public partial bool IsVideoMode { get; set; }
+
     /// <summary>Minimal layout: the side panel is shown. Off each time the view opens without asking for a tab.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPanel), nameof(PanelToggleLabel))]
@@ -140,7 +167,35 @@ public sealed partial class NowPlayingViewModel : ObservableObject
     /// <summary>The blurred backdrop drifts: the Standard layout with the "Moving background" setting on.</summary>
     public bool DriftsBackdrop => IsStandard && _settings.Current.AnimateNowPlayingBackground;
 
+    /// <summary>
+    /// The backdrop swells and a glow behind the cover breathes with the music: the Standard layout with "Pulse to the
+    /// music" on, where Windows lets the app capture its own audio.
+    /// </summary>
+    public bool PulsesToMusic => IsStandard && _settings.Current.PulseToMusic && Pulse.Availability == MusicPulseAvailability.Available;
+
+    /// <summary>The levels behind <see cref="PulsesToMusic"/>.</summary>
+    public IMusicPulse Pulse { get; }
+
     public string PanelToggleLabel => ShowsPanel ? "Hide Up next and lyrics" : "Show Up next and lyrics";
+
+    /// <summary>The video toggle: YouTube items in the Standard layout (Minimal keeps to the cover; radio has no video).</summary>
+    public bool CanShowVideo => IsStandard && Player.HasTrack && !Player.IsLive;
+
+    /// <summary>
+    /// The video picture is on. It still fetches only while the view is on screen and the item is a music video
+    /// (<see cref="Track.IsMusicVideo"/>); otherwise the cover shows.
+    /// </summary>
+    public bool ShowsVideo => IsVideoMode && IsStandard;
+
+    /// <summary>
+    /// Video mode, playing a song whose music video YouTube Music names (<see cref="Track.VideoVersion"/>): offered as
+    /// "Watch video". The video's sound is its own recording, so it plays as its own item, never over the song.
+    /// </summary>
+    public Track? VideoVersion => ShowsVideo ? Player.Track?.VideoVersion : null;
+
+    public bool HasVideoVersion => VideoVersion is not null;
+
+    public string VideoToggleLabel => IsVideoMode ? "Show the cover" : "Show the music video";
 
     public bool ShowsPanel => IsMinimal ? IsMinimalPanelShown : !CoverFlow.IsEnabled || !IsPanelHidden;
 
@@ -258,6 +313,34 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         _ = _settings.UpdateAsync(s => s.NowPlayingPanelHidden = hidden);
     }
 
+    [RelayCommand]
+    private void ToggleVideo()
+    {
+        IsVideoMode = !IsVideoMode;
+        var on = IsVideoMode;
+        _ = _settings.UpdateAsync(s => s.NowPlayingVideo = on);
+    }
+
+    /// <summary>Plays the song's music video next and skips to it (YouTube Music's Song / Video switch).</summary>
+    [RelayCommand]
+    private async Task WatchVideoAsync()
+    {
+        if (VideoVersion is not { } video)
+        {
+            return;
+        }
+
+        try
+        {
+            _queue.EnqueueNext([video]);
+            await _player.NextAsync();
+        }
+        catch (Exception ex)
+        {
+            _notifications.ShowError("Could not play the video", ex);
+        }
+    }
+
     partial void OnIsPanelHiddenChanged(bool value) => UpdateActiveTabs();
 
     partial void OnIsMinimalPanelShownChanged(bool value) => UpdateActiveTabs();
@@ -334,18 +417,33 @@ public sealed partial class NowPlayingViewModel : ObservableObject
             IsMinimalPanelShown = false;
             OnPropertyChanged(nameof(IsMinimal));
             OnPropertyChanged(nameof(IsStandard));
-            UpdateDriftsBackdrop();
+            OnVideoStateChanged();
+            UpdateBackdropEffects();
             OnPanelStateChanged();
         }
     }
 
-    private void UpdateDriftsBackdrop()
+    private void UpdateBackdropEffects()
     {
         if (_driftsBackdrop != DriftsBackdrop)
         {
             _driftsBackdrop = DriftsBackdrop;
             OnPropertyChanged(nameof(DriftsBackdrop));
         }
+
+        if (_pulsesToMusic != PulsesToMusic)
+        {
+            _pulsesToMusic = PulsesToMusic;
+            OnPropertyChanged(nameof(PulsesToMusic));
+        }
+    }
+
+    private void OnVideoStateChanged()
+    {
+        OnPropertyChanged(nameof(CanShowVideo));
+        OnPropertyChanged(nameof(ShowsVideo));
+        OnPropertyChanged(nameof(VideoVersion));
+        OnPropertyChanged(nameof(HasVideoVersion));
     }
 
     private void OnPanelStateChanged()
@@ -363,6 +461,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSongTabs));
         OnPropertyChanged(nameof(HasRadioTabs));
         OnPropertyChanged(nameof(CanShowLyrics));
+        OnVideoStateChanged();
         if (!IsAvailable(Tab))
         {
             ShowTab(NowPlayingTab.UpNext);

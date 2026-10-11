@@ -61,6 +61,33 @@ public sealed class RadioTrackMatcher(ISearchApi search, ILogger<RadioTrackMatch
         return cached.Count <= count ? cached : [.. cached.Take(count)];
     }
 
+    /// <summary>
+    /// True when <paramref name="track"/> is very likely the song the station announced, strict enough to act on without
+    /// asking (saving it to a playlist): an artist credit matches the announced artist, and one title starts with the other
+    /// ("Title" / "Title (feat. Singer)" / "Title - Radio Edit"). A title without an artist only counts when it names both
+    /// the song and one of its artists ("Daft Punk One More Time"). Looser matches still rank first in
+    /// <see cref="FindAsync"/>, for the user to judge.
+    /// </summary>
+    public static bool IsConfident(RadioNowPlaying song, Track track, string? stationName = null)
+    {
+        ArgumentNullException.ThrowIfNull(song);
+        ArgumentNullException.ThrowIfNull(track);
+        var title = RadioSongQuery.Comparable(RadioSongQuery.Clean(song.Title, stationName));
+        var artist = song.Artist is null || RadioSongQuery.IsPlaceholderArtist(song.Artist)
+            ? string.Empty
+            : RadioSongQuery.Comparable(RadioSongQuery.Clean(song.Artist, stationName));
+        var trackTitle = RadioSongQuery.Comparable(RadioSongQuery.Clean(track.Title));
+        if (title.Length == 0 || trackTitle.Length == 0)
+        {
+            return false;
+        }
+
+        // Without an artist the announced title holds "Artist Title", so the song title sits inside it, not at its start.
+        var titleMatches = artist.Length > 0 ? StartsWithOther(trackTitle, title) : Overlaps(trackTitle, title);
+        var announced = artist.Length > 0 ? artist : title;
+        return titleMatches && track.Artists.Any(credit => Overlaps(RadioSongQuery.Comparable(credit.Name), announced));
+    }
+
     private static List<Track> Candidates(SearchResults results)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -120,6 +147,13 @@ public sealed class RadioTrackMatcher(ISearchApi search, ILogger<RadioTrackMatch
 
         var (shorter, longer) = a.Length <= b.Length ? (a, b) : (b, a);
         return shorter.Length >= 3 ? longer.Contains(shorter, StringComparison.Ordinal) : shorter == longer;
+    }
+
+    // Like Overlaps, but the shorter one must be where the longer one starts: "titlefeatsinger" / "title", not "lovemedo" / "medo".
+    private static bool StartsWithOther(string a, string b)
+    {
+        var (shorter, longer) = a.Length <= b.Length ? (a, b) : (b, a);
+        return shorter.Length >= 3 ? longer.StartsWith(shorter, StringComparison.Ordinal) : shorter == longer;
     }
 
     private void Remember(string query, IReadOnlyList<Track> tracks)

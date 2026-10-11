@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Media;
 using Windows.UI.ViewManagement;
 using HushMusic.App.Helpers;
 using HushMusic.App.Services.Pages;
@@ -21,6 +22,8 @@ namespace HushMusic.App.Controls.NowPlaying;
 /// stepped instead, <see cref="DriftFramesPerSecond"/> times a second: each step is a small fraction of one pixel of the
 /// stretched artwork, which can't be told apart from smooth motion. It runs only while music plays, the window is on
 /// screen and the "Moving background" setting is on; otherwise it holds still where it is (<see cref="AnimationGate"/>).
+/// "Pulse to the music" (<see cref="NowPlayingPulse"/>) also swells the art a little and lightens it with a white wash, on
+/// top of the drift.
 /// </remarks>
 public sealed partial class ArtworkBackdrop : Grid
 {
@@ -50,30 +53,48 @@ public sealed partial class ArtworkBackdrop : Grid
 
     private static readonly CubicBezier DriftEase = new(0.45, 0, 0.55, 1);
 
+    private static readonly TimeSpan PulseRestDuration = TimeSpan.FromMilliseconds(450);
+
     private readonly CrossfadeImage _image = new()
     {
         DecodePixelWidth = 28,
         FadeDuration = TimeSpan.FromMilliseconds(900),
     };
 
+    // The pulse scales this (around the middle) while the drift scales and moves the image inside it.
+    private readonly Grid _swell = new();
+    private readonly Border _lift = new() { Background = new SolidColorBrush(Microsoft.UI.Colors.White), Visibility = Visibility.Collapsed };
+
     private readonly UISettings _uiSettings = new();
     private readonly AnimationGate _gate;
     private readonly INowPlayingService? _nowPlaying = App.Services?.GetService<INowPlayingService>();
     private readonly Stopwatch _driftClock = new();
     private Visual? _visual;
+    private Visual? _swellVisual;
+    private Visual? _liftVisual;
     private DispatcherQueueTimer? _driftTimer;
     private bool _drifting;
+    private int _pulseVersion;
+    private long _drawnAt;
 
     public ArtworkBackdrop()
     {
         IsHitTestVisible = false;
-        Children.Add(_image);
+        _swell.Children.Add(_image);
+        Children.Add(_swell);
+        Children.Add(_lift);
         _gate = new AnimationGate(this, OnGateChanged);
         SizeChanged += (_, e) =>
         {
+            var center = new Vector3((float)e.NewSize.Width / 2, (float)e.NewSize.Height / 2, 0);
             if (_visual is not null)
             {
-                _visual.CenterPoint = new Vector3((float)e.NewSize.Width / 2, (float)e.NewSize.Height / 2, 0);
+                _visual.CenterPoint = center;
+            }
+
+            if (_swellVisual is not null)
+            {
+                _swellVisual.CenterPoint = center;
             }
         };
         Loaded += (_, _) =>
@@ -142,6 +163,83 @@ public sealed partial class ArtworkBackdrop : Grid
         UpdateWanted();
     }
 
+    /// <summary>
+    /// "Pulse to the music": swells the art by <paramref name="swell"/> (a fraction of its size) and lightens it by
+    /// <paramref name="lift"/> (the opacity of a white wash under the view's frosted scrim).
+    /// </summary>
+    public void SetPulse(float swell, float lift)
+    {
+        if (EnsureVisual() is null || _swellVisual is null || _liftVisual is null)
+        {
+            return;
+        }
+
+        if (_lift.Visibility != Visibility.Visible)
+        {
+            _pulseVersion++;
+            _lift.Visibility = Visibility.Visible;
+        }
+
+        _swellVisual.StopAnimation(nameof(Visual.Scale));
+        _liftVisual.StopAnimation(nameof(Visual.Opacity));
+        _swellVisual.Scale = new Vector3(1 + swell, 1 + swell, 1);
+        _liftVisual.Opacity = lift;
+
+        // Every change redraws the view, so the drift steps along in this frame and skips its own next step.
+        _drawnAt = Stopwatch.GetTimestamp();
+        if (_driftClock.IsRunning)
+        {
+            ApplyDrift();
+        }
+    }
+
+    /// <summary>Eases back from the pulse to the plain art (at once when <paramref name="animate"/> is false).</summary>
+    public void RestPulse(bool animate)
+    {
+        if (_lift.Visibility != Visibility.Visible || _swellVisual is null || _liftVisual is null)
+        {
+            return;
+        }
+
+        var version = ++_pulseVersion;
+        var swell = _swellVisual;
+        var lift = _liftVisual;
+        if (!animate)
+        {
+            Settle();
+            return;
+        }
+
+        var compositor = swell.Compositor;
+        var easing = compositor.CreateCubicBezierEasingFunction(new Vector2(0.25f, 0.1f), new Vector2(0.25f, 1f));
+        var scale = compositor.CreateVector3KeyFrameAnimation();
+        scale.Duration = PulseRestDuration;
+        scale.InsertKeyFrame(1f, Vector3.One, easing);
+        var fade = compositor.CreateScalarKeyFrameAnimation();
+        fade.Duration = PulseRestDuration;
+        fade.InsertKeyFrame(1f, 0f, easing);
+        var batch = compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
+        swell.StartAnimation(nameof(Visual.Scale), scale);
+        lift.StartAnimation(nameof(Visual.Opacity), fade);
+        batch.End();
+        batch.Completed += (_, _) => DispatcherQueue.TryEnqueue(() =>
+        {
+            if (version == _pulseVersion)
+            {
+                Settle();
+            }
+        });
+
+        void Settle()
+        {
+            swell.StopAnimation(nameof(Visual.Scale));
+            lift.StopAnimation(nameof(Visual.Opacity));
+            swell.Scale = Vector3.One;
+            lift.Opacity = 0;
+            _lift.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private void OnNowPlayingChanged(object? sender, EventArgs e) => UpdateWanted();
 
     private void UpdateWanted() => _gate.IsWanted = _drifting && _nowPlaying?.IsPlaying != false;
@@ -160,7 +258,13 @@ public sealed partial class ArtworkBackdrop : Grid
         {
             _driftTimer = DispatcherQueue.CreateTimer();
             _driftTimer.Interval = TimeSpan.FromSeconds(1 / DriftFramesPerSecond);
-            _driftTimer.Tick += (_, _) => ApplyDrift();
+            _driftTimer.Tick += (_, _) =>
+            {
+                if (Stopwatch.GetElapsedTime(_drawnAt).TotalSeconds >= 0.75 / DriftFramesPerSecond)
+                {
+                    ApplyDrift();
+                }
+            };
         }
 
         _driftClock.Start();
@@ -205,9 +309,14 @@ public sealed partial class ArtworkBackdrop : Grid
             host.Clip = host.Compositor.CreateInsetClip();
 
             ElementCompositionPreview.SetIsTranslationEnabled(_image, true);
+            var center = new Vector3((float)ActualWidth / 2, (float)ActualHeight / 2, 0);
             _visual = ElementCompositionPreview.GetElementVisual(_image);
-            _visual.CenterPoint = new Vector3((float)ActualWidth / 2, (float)ActualHeight / 2, 0);
+            _visual.CenterPoint = center;
             _visual.Scale = new Vector3(BaseScale, BaseScale, 1);
+            _swellVisual = ElementCompositionPreview.GetElementVisual(_swell);
+            _swellVisual.CenterPoint = center;
+            _liftVisual = ElementCompositionPreview.GetElementVisual(_lift);
+            _liftVisual.Opacity = 0;
         }
 
         return _visual;

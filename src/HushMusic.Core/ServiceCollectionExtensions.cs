@@ -37,6 +37,14 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<PlaybackSessionKeeper>();
         services.AddListeningStats();
 
+        // Smart skip (songs the user keeps skipping stay out of radio and autoplay) and the weekly "Fresh for you" mix.
+        services.AddSingleton<SmartSkipService>();
+        services.AddSingleton<ISmartSkip>(sp => sp.GetRequiredService<SmartSkipService>());
+        services.AddHostedService(sp => sp.GetRequiredService<SmartSkipService>());
+        services.AddSingleton<WeeklyMixService>();
+        services.AddSingleton<IWeeklyMix>(sp => sp.GetRequiredService<WeeklyMixService>());
+        services.AddHostedService(sp => sp.GetRequiredService<WeeklyMixService>());
+
         services.AddHttpClient(LastFmClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(20));
         services.AddSingleton<LastFmService>();
         services.AddSingleton<ILastFmService>(sp => sp.GetRequiredService<LastFmService>());

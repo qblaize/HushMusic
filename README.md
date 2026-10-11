@@ -41,11 +41,15 @@ Windows taskbar.
 - Home with your recommendations and Quick picks, search with suggestions and filters (songs, albums, artists,
   playlists), album, artist and playlist pages.
 - **Explore**: new releases, trending songs, moods & genres, and charts by country.
+- **Fresh for you** on Home: a new mix every Monday with artists you love and songs you haven't heard yet, built from
+  your listening on this PC. Play it, shuffle it, or save it as a playlist.
 - Artist pages with **See all** for the full list of albums, singles and videos.
 - Your library, playlists, liked songs and history once you sign in. Like and unlike songs, add them to playlists,
   create, rename and delete playlists. Changes go straight to your account.
 - Start a radio from any song; radio and up-next queues keep topping themselves up.
 - When an album or playlist ends, it keeps going with similar songs (you can turn this off).
+- **Smart skip**: a song you skip in its first seconds three times stops showing up in radio, autoplay and your
+  weekly mix. Songs you pick yourself still play. Settings → Playback lists them, so you can forgive one.
 - Save the current queue as a playlist.
 - Edit your playlists: drag songs to reorder them, or select several (**Select**, or Ctrl/Shift-click) to play, queue,
   add to another playlist or remove them, with Undo.
@@ -54,6 +58,9 @@ Windows taskbar.
   there.
 - **Your stats** (Library → Your stats): top artists, songs and albums, listening time and when you listen, by week,
   month, year or all time. Kept only on this PC.
+- **Your year in Hush**: a full-screen recap of your year (top songs and artists, your listening clock, the days you
+  listened), with Save image for sharing. Open it from Your stats.
+- **Achievements** in Your stats: badges for listening hours, streaks, songs and artists you've discovered, and more.
 - Songs you play show up in your YouTube Music history, as they would in the official app (you can turn this off).
 - Drag songs onto the queue, the player bar or a playlist.
 
@@ -64,6 +71,10 @@ Windows taskbar.
 - Synced lyrics when YouTube has them: the current line follows the song, and clicking a line jumps to it.
 - **Cover Flow**: earlier and later songs stack behind the current cover and glide into place when the song changes.
   Click one to play it. Settings → Appearance → Now Playing artwork switches between Single and Cover Flow.
+- **Video mode** (optional): the camera button in Now Playing plays the music video in place of the cover, in sync with
+  the sound. It streams only while Now Playing is on screen. A song with a music video gets a **Watch video** button.
+- **Pulse to the music** (optional, Windows 11): the background swells and a glow blooms around the cover on the beat.
+  Hush listens only to its own audio, and only while Now Playing is open and something plays.
 
 **Listening**
 
@@ -83,6 +94,9 @@ Windows taskbar.
 - Stations show a LIVE badge and the song on air. Next and Previous switch stations.
 - Heard something you like? Click the song on air to find it on YouTube Music, then play it, queue it, like it or add
   it to a playlist. Now Playing keeps a list of what played on the station.
+- **Save songs to a playlist** (per station, when signed in): every song that plays for 30 seconds and matches a song
+  on YouTube Music goes into a private "Heard on <station>" playlist.
+- **Station of the day**: a new station every day from the genres you listen to.
 
 **Windows**
 
@@ -182,7 +196,12 @@ Everything is in `%LOCALAPPDATA%\HushMusic`. The app itself is installed in `%LO
 | `cache\lastfm-queue.json` | Scrobbles waiting to be sent. |
 | `cache\visitor_id.txt` | YouTube's anonymous visitor id (not a credential). |
 | `radio-favorites.json` | Your favourite stations. |
+| `radio-autosave.json` | Stations whose songs are saved to a playlist, and those playlists' ids. |
+| `radio-station-of-the-day.json` | Today's station and its candidates. |
+| `skipped-songs.json` | Smart skip counts. |
+| `weekly-mix.json` | This week's Fresh for you mix. |
 | `history\plays-YYYY.jsonl` | Your listening log for **Your stats** (one line per play). Clear it from the stats page. |
+| `history\achievements.json` | Achievements already announced. |
 | `tools\yt-dlp\<version>\`, `tools\deno\<version>\` | The app-managed yt-dlp and Deno. |
 | `logs\hushmusic-*.log` | Daily log files, kept for 14 days. Settings → Diagnostics sets the level and opens the folder. |
 

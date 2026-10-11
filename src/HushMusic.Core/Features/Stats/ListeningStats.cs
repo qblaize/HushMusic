@@ -122,10 +122,10 @@ public static class ListeningStatsCalculator
         };
     }
 
-    private static TimeSpan Sum(IEnumerable<PlayRecord> records) => TimeSpan.FromSeconds(records.Sum(r => (long)r.ListenedSeconds));
+    internal static TimeSpan Sum(IEnumerable<PlayRecord> records) => TimeSpan.FromSeconds(records.Sum(r => (long)r.ListenedSeconds));
 
     // Ranked by plays, then by listening time; groups with no counted play only show up when there is room.
-    private static List<TopSong> TopSongs(List<PlayRecord> tracks, int count) =>
+    internal static List<TopSong> TopSongs(List<PlayRecord> tracks, int count) =>
     [
         .. tracks
             .GroupBy(r => r.ItemId, StringComparer.Ordinal)
@@ -149,7 +149,7 @@ public static class ListeningStatsCalculator
     ];
 
     // A song with several artists counts for each of them.
-    private static List<TopArtist> TopArtists(List<PlayRecord> tracks, int count) =>
+    internal static List<TopArtist> TopArtists(List<PlayRecord> tracks, int count) =>
     [
         .. tracks
             .SelectMany(r => r.Artists.Select(a => (Artist: a, Record: r)))
@@ -173,7 +173,7 @@ public static class ListeningStatsCalculator
             .Take(count),
     ];
 
-    private static List<TopAlbum> TopAlbums(List<PlayRecord> tracks, int count) =>
+    internal static List<TopAlbum> TopAlbums(List<PlayRecord> tracks, int count) =>
     [
         .. tracks
             .Where(r => r.Album is not null)
@@ -197,7 +197,7 @@ public static class ListeningStatsCalculator
     ];
 
     // Stations are ranked by time: a radio "play" is an evening, not a song.
-    private static List<TopStation> TopStations(List<PlayRecord> radio, int count) =>
+    internal static List<TopStation> TopStations(List<PlayRecord> radio, int count) =>
     [
         .. radio
             .GroupBy(r => r.ItemId, StringComparer.Ordinal)
@@ -211,13 +211,13 @@ public static class ListeningStatsCalculator
             .Take(count),
     ];
 
-    private static string ArtistKey(PlayArtist artist) => artist.BrowseId ?? "name:" + artist.Name.ToUpperInvariant();
+    internal static string ArtistKey(PlayArtist artist) => artist.BrowseId ?? "name:" + artist.Name.ToUpperInvariant();
 
     private static string? Art(IEnumerable<PlayRecord> records) =>
         records.Where(r => r.ArtUrl is not null).MaxBy(r => r.Start)?.ArtUrl;
 
     // A long session (an evening of radio) is spread over the hours and days it covered, as if listened to without pauses.
-    private static void Spread(PlayRecord record, TimeZoneInfo timeZone, TimeSpan[] byHour, TimeSpan[] byWeekday)
+    internal static void Spread(PlayRecord record, TimeZoneInfo timeZone, TimeSpan[] byHour, TimeSpan[] byWeekday)
     {
         var cursor = TimeZoneInfo.ConvertTime(record.Start, timeZone);
         var left = record.Listened;

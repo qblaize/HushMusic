@@ -5,7 +5,8 @@ namespace HushMusic.App.Controls.Radio;
 
 /// <summary>
 /// A radio station card: logo (or generated art), name, genres, country and quality. Clicking plays it; hovering
-/// reveals play and favourite buttons; right-click has Play, favourite and Open website. Logic lives in <see cref="StationItem"/>.
+/// reveals play, favourite and "More options" buttons; the menu (also on right-click) has Play, favourite, "Save songs to
+/// a playlist" and Open website. Logic lives in <see cref="StationItem"/>.
 /// </summary>
 public sealed partial class StationCard : UserControl
 {
@@ -19,6 +20,8 @@ public sealed partial class StationCard : UserControl
         InitializeComponent();
         FavoriteButton.GotFocus += (_, _) => SetHover(true);
         FavoriteButton.LostFocus += (_, _) => SetHover(false);
+        MoreButton.GotFocus += (_, _) => SetHover(true);
+        MoreButton.LostFocus += (_, _) => SetHover(false);
         CardButton.GotFocus += (_, _) =>
         {
             if (CardButton.FocusState == FocusState.Keyboard)
@@ -65,6 +68,7 @@ public sealed partial class StationCard : UserControl
     {
         VisualStateManager.GoToState(this, _isHovered ? "Hover" : "Rest", useTransitions);
         FavoriteButton.IsHitTestVisible = _isHovered;
+        MoreButton.IsHitTestVisible = _isHovered;
         PlayButton.IsHitTestVisible = _isHovered;
     }
 }

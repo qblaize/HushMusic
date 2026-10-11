@@ -163,6 +163,75 @@
             </Button>
         </DataTemplate>
 
+        <!-- A year to look back on, when there is more than one. -->
+        <DataTemplate x:Key="ReviewYearTemplate" x:DataType="vm:ReviewYearChoice">
+            <ToggleButton
+                Click="OnReviewYearClick"
+                Content="{x:Bind Label}"
+                IsChecked="{x:Bind IsSelected}"
+                Style="{StaticResource ChipToggleButtonStyle}"
+                Tag="{x:Bind Year}" />
+        </DataTemplate>
+
+        <!-- An achievement: an accent badge with the day it was unlocked, or a dimmed one with the progress so far. -->
+        <DataTemplate x:Key="AchievementTemplate" x:DataType="vm:AchievementItem">
+            <Grid
+                Padding="16,16,16,14"
+                AutomationProperties.Name="{x:Bind AutomationName}"
+                Background="{ThemeResource Surface1Brush}"
+                CornerRadius="{StaticResource RadiusMedium}"
+                RowSpacing="2"
+                ToolTipService.ToolTip="{x:Bind Description}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid
+                    Width="44"
+                    Height="44"
+                    Margin="0,0,0,12"
+                    HorizontalAlignment="Left">
+                    <Ellipse Fill="{StaticResource AccentBrush}" Visibility="{x:Bind IsUnlocked}" />
+                    <FontIcon
+                        FontSize="18"
+                        Foreground="{StaticResource AccentForegroundBrush}"
+                        Glyph="{x:Bind Glyph}"
+                        Visibility="{x:Bind IsUnlocked}" />
+                    <Ellipse Fill="{ThemeResource Surface2Brush}" Visibility="{x:Bind IsLocked}" />
+                    <FontIcon
+                        FontSize="18"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        Glyph="{x:Bind Glyph}"
+                        Visibility="{x:Bind IsLocked}" />
+                </Grid>
+                <TextBlock
+                    Grid.Row="1"
+                    Opacity="{x:Bind TitleOpacity}"
+                    Style="{StaticResource HeadlineStyle}"
+                    Text="{x:Bind Title}" />
+                <TextBlock
+                    Grid.Row="2"
+                    Style="{StaticResource FootnoteStyle}"
+                    Text="{x:Bind Caption}"
+                    Typography.NumeralAlignment="Tabular" />
+                <Grid
+                    Grid.Row="3"
+                    Height="4"
+                    Margin="0,10,0,0"
+                    Background="{ThemeResource Surface2Brush}"
+                    CornerRadius="2"
+                    Visibility="{x:Bind IsLocked}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{x:Bind ProgressDone}" />
+                        <ColumnDefinition Width="{x:Bind ProgressLeft}" />
+                    </Grid.ColumnDefinitions>
+                    <Border Background="{ThemeResource TextTertiaryBrush}" CornerRadius="2" />
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
         <!-- Top albums: square cover, title, artist, plays and time. -->
         <DataTemplate x:Key="AlbumCardTemplate" x:DataType="vm:StatsRankItem">
             <Button
@@ -202,7 +271,7 @@
     </Page.Resources>
 
     <Grid>
-        <ScrollViewer>
+        <ScrollViewer x:Name="Scroller">
             <!-- Full width up to a comfortable maximum, kept on the left like the other pages. -->
             <Grid Padding="{StaticResource PagePadding}">
                 <Grid.ColumnDefinitions>
@@ -278,6 +347,94 @@
                             Content="Clear statistics…"
                             Style="{StaticResource TextActionButtonStyle}" />
                     </StackPanel>
+
+                    <!-- Your year in Hush: the year's top cover, the title, and the way in (or what it still needs). -->
+                    <Grid
+                        Height="144"
+                        Margin="0,24,0,0"
+                        AutomationProperties.Name="{x:Bind ViewModel.ReviewTitle, Mode=OneWay}"
+                        Background="{ThemeResource Surface1Brush}"
+                        CornerRadius="{StaticResource RadiusLarge}"
+                        RequestedTheme="Dark"
+                        Visibility="{x:Bind ViewModel.HasHighlights, Mode=OneWay}">
+                        <Image
+                            helpers:ImageLoader.DecodeWidth="12"
+                            helpers:ImageLoader.Url="{x:Bind ViewModel.ReviewArtUrl, Mode=OneWay}"
+                            IsHitTestVisible="False"
+                            Stretch="UniformToFill" />
+                        <Rectangle
+                            Fill="{ThemeResource AppBackgroundBrush}"
+                            IsHitTestVisible="False"
+                            Opacity="0.75" />
+                        <Grid Padding="20" ColumnSpacing="20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid
+                                Width="104"
+                                Height="104"
+                                Background="{ThemeResource Surface2Brush}"
+                                CornerRadius="{StaticResource RadiusMedium}">
+                                <FontIcon
+                                    FontSize="32"
+                                    Foreground="{ThemeResource TextTertiaryBrush}"
+                                    Glyph="&#xE8D6;" />
+                                <Image
+                                    helpers:ImageLoader.DecodeWidth="104"
+                                    helpers:ImageLoader.Url="{x:Bind ViewModel.ReviewArtUrl, Mode=OneWay}"
+                                    Stretch="UniformToFill" />
+                            </Grid>
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="4">
+                                <TextBlock
+                                    Foreground="{ThemeResource AccentTextBrush}"
+                                    Style="{StaticResource EyebrowStyle}"
+                                    Text="{x:Bind items:ItemFormat.Upper('Year in review')}" />
+                                <TextBlock
+                                    AutomationProperties.HeadingLevel="Level2"
+                                    Style="{StaticResource Title1Style}"
+                                    Text="{x:Bind ViewModel.ReviewTitle, Mode=OneWay}" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextPrimaryBrush}"
+                                    Opacity="0.8"
+                                    Style="{StaticResource SubheadStyle}"
+                                    Text="{x:Bind ViewModel.ReviewCaption, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="2"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Spacing="12">
+                                <Button
+                                    HorizontalAlignment="Right"
+                                    AutomationProperties.AutomationId="StatsOpenYearInReview"
+                                    AutomationProperties.Name="{x:Bind ViewModel.ReviewTitle, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.OpenReviewCommand}"
+                                    Style="{StaticResource PillButtonStyle}"
+                                    Visibility="{x:Bind ViewModel.CanOpenReview, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon FontSize="12" Glyph="&#xE768;" />
+                                        <TextBlock Text="Watch" />
+                                    </StackPanel>
+                                </Button>
+                                <ItemsRepeater
+                                    HorizontalAlignment="Right"
+                                    AutomationProperties.Name="Year"
+                                    ItemTemplate="{StaticResource ReviewYearTemplate}"
+                                    ItemsSource="{x:Bind ViewModel.ReviewYears, Mode=OneWay}"
+                                    Visibility="{x:Bind ViewModel.HasYearChoice, Mode=OneWay}">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Orientation="Horizontal" Spacing="6" />
+                                    </ItemsRepeater.Layout>
+                                </ItemsRepeater>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
 
                     <ProgressRing
                         Margin="0,80,0,0"
@@ -413,6 +570,32 @@
                                 ItemTemplate="{StaticResource StationRowTemplate}"
                                 ItemsSource="{x:Bind ViewModel.TopStations, Mode=OneWay}" />
                         </StackPanel>
+                    </StackPanel>
+
+                    <!-- Achievements: all time, whatever the period above. -->
+                    <StackPanel
+                        Margin="0,36,0,0"
+                        Spacing="10"
+                        Visibility="{x:Bind ViewModel.HasHighlights, Mode=OneWay}">
+                        <StackPanel Spacing="2">
+                            <items:SectionHeader Title="Achievements" />
+                            <TextBlock
+                                Style="{StaticResource FootnoteStyle}"
+                                Text="{x:Bind ViewModel.AchievementsSummary, Mode=OneWay}" />
+                        </StackPanel>
+                        <ItemsRepeater
+                            AutomationProperties.Name="Achievements"
+                            ItemTemplate="{StaticResource AchievementTemplate}"
+                            ItemsSource="{x:Bind ViewModel.Achievements, Mode=OneWay}">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout
+                                    ItemsStretch="Fill"
+                                    MaximumRowsOrColumns="6"
+                                    MinColumnSpacing="12"
+                                    MinItemWidth="168"
+                                    MinRowSpacing="12" />
+                            </ItemsRepeater.Layout>
+                        </ItemsRepeater>
                     </StackPanel>
                 </StackPanel>
             </Grid>

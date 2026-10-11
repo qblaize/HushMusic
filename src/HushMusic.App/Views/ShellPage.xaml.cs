@@ -6,6 +6,7 @@ using Windows.System;
 using HushMusic.App.Controls.Shell;
 using HushMusic.App.Services.Shell;
 using HushMusic.App.ViewModels.Shell;
+using HushMusic.App.ViewModels.YearInReview;
 
 namespace HushMusic.App.Views;
 
@@ -41,9 +42,15 @@ public sealed partial class ShellPage : Page
         {
             ViewModel.Player.PropertyChanged -= OnPlayerPropertyChanged;
             ViewModel.Player.PropertyChanged += OnPlayerPropertyChanged;
+            ViewModel.YearInReview.PropertyChanged -= OnYearInReviewPropertyChanged;
+            ViewModel.YearInReview.PropertyChanged += OnYearInReviewPropertyChanged;
             ApplyPlayerLayout();
         };
-        Unloaded += (_, _) => ViewModel.Player.PropertyChanged -= OnPlayerPropertyChanged;
+        Unloaded += (_, _) =>
+        {
+            ViewModel.Player.PropertyChanged -= OnPlayerPropertyChanged;
+            ViewModel.YearInReview.PropertyChanged -= OnYearInReviewPropertyChanged;
+        };
     }
 
     /// <summary>Interactive elements inside the title band changed size or position (the window updates its pass-through regions).</summary>
@@ -103,7 +110,7 @@ public sealed partial class ShellPage : Page
     {
         if (!ViewModel.Search.IsOpen
             && e.GetCurrentPoint(this).Properties.IsXButton1Pressed
-            && (ViewModel.NowPlaying.IsOpen || ViewModel.CanGoBack))
+            && (ViewModel.YearInReview.IsOpen || ViewModel.NowPlaying.IsOpen || ViewModel.CanGoBack))
         {
             ViewModel.Back();
             e.Handled = true;
@@ -117,6 +124,28 @@ public sealed partial class ShellPage : Page
         var visibility = covered ? Visibility.Collapsed : Visibility.Visible;
         BackButton.Visibility = visibility;
         ContentArea.Visibility = visibility;
+        if (covered)
+        {
+            RailTip.Opacity = 0;
+        }
+
+        TitleBarLayoutChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // The year in review covers the whole window: like under Now Playing, the rail and the pages are collapsed while it
+    // does. They come back (unless Now Playing still covers the pages) before it starts to close.
+    private void OnYearInReviewPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(YearInReviewViewModel.CoversShell))
+        {
+            return;
+        }
+
+        var covered = ViewModel.YearInReview.CoversShell;
+        var pages = covered || ViewModel.NowPlaying.IsOpen ? Visibility.Collapsed : Visibility.Visible;
+        Rail.Visibility = covered ? Visibility.Collapsed : Visibility.Visible;
+        BackButton.Visibility = pages;
+        ContentArea.Visibility = pages;
         if (covered)
         {
             RailTip.Opacity = 0;

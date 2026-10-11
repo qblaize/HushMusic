@@ -8,6 +8,7 @@
     xmlns:np="using:HushMusic.App.Controls.NowPlaying"
     xmlns:shell="using:HushMusic.App.Controls.Shell"
     xmlns:vm="using:HushMusic.App.ViewModels"
+    xmlns:yir="using:HushMusic.App.Controls.YearInReview"
     Background="{ThemeResource WindowBackgroundBrush}"
     FontFamily="{StaticResource AppFontFamily}"
     PreviewKeyDown="OnPreviewKeyDown"
@@ -118,6 +119,13 @@
                 </StackPanel>
             </Border>
         </Canvas>
+
+        <!--  Your year in Hush: over the whole window, below the toasts; it exists only while it is open.  -->
+        <yir:YearInReviewView
+            x:Name="YearInReviewOverlay"
+            Grid.RowSpan="2"
+            Grid.ColumnSpan="2"
+            x:Load="{x:Bind ViewModel.YearInReview.IsRealized, Mode=OneWay}" />
 
         <!--  Errors and messages as floating toasts above the player bar and Now Playing: never silent.  -->
         <ItemsControl

@@ -5,8 +5,8 @@ using HushMusic.App.ViewModels.NowPlaying;
 namespace HushMusic.App.Controls.NowPlaying;
 
 /// <summary>
-/// The "Heard on air" tab for live radio. Logic lives in <see cref="RadioHeardViewModel"/>; a click on a song opens
-/// "On YouTube Music" beside it.
+/// The "Heard on air" tab for live radio, with the station's "Save songs to a playlist" switch. Logic lives in
+/// <see cref="RadioHeardViewModel"/>; a click on a song opens "On YouTube Music" beside it.
 /// </summary>
 public sealed partial class HeardOnAirPanel : UserControl
 {

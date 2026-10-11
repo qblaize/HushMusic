@@ -7,6 +7,7 @@ using Windows.System;
 using HushMusic.App.Services.Shell;
 using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.Shell;
+using HushMusic.App.ViewModels.YearInReview;
 using HushMusic.Core.Abstractions;
 
 namespace HushMusic.App.ViewModels;
@@ -32,6 +33,7 @@ public sealed partial class ShellViewModel : ObservableObject
         PlayerViewModel player,
         NowPlayingViewModel nowPlaying,
         SearchBoxViewModel search,
+        YearInReviewViewModel yearInReview,
         ILogger<ShellViewModel> logger)
     {
         _navigation = navigation;
@@ -43,6 +45,7 @@ public sealed partial class ShellViewModel : ObservableObject
         Player = player;
         NowPlaying = nowPlaying;
         Search = search;
+        YearInReview = yearInReview;
 
         _navigation.Navigated += (_, key) =>
         {
@@ -61,6 +64,9 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>The search modal (rail Search button, Ctrl+F).</summary>
     public SearchBoxViewModel Search { get; }
+
+    /// <summary>"Your year in Hush", over the whole window (opened from the stats page).</summary>
+    public YearInReviewViewModel YearInReview { get; }
 
     public ObservableCollection<NotificationViewModel> Notifications { get; } = [];
 
@@ -114,6 +120,12 @@ public sealed partial class ShellViewModel : ObservableObject
     /// </summary>
     public bool HandleShortcut(VirtualKey key, VirtualKeyModifiers modifiers, ShortcutFocus focus, bool isRepeat)
     {
+        // The year in review covers everything but the search modal, and takes its keys (arrows, Space, Esc) first.
+        if (YearInReview.IsOpen && !Search.IsOpen && YearInReview.HandleKey(key, modifiers, isRepeat))
+        {
+            return true;
+        }
+
         // The search modal sits above Now Playing and handles its own Esc.
         if (key == VirtualKey.Escape && modifiers == VirtualKeyModifiers.None && NowPlaying.IsOpen && !Search.IsOpen)
         {
@@ -176,10 +188,17 @@ public sealed partial class ShellViewModel : ObservableObject
         }
     }
 
-    /// <summary>Alt+Left and the mouse back button: closes Now Playing when it is open, otherwise goes back a page.</summary>
+    /// <summary>
+    /// Alt+Left and the mouse back button: closes the year in review or Now Playing when one is open, otherwise goes back
+    /// a page.
+    /// </summary>
     public void Back()
     {
-        if (NowPlaying.IsOpen)
+        if (YearInReview.IsOpen)
+        {
+            YearInReview.Close();
+        }
+        else if (NowPlaying.IsOpen)
         {
             NowPlaying.Close();
         }

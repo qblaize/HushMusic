@@ -38,6 +38,9 @@ public enum PageKey
 
     /// <summary>Local listening statistics.</summary>
     Stats,
+
+    /// <summary>The weekly "Fresh for you" mix.</summary>
+    FreshMix,
 }
 
 /// <summary>Maps <see cref="PageKey"/> to page types. Filled by the Shell/Page service registrations.</summary>

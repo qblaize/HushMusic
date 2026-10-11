@@ -8,11 +8,14 @@ namespace HushMusic.Core.Features;
 /// Keeps radio and "up next" queues endless: when only a few items are left after the current one
 /// and the queue has a continuation token, fetches the next page and appends it.
 /// Reference example of a feature: it only listens to <see cref="IQueueService"/> events and reshapes the queue.
+/// Radio and up-next pages leave out the songs the user keeps skipping (<see cref="ISmartSkip"/>); the later pages of a
+/// playlist the user plays are appended whole.
 /// </summary>
 public sealed class QueueAutoExtender(
     IQueueService queue,
     IWatchApi watchApi,
-    ILogger<QueueAutoExtender> logger) : IHostedService, IDisposable
+    ILogger<QueueAutoExtender> logger,
+    ISmartSkip? smartSkip = null) : IHostedService, IDisposable
 {
     /// <summary>Extend when this many items or fewer remain after the current one.</summary>
     public const int RemainingThreshold = 3;
@@ -90,7 +93,9 @@ public sealed class QueueAutoExtender(
             // Release before appending: the append raises Changed, which chains the next page if still short.
             released = true;
             Volatile.Write(ref _inFlight, 0);
-            queue.AppendContinuation([.. page.Items.Where(t => t.IsAvailable)], page.Continuation);
+            var available = page.Items.Where(t => t.IsAvailable);
+            var automatic = queue.Source?.Kind is QueueSourceKind.Radio or QueueSourceKind.UpNext;
+            queue.AppendContinuation(automatic ? smartSkip.WithoutLeftOut(available) : [.. available], page.Continuation);
             logger.LogDebug("Extended the queue with {Count} tracks", page.Items.Count);
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested)

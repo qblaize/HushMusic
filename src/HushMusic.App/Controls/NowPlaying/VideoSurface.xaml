@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.NowPlaying.VideoSurface"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    AutomationProperties.AccessibilityView="Raw"
+    IsHitTestVisible="False"
+    IsTabStop="False">
+
+    <!--  Transparent until the picture runs: the cover underneath shows through.  -->
+    <MediaPlayerElement
+        x:Name="Picture"
+        AreTransportControlsEnabled="False"
+        AutoPlay="False"
+        Opacity="0"
+        Stretch="UniformToFill"
+        Visibility="Collapsed" />
+</UserControl>

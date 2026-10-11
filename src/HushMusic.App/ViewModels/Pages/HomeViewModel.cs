@@ -21,11 +21,12 @@ public sealed partial class HomeViewModel : PageViewModelBase
     private bool _accountChanged;
     private bool _isActive;
 
-    public HomeViewModel(IBrowseApi browse, AccountViewModel account, PageServices services)
+    public HomeViewModel(IBrowseApi browse, AccountViewModel account, FreshMixCardViewModel freshMix, PageServices services)
         : base(services)
     {
         _browse = browse;
         _account = account;
+        FreshMix = freshMix;
         _account.PropertyChanged += OnAccountPropertyChanged;
         UpdateGreeting();
         Shelves = new IncrementalCollection<Shelf>(
@@ -46,6 +47,9 @@ public sealed partial class HomeViewModel : PageViewModelBase
 
     public IncrementalCollection<Shelf> Shelves { get; }
 
+    /// <summary>The weekly "Fresh for you" mix above the feed (hidden until there is one).</summary>
+    public FreshMixCardViewModel FreshMix { get; }
+
     /// <summary>"Good evening, Alex" (no name when signed out).</summary>
     [ObservableProperty]
     public partial string Greeting { get; set; } = string.Empty;
@@ -62,6 +66,7 @@ public sealed partial class HomeViewModel : PageViewModelBase
     {
         _isActive = true;
         UpdateGreeting();
+        FreshMix.Refresh();
         IsFreshVisit = !HasContent || !IsBackNavigation || _accountChanged || DateTimeOffset.UtcNow - _loadedAt > MaxAgeOnBack;
         return IsFreshVisit ? LoadAsync() : Task.CompletedTask;
     }

@@ -37,6 +37,15 @@ public sealed record ResolvedStream
 
     public DateTimeOffset ExpiresAt { get; init; }
 
+    /// <summary>Picture size of a video stream (<see cref="IStreamResolver.ResolveVideoAsync"/>); null for audio.</summary>
+    public int? Width { get; init; }
+
+    /// <inheritdoc cref="Width"/>
+    public int? Height { get; init; }
+
+    /// <summary>Frames per second of a video stream; null for audio.</summary>
+    public double? FrameRate { get; init; }
+
     /// <summary>HTTP headers the stream host expects (user-agent etc.).</summary>
     public IReadOnlyDictionary<string, string> Headers { get; init; } = new Dictionary<string, string>();
 
@@ -60,7 +69,16 @@ public interface IStreamResolver
         return ResolveAsync(track.VideoId, cancellationToken);
     }
 
-    /// <summary>Drops the cached stream (e.g. after an HTTP 403) so the next resolve is fresh.</summary>
+    /// <summary>
+    /// Resolves the picture of a music video, without sound, to show beside the audio from
+    /// <see cref="ResolveAsync(Track, CancellationToken)"/>: a format Windows plays over HTTP, at most
+    /// <paramref name="maxHeight"/> pixels tall. Throws <see cref="StreamResolutionException"/> when there is none.
+    /// (The default implementation, for resolvers without video, always throws.)
+    /// </summary>
+    Task<ResolvedStream> ResolveVideoAsync(string videoId, int maxHeight, CancellationToken cancellationToken = default) =>
+        Task.FromException<ResolvedStream>(new StreamResolutionException(videoId, "Videos aren't available."));
+
+    /// <summary>Drops the cached stream (e.g. after an HTTP 403) so the next resolve is fresh. Video streams of the track too.</summary>
     void Invalidate(string videoId);
 
     /// <summary>Resolves in the background so the next track starts instantly. Never throws.</summary>

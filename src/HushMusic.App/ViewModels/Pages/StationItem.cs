@@ -12,6 +12,7 @@ public enum StationSection
     Curated,
     Directory,
     Results,
+    StationOfTheDay,
 }
 
 /// <summary>What a station card asks of its page.</summary>
@@ -22,6 +23,9 @@ public interface IStationHost
     Task ToggleFavoriteAsync(StationItem item);
 
     Task OpenWebsiteAsync(StationItem item);
+
+    /// <summary>Turns "Save songs to a playlist" on or off for the station.</summary>
+    Task ToggleAutoSaveAsync(StationItem item);
 }
 
 /// <summary>One station card on the Radio page.</summary>
@@ -36,6 +40,7 @@ public sealed partial class StationItem : ObservableObject
         PlayCommand = new AsyncRelayCommand(() => host.PlayAsync(this));
         ToggleFavoriteCommand = new AsyncRelayCommand(() => host.ToggleFavoriteAsync(this));
         OpenWebsiteCommand = new AsyncRelayCommand(() => host.OpenWebsiteAsync(this), () => HasWebsite);
+        ToggleAutoSaveCommand = new AsyncRelayCommand(() => host.ToggleAutoSaveAsync(this), () => CanAutoSave);
     }
 
     public RadioStation Station { get; }
@@ -68,6 +73,26 @@ public sealed partial class StationItem : ObservableObject
     [ObservableProperty]
     public partial bool IsPlaying { get; set; }
 
+    /// <summary>"Save songs to a playlist" is on for the station.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AutoSaveLabel), nameof(AutoSaveGlyph))]
+    public partial bool IsAutoSaveOn { get; set; }
+
+    /// <summary>Signed in: songs can be saved.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AutoSaveLabel))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleAutoSaveCommand))]
+    public partial bool CanAutoSave { get; set; }
+
+    public string AutoSaveLabel => this switch
+    {
+        { CanAutoSave: false } => "Sign in to save songs",
+        { IsAutoSaveOn: true } => "Stop saving songs",
+        _ => "Save songs to a playlist",
+    };
+
+    public string AutoSaveGlyph => IsAutoSaveOn ? "" : "";
+
     public string PlayLabel => "Play " + Station.Name;
 
     public string FavoriteGlyph => IsFavorite ? "" : "";
@@ -79,6 +104,8 @@ public sealed partial class StationItem : ObservableObject
     public IAsyncRelayCommand ToggleFavoriteCommand { get; }
 
     public IAsyncRelayCommand OpenWebsiteCommand { get; }
+
+    public IAsyncRelayCommand ToggleAutoSaveCommand { get; }
 
     private static string DetailsOf(RadioStation station)
     {

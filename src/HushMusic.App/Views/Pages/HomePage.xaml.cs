@@ -1,3 +1,6 @@
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using HushMusic.App.Controls.Items;
 using HushMusic.App.ViewModels.Pages;
@@ -31,6 +34,20 @@ public sealed partial class HomePage : Page
     protected override void OnNavigatedFrom(NavigationEventArgs e) => ViewModel.OnNavigatedFrom();
 
     private void OnItemClick(object sender, ItemClickEventArgs e) => ViewModel.OpenItemCommand.Execute(e.ClickedItem);
+
+    // Anywhere on the "Fresh for you" card but its buttons opens the mix.
+    private void OnFreshMixTapped(object sender, TappedRoutedEventArgs e)
+    {
+        for (var element = e.OriginalSource as DependencyObject; element is not null && !ReferenceEquals(element, sender); element = VisualTreeHelper.GetParent(element))
+        {
+            if (element is ButtonBase)
+            {
+                return;
+            }
+        }
+
+        ViewModel.FreshMix.OpenCommand.Execute(null);
+    }
 
     private void OnScrollViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => LoadMoreIfNearEnd();
 

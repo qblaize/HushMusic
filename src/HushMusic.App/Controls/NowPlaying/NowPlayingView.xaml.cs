@@ -18,7 +18,7 @@ namespace HushMusic.App.Controls.NowPlaying;
 /// The full-window Now Playing sheet. Logic lives in <see cref="NowPlayingViewModel"/>; this is UI glue: the slide
 /// up / down, fitting the artwork to the window, seek drags, focus in and back out.
 /// While it is closed, or the window is minimized or hidden, it lets go of what it showed (the artwork, the backdrop,
-/// the Cover Flow covers and the Up next rows) and builds it again when it is seen.
+/// the Cover Flow covers, the Up next rows and the music video) and builds it again when it is seen.
 /// </summary>
 public sealed partial class NowPlayingView : UserControl
 {
@@ -26,10 +26,14 @@ public sealed partial class NowPlayingView : UserControl
     private const double MinArtSize = 120;
     private const double MinControlsWidth = 340;
 
+    // The pulse glow is this many times the cover's size, so a halo shows around it.
+    private const double GlowSize = 1.8;
+
     private static readonly TimeSpan OpenDuration = TimeSpan.FromMilliseconds(460);
     private static readonly TimeSpan CloseDuration = TimeSpan.FromMilliseconds(320);
 
     private readonly UISettings _uiSettings = new();
+    private readonly NowPlayingPulse _pulse;
     private DependencyObject? _restoreFocus;
     private int _version;
     private bool _contentShown;
@@ -37,6 +41,7 @@ public sealed partial class NowPlayingView : UserControl
     public NowPlayingView()
     {
         InitializeComponent();
+        _pulse = new NowPlayingPulse(Root, Backdrop, Glow, ViewModel.Pulse);
         Backdrop.Animate = false;
         HeroArt.Animate = false;
 
@@ -68,7 +73,7 @@ public sealed partial class NowPlayingView : UserControl
     public NowPlayingViewModel ViewModel { get; } = App.GetService<NowPlayingViewModel>();
 
     /// <summary>Buttons in the window's title band: the window must let clicks through to them.</summary>
-    public IReadOnlyList<FrameworkElement> TitleBarButtons => [CloseButton, PanelToggleButton];
+    public IReadOnlyList<FrameworkElement> TitleBarButtons => [CloseButton, VideoToggleButton, PanelToggleButton];
 
     /// <summary>
     /// True once the sheet fully covers the shell (the shell can hide what is underneath), false as soon as it starts
@@ -106,6 +111,14 @@ public sealed partial class NowPlayingView : UserControl
                 }
 
                 break;
+            case nameof(NowPlayingViewModel.PulsesToMusic):
+                // "Pulse to the music" or the player layout changed while the sheet is open.
+                if (ViewModel.IsOpen && Visibility == Visibility.Visible)
+                {
+                    _pulse.SetEnabled(ViewModel.PulsesToMusic);
+                }
+
+                break;
         }
     }
 
@@ -138,6 +151,7 @@ public sealed partial class NowPlayingView : UserControl
         }
 
         Backdrop.SetDrifting(ViewModel.DriftsBackdrop);
+        _pulse.SetEnabled(ViewModel.PulsesToMusic);
         Animate(opening: true, version);
         PlayPauseButton.Focus(FocusState.Programmatic);
     }
@@ -145,6 +159,9 @@ public sealed partial class NowPlayingView : UserControl
     private async void Hide()
     {
         var version = ++_version;
+
+        // Stop listening to the music at once; the pulse eases back while the sheet slides away.
+        _pulse.SetEnabled(false);
 
         // The shell shows its content again under the sheet; lay it out before the sheet starts to move (same reason).
         CoverChanged?.Invoke(this, false);
@@ -223,7 +240,7 @@ public sealed partial class NowPlayingView : UserControl
         UiMemory.CollectSoon();
     }
 
-    // Builds (true) or lets go of (false) the artwork, the backdrop, the covers and the Up next rows.
+    // Builds (true) or lets go of (false) the artwork, the backdrop, the covers, the Up next rows and the video.
     private void ShowContent(bool shown)
     {
         if (shown == _contentShown)
@@ -234,6 +251,7 @@ public sealed partial class NowPlayingView : UserControl
         _contentShown = shown;
         Covers.SetShown(shown);
         UpNext.SetRowsShown(shown);
+        Video.SetShown(shown);
         if (shown)
         {
             HeroArt.Refresh();
@@ -438,6 +456,12 @@ public sealed partial class NowPlayingView : UserControl
         var art = Math.Floor(Math.Clamp(Math.Min(availableWidth, availableHeight - ControlsPanel.DesiredSize.Height), MinArtSize, MaxArtSize));
         ArtFrame.Width = art;
         ArtFrame.Height = art;
+        VideoFrame.Width = art;
+        VideoFrame.Height = art;
+        var glowOverhang = Math.Floor(art * (GlowSize - 1) / 2);
+        Glow.Width = art + (2 * glowOverhang);
+        Glow.Height = art + (2 * glowOverhang);
+        Glow.Margin = new Thickness(-glowOverhang);
         PlayerStack.Width = Math.Min(availableWidth, Math.Max(art, MinControlsWidth));
 
         // Negative margins (no layout clip) take the Cover Flow out to both edges of the column, centred on the cover.

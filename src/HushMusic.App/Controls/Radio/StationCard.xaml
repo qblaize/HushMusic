@@ -95,38 +95,50 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!--  Right-click, or the "More options" button on the artwork.  -->
+        <MenuFlyout x:Key="StationMenu" MenuFlyoutPresenterStyle="{StaticResource AppMenuFlyoutPresenterStyle}">
+            <MenuFlyoutItem
+                Command="{x:Bind Item.PlayCommand, Mode=OneWay}"
+                Style="{StaticResource AppMenuFlyoutItemStyle}"
+                Text="Play">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE768;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
+                Command="{x:Bind Item.ToggleFavoriteCommand, Mode=OneWay}"
+                Style="{StaticResource AppMenuFlyoutItemStyle}"
+                Text="{x:Bind Item.FavoriteLabel, Mode=OneWay}">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="{x:Bind Item.FavoriteGlyph, Mode=OneWay}" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
+                AutomationProperties.AutomationId="StationAutoSave"
+                Command="{x:Bind Item.ToggleAutoSaveCommand, Mode=OneWay}"
+                Style="{StaticResource AppMenuFlyoutItemStyle}"
+                Text="{x:Bind Item.AutoSaveLabel, Mode=OneWay}">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="{x:Bind Item.AutoSaveGlyph, Mode=OneWay}" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                Command="{x:Bind Item.OpenWebsiteCommand, Mode=OneWay}"
+                Style="{StaticResource AppMenuFlyoutItemStyle}"
+                Text="Open website">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE774;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+        </MenuFlyout>
     </UserControl.Resources>
 
-    <Grid x:Name="Root" Width="{StaticResource CardArtSize}">
-        <Grid.ContextFlyout>
-            <MenuFlyout MenuFlyoutPresenterStyle="{StaticResource AppMenuFlyoutPresenterStyle}">
-                <MenuFlyoutItem
-                    Command="{x:Bind Item.PlayCommand, Mode=OneWay}"
-                    Style="{StaticResource AppMenuFlyoutItemStyle}"
-                    Text="Play">
-                    <MenuFlyoutItem.Icon>
-                        <FontIcon Glyph="&#xE768;" />
-                    </MenuFlyoutItem.Icon>
-                </MenuFlyoutItem>
-                <MenuFlyoutItem
-                    Command="{x:Bind Item.ToggleFavoriteCommand, Mode=OneWay}"
-                    Style="{StaticResource AppMenuFlyoutItemStyle}"
-                    Text="{x:Bind Item.FavoriteLabel, Mode=OneWay}">
-                    <MenuFlyoutItem.Icon>
-                        <FontIcon Glyph="{x:Bind Item.FavoriteGlyph, Mode=OneWay}" />
-                    </MenuFlyoutItem.Icon>
-                </MenuFlyoutItem>
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem
-                    Command="{x:Bind Item.OpenWebsiteCommand, Mode=OneWay}"
-                    Style="{StaticResource AppMenuFlyoutItemStyle}"
-                    Text="Open website">
-                    <MenuFlyoutItem.Icon>
-                        <FontIcon Glyph="&#xE774;" />
-                    </MenuFlyoutItem.Icon>
-                </MenuFlyoutItem>
-            </MenuFlyout>
-        </Grid.ContextFlyout>
+    <Grid
+        x:Name="Root"
+        Width="{StaticResource CardArtSize}"
+        ContextFlyout="{StaticResource StationMenu}">
 
         <VisualStateManager.VisualStateGroups>
             <!--  Explicit storyboards, not implicit transitions: those crash when they fire during layout.  -->
@@ -145,6 +157,11 @@
                             Duration="0:0:0.15" />
                         <DoubleAnimation
                             Storyboard.TargetName="FavoriteButton"
+                            Storyboard.TargetProperty="Opacity"
+                            To="0"
+                            Duration="0:0:0.15" />
+                        <DoubleAnimation
+                            Storyboard.TargetName="MoreButton"
                             Storyboard.TargetProperty="Opacity"
                             To="0"
                             Duration="0:0:0.15" />
@@ -169,6 +186,11 @@
                             Duration="0:0:0.15" />
                         <DoubleAnimation
                             Storyboard.TargetName="FavoriteButton"
+                            Storyboard.TargetProperty="Opacity"
+                            To="1"
+                            Duration="0:0:0.15" />
+                        <DoubleAnimation
+                            Storyboard.TargetName="MoreButton"
                             Storyboard.TargetProperty="Opacity"
                             To="1"
                             Duration="0:0:0.15" />
@@ -250,7 +272,7 @@
             </StackPanel>
         </Button>
 
-        <!--  Over the artwork, as siblings of the card button (buttons can't nest): favourite and play.  -->
+        <!--  Over the artwork, as siblings of the card button (buttons can't nest): more options, favourite and play.  -->
         <Grid Height="{StaticResource CardArtSize}" VerticalAlignment="Top">
             <FontIcon
                 x:Name="FavoriteMark"
@@ -263,6 +285,20 @@
                 Glyph="&#xEB52;"
                 IsHitTestVisible="False"
                 Visibility="{x:Bind helpers:Format.VisibleIf(Item.IsFavorite), Mode=OneWay}" />
+            <Button
+                x:Name="MoreButton"
+                Margin="0,6,42,6"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                AutomationProperties.AutomationId="StationMore"
+                AutomationProperties.Name="More options"
+                Flyout="{StaticResource StationMenu}"
+                IsHitTestVisible="False"
+                Opacity="0"
+                Style="{StaticResource StationArtIconButtonStyle}"
+                ToolTipService.ToolTip="More options">
+                <FontIcon FontSize="13" Glyph="&#xE712;" />
+            </Button>
             <Button
                 x:Name="FavoriteButton"
                 Margin="6"

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="HushMusic.App.Views.Pages.FreshMixPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items">
+
+    <Grid items:TrackMenu.Host="{x:Bind ViewModel}">
+        <ListView
+            Padding="{StaticResource ListPagePadding}"
+            IsItemClickEnabled="True"
+            ItemClick="OnTrackClick"
+            ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
+            ItemTemplate="{StaticResource TrackRowTemplate}"
+            ItemsSource="{x:Bind ViewModel.Tracks}"
+            SelectionMode="None"
+            Visibility="{x:Bind helpers:Format.CollapsedIfAny(ViewModel.ShowError, ViewModel.IsEmpty), Mode=OneWay}"
+            items:TrackDrag.IsEnabled="True"
+            items:TrackMenu.IsEnabled="True"
+            items:TrackSelectionList.Selection="{x:Bind ViewModel.Selection}">
+            <ListView.Header>
+                <!--
+                    Laid out like the album and playlist headers (DetailHeader), with the mix's cover mosaic. Reaches the
+                    page edges (undoes the list padding) so the artwork wash spans the whole width.
+                -->
+                <Grid Margin="-32,-28,-32,16">
+                    <items:FadingArtwork
+                        DecodeSize="24"
+                        FadeFrom="0.3"
+                        Opacity="{ThemeResource ArtworkWashOpacity}"
+                        TopOpacity="0.35"
+                        Url="{x:Bind ViewModel.WashUrl, Mode=OneWay}" />
+                    <Grid
+                        Padding="40,48,40,28"
+                        ColumnSpacing="32"
+                        SizeChanged="OnHeaderSizeChanged">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid
+                            x:Name="Art"
+                            Width="{StaticResource HeaderArtSize}"
+                            Height="{StaticResource HeaderArtSize}"
+                            VerticalAlignment="Bottom"
+                            CornerRadius="{StaticResource RadiusLarge}"
+                            Translation="0,0,40">
+                            <Grid.Shadow>
+                                <ThemeShadow />
+                            </Grid.Shadow>
+                            <items:CoverMosaic
+                                Covers="{x:Bind ViewModel.Covers, Mode=OneWay}"
+                                CornerRadius="{StaticResource RadiusLarge}"
+                                PlaceholderSize="56" />
+                        </Grid>
+                        <StackPanel
+                            Grid.Column="1"
+                            MaxWidth="760"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Bottom">
+                            <TextBlock
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                Style="{StaticResource EyebrowStyle}"
+                                Text="WEEKLY MIX" />
+                            <TextBlock
+                                Margin="0,8,0,0"
+                                AutomationProperties.HeadingLevel="Level1"
+                                Style="{StaticResource Title1Style}"
+                                Text="{x:Bind ViewModel.Title}" />
+                            <TextBlock
+                                MaxWidth="640"
+                                Margin="0,10,0,0"
+                                HorizontalAlignment="Left"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                Style="{StaticResource BodyStyle}"
+                                Text="{x:Bind ViewModel.Description}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,6,0,0"
+                                Style="{StaticResource MetaTextStyle}"
+                                Text="{x:Bind ViewModel.Details, Mode=OneWay}" />
+                            <StackPanel
+                                Margin="0,20,0,0"
+                                Orientation="Horizontal"
+                                Spacing="10">
+                                <Button
+                                    AutomationProperties.Name="Play"
+                                    Command="{x:Bind ViewModel.PlayCommand}"
+                                    Style="{StaticResource PillButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon FontSize="12" Glyph="&#xF5B0;" />
+                                        <TextBlock Text="Play" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    AutomationProperties.Name="Shuffle"
+                                    Command="{x:Bind ViewModel.ShuffleCommand}"
+                                    Style="{StaticResource PillSecondaryButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon FontSize="13" Glyph="&#xE8B1;" />
+                                        <TextBlock Text="Shuffle" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    AutomationProperties.Name="Save as playlist"
+                                    Command="{x:Bind ViewModel.SaveAsPlaylistCommand}"
+                                    Style="{StaticResource PillSecondaryButtonStyle}"
+                                    ToolTipService.ToolTip="Keep this week's mix as a private playlist on your account"
+                                    Visibility="{x:Bind ViewModel.IsSignedIn, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon FontSize="13" Glyph="&#xE710;" />
+                                        <TextBlock Text="Save as playlist" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    AutomationProperties.Name="{x:Bind ViewModel.Selection.ModeButtonText, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.Selection.ToggleModeCommand}"
+                                    Style="{StaticResource PillSecondaryButtonStyle}"
+                                    ToolTipService.ToolTip="Select several songs (or Ctrl-click them)">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon FontSize="13" Glyph="&#xE762;" />
+                                        <TextBlock Text="{x:Bind ViewModel.Selection.ModeButtonText, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </ListView.Header>
+        </ListView>
+
+        <ProgressBar Style="{StaticResource BusyBarStyle}" Visibility="{x:Bind ViewModel.ShowBusyBar, Mode=OneWay}" />
+        <items:SelectionBar Selection="{x:Bind ViewModel.Selection}" />
+        <items:EmptyState
+            Glyph="&#xE8D6;"
+            Heading="No mix yet"
+            Message="Keep listening: once Hush knows what you like, a new mix of artists you love and songs you haven't heard appears here every Monday."
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+        <items:EmptyState
+            ActionText="Try again"
+            Command="{x:Bind ViewModel.RetryCommand}"
+            Glyph="&#xE783;"
+            Heading="Couldn't load your mix"
+            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.ShowError, Mode=OneWay}" />
+    </Grid>
+</Page>

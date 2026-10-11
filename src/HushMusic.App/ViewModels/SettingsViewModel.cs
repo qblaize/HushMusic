@@ -16,6 +16,7 @@ using HushMusic.App.ViewModels.Shell;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Services;
 using HushMusic.Playback;
+using HushMusic.Playback.Pulse;
 
 namespace HushMusic.App.ViewModels;
 
@@ -32,6 +33,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     private readonly IUiDispatcher _dispatcher;
     private readonly IUpdateService _appUpdates;
     private readonly IGlobalHotkeyService _hotkeys;
+    private readonly IMusicPulse _pulse;
     private readonly ILogger<SettingsViewModel> _logger;
     private CancellationTokenSource? _updateCts;
     private CancellationTokenSource? _lastFmCts;
@@ -56,6 +58,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         IUiDispatcher dispatcher,
         IUpdateService appUpdates,
         IGlobalHotkeyService hotkeys,
+        IMusicPulse pulse,
+        SmartSkipSettingsViewModel smartSkip,
         INotificationService notifications,
         ILogger<SettingsViewModel> logger)
         : base(notifications)
@@ -69,13 +73,18 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         _dispatcher = dispatcher;
         _appUpdates = appUpdates;
         _hotkeys = hotkeys;
+        _pulse = pulse;
         _logger = logger;
         Account = account;
+        SmartSkip = smartSkip;
         AccentSwatches = BuildAccentSwatches();
         Hotkeys = [.. GlobalHotkeyMap.Actions.Select(a => new HotkeySettingViewModel(a, OnHotkeyEdited, hotkeys.Pause))];
     }
 
     public AccountViewModel Account { get; }
+
+    /// <summary>Playback: smart skip and the songs it leaves out.</summary>
+    public SmartSkipSettingsViewModel SmartSkip { get; }
 
     public IReadOnlyList<string> LogLevels { get; } = ["Verbose", "Debug", "Information", "Warning", "Error"];
 
@@ -123,6 +132,19 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     public partial bool AnimateNowPlayingBackground { get; set; } = true;
 
     [ObservableProperty]
+    public partial bool PulseToMusic { get; set; }
+
+    /// <summary>"Pulse to the music" works in the Standard layout, where Windows lets the app capture its own audio.</summary>
+    public bool IsPulseAvailable => IsArtStyleAvailable && _pulse.Availability == MusicPulseAvailability.Available;
+
+    public string PulseDescription => _pulse.Availability switch
+    {
+        MusicPulseAvailability.NeedsNewerWindows => "Needs Windows 11: earlier versions can't capture one app's sound.",
+        MusicPulseAvailability.Failed => "Not available: Windows didn't let Hush listen to its own sound.",
+        _ => "The background and cover glow move with the beat. Uses more power.",
+    };
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDesignRestartPending))]
     public partial string DesignSystem { get; set; } = DesignSystems.Hush;
 
@@ -130,7 +152,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     public bool IsDesignRestartPending => DesignSystem != DesignSystems.Active;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsArtStyleAvailable), nameof(ArtStyleDescription))]
+    [NotifyPropertyChangedFor(nameof(IsArtStyleAvailable), nameof(ArtStyleDescription), nameof(IsPulseAvailable))]
     public partial string PlayerLayout { get; set; } = PlayerLayouts.Standard;
 
     /// <summary>The Minimal layout always shows the single cover.</summary>
@@ -356,6 +378,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         AccentStyle = AccentPresets.Normalize(current.AccentStyle);
         NowPlayingArtStyle = CoverFlowViewModel.IsCoverFlow(current.NowPlayingArtStyle) ? CoverFlowViewModel.CoverFlowStyle : CoverFlowViewModel.SingleStyle;
         AnimateNowPlayingBackground = current.AnimateNowPlayingBackground;
+        PulseToMusic = current.PulseToMusic;
         DesignSystem = DesignSystems.Normalize(current.DesignSystem);
         PlayerLayout = PlayerLayouts.IsMinimal(current.PlayerLayout) ? PlayerLayouts.Minimal : PlayerLayouts.Standard;
         ReportPlaybackHistory = current.ReportPlaybackHistory;
@@ -619,6 +642,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     }
 
     partial void OnAnimateNowPlayingBackgroundChanged(bool value) => Save(s => s.AnimateNowPlayingBackground = value);
+
+    partial void OnPulseToMusicChanged(bool value) => Save(s => s.PulseToMusic = value);
 
     partial void OnReportPlaybackHistoryChanged(bool value) => Save(s => s.ReportPlaybackHistory = value);
 

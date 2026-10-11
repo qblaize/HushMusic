@@ -84,8 +84,20 @@ public sealed class AppSettings
     /// <summary>Cover Flow mode only: the Up next / Lyrics / Related panel is hidden so the covers get the whole view.</summary>
     public bool NowPlayingPanelHidden { get; set; }
 
+    /// <summary>
+    /// Now Playing shows the music video in place of the cover when the playing item is one. Picture only (the sound
+    /// still comes from the audio stream), fetched only while Now Playing is on screen.
+    /// </summary>
+    public bool NowPlayingVideo { get; set; }
+
     /// <summary>The blurred artwork behind Now Playing slowly drifts (Standard player layout). Off holds it still.</summary>
     public bool AnimateNowPlayingBackground { get; set; } = true;
+
+    /// <summary>
+    /// The Now Playing background and a glow behind the cover move with the music (Standard player layout). Off by
+    /// default: it listens to the app's own audio while Now Playing is open, which costs a little CPU.
+    /// </summary>
+    public bool PulseToMusic { get; set; }
 
     /// <summary>"Hush" (the app's own design) or "Windows" (stock Windows 11 / Fluent look with Mica). Applied at startup.</summary>
     public string DesignSystem { get; set; } = "Hush";
@@ -101,6 +113,12 @@ public sealed class AppSettings
 
     /// <summary>When an album or playlist ends, keep playing similar songs (a radio from the last track).</summary>
     public bool AutoplayWhenQueueEnds { get; set; } = true;
+
+    /// <summary>
+    /// Songs skipped in their first seconds three times stop being added automatically (radio, autoplay, the weekly mix);
+    /// see <see cref="ISmartSkip"/>. Songs the user picks still play.
+    /// </summary>
+    public bool SmartSkip { get; set; } = true;
 
     /// <summary>A Windows notification with the cover when a new song starts (only while Hush isn't in front).</summary>
     public bool ShowTrackNotifications { get; set; }

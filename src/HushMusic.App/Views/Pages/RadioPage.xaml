@@ -207,6 +207,118 @@
 
             <!--  ===== Browsing: genres, favourites, curated and directory stations =====  -->
             <StackPanel Visibility="{x:Bind ViewModel.IsBrowsing, Mode=OneWay}">
+                <!--  Station of the day: one station from the user's genres, the same all day.  -->
+                <Grid
+                    Margin="0,24,0,0"
+                    Padding="16"
+                    Background="{ThemeResource Surface1Brush}"
+                    BorderBrush="{ThemeResource SeparatorBrush}"
+                    BorderThickness="1"
+                    ColumnSpacing="20"
+                    CornerRadius="{StaticResource RadiusXL}"
+                    Visibility="{x:Bind ViewModel.HasTodayStation, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid
+                        Width="136"
+                        Height="136"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource Surface2Brush}"
+                        CornerRadius="{StaticResource ArtCornerRadius}">
+                        <radio:StationArt LogoUrl="{x:Bind ViewModel.TodayStation.LogoUrl, Mode=OneWay}" StationName="{x:Bind ViewModel.TodayStation.Name, Mode=OneWay}" />
+                        <Border
+                            BorderBrush="{ThemeResource SeparatorBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource ArtCornerRadius}"
+                            IsHitTestVisible="False" />
+                    </Grid>
+                    <StackPanel
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Spacing="2">
+                        <TextBlock Style="{StaticResource EyebrowStyle}" Text="STATION OF THE DAY" />
+                        <TextBlock
+                            AutomationProperties.HeadingLevel="Level2"
+                            Style="{StaticResource Title2Style}"
+                            Text="{x:Bind ViewModel.TodayStation.Name, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            Style="{StaticResource SubheadStyle}"
+                            Text="{x:Bind ViewModel.TodayDetails, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            Style="{StaticResource FootnoteStyle}"
+                            Text="{x:Bind ViewModel.TodayReason, Mode=OneWay}" />
+                        <StackPanel
+                            Margin="0,12,0,0"
+                            Orientation="Horizontal"
+                            Spacing="10">
+                            <Button
+                                AutomationProperties.AutomationId="StationOfTheDayPlay"
+                                AutomationProperties.Name="{x:Bind ViewModel.TodayStation.PlayLabel, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.TodayStation.PlayCommand, Mode=OneWay}"
+                                Style="{StaticResource PillButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="12" Glyph="&#xF5B0;" />
+                                    <TextBlock Text="Play" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                AutomationProperties.AutomationId="StationOfTheDayFavorite"
+                                AutomationProperties.Name="{x:Bind ViewModel.TodayStation.FavoriteLabel, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.TodayStation.ToggleFavoriteCommand, Mode=OneWay}"
+                                CornerRadius="18"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.TodayStation.FavoriteLabel, Mode=OneWay}">
+                                <FontIcon Glyph="{x:Bind ViewModel.TodayStation.FavoriteGlyph, Mode=OneWay}" />
+                            </Button>
+                            <Button
+                                AutomationProperties.AutomationId="StationOfTheDayReroll"
+                                AutomationProperties.Name="Another one"
+                                Command="{x:Bind ViewModel.RerollTodayCommand}"
+                                Style="{StaticResource PillSecondaryButtonStyle}"
+                                ToolTipService.ToolTip="Pick another station for today"
+                                Visibility="{x:Bind ViewModel.CanRerollToday, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="13" Glyph="&#xE72C;" />
+                                    <TextBlock Text="Another one" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                AutomationProperties.AutomationId="StationOfTheDayMore"
+                                AutomationProperties.Name="More options"
+                                CornerRadius="18"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="More options">
+                                <FontIcon Glyph="&#xE712;" />
+                                <Button.Flyout>
+                                    <MenuFlyout MenuFlyoutPresenterStyle="{StaticResource AppMenuFlyoutPresenterStyle}" Placement="BottomEdgeAlignedLeft">
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.TodayStation.ToggleAutoSaveCommand, Mode=OneWay}"
+                                            Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                            Text="{x:Bind ViewModel.TodayStation.AutoSaveLabel, Mode=OneWay}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="{x:Bind ViewModel.TodayStation.AutoSaveGlyph, Mode=OneWay}" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.TodayStation.OpenWebsiteCommand, Mode=OneWay}"
+                                            Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                            Text="Open website">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="&#xE774;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
                 <!--  Genre chips (ToggleButtons kept exclusive by ToggleGroup), scrolling sideways on narrow windows.  -->
                 <ScrollViewer
                     Margin="0,20,-40,0"

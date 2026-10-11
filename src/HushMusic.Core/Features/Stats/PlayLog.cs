@@ -12,7 +12,10 @@ namespace HushMusic.Core.Features.Stats;
 /// <summary>The local, append-only log of plays behind "Your stats". Thread-safe.</summary>
 public interface IPlayLog
 {
-    /// <summary>Raised after a line was added or the log was cleared (on the writing thread).</summary>
+    /// <summary>
+    /// Raised after a line was added or the log was cleared (on the writing thread). The arguments are a
+    /// <see cref="PlayLogChangedEventArgs"/> when the log can tell which.
+    /// </summary>
     event EventHandler? Changed;
 
     Task AppendAsync(PlayRecord record, CancellationToken cancellationToken = default);
@@ -25,6 +28,15 @@ public interface IPlayLog
 
     /// <summary>Deletes the whole log.</summary>
     Task ClearAsync(CancellationToken cancellationToken = default);
+}
+
+/// <summary>What changed in the play log: the line that was added, or nothing when the log was cleared.</summary>
+public sealed class PlayLogChangedEventArgs(PlayRecord? appended) : EventArgs
+{
+    public static readonly PlayLogChangedEventArgs Cleared = new(null);
+
+    /// <summary>The record of the line that was added; null when the log was cleared.</summary>
+    public PlayRecord? Appended { get; } = appended;
 }
 
 /// <summary>
@@ -94,7 +106,7 @@ internal sealed partial class JsonLinesPlayLog : IPlayLog
             _gate.Release();
         }
 
-        Changed?.Invoke(this, EventArgs.Empty);
+        Changed?.Invoke(this, new PlayLogChangedEventArgs(record));
     }
 
     public async Task<IReadOnlyList<PlayRecord>> ReadAsync(DateTimeOffset? since = null, CancellationToken cancellationToken = default)
@@ -165,7 +177,7 @@ internal sealed partial class JsonLinesPlayLog : IPlayLog
             _gate.Release();
         }
 
-        Changed?.Invoke(this, EventArgs.Empty);
+        Changed?.Invoke(this, PlayLogChangedEventArgs.Cleared);
     }
 
     internal static PlayRecord? TryParse(string line)

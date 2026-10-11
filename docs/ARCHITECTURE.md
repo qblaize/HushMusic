@@ -68,6 +68,14 @@ Rules that follow from this:
    ends. When the fade starts, the queue advances: `TrackCompleted` fires for the outgoing song, then `TrackChanged` and
    `TrackStarted` for the incoming one. Live radio, repeat-one, the sleep timer's end-of-track pause and short songs are
    never faded. The system media controls stay bound to one player's session.
+6. Video mode (Now Playing, off by default) shows a playing music video in place of the cover. `MusicVideoPlayer` plays
+   the picture on a third, muted `MediaPlayer` and keeps it in step with the sound (`VideoSync`: a seek aims ahead of
+   the sound by the measured seek time and waits for it; small drift is evened out by up to ±12% speed). The picture
+   is a video-only VP9/WebM stream (`IStreamResolver.ResolveVideoAsync`), picked from the format list the audio's
+   yt-dlp run already returned and sized to the cover (720p cap, never above 1080p). YouTube's MP4 video is fragmented
+   like its M4A audio and doesn't play over HTTP. Nothing is fetched or decoded unless Now Playing is on screen. A
+   song keeps its cover: its music video (`Track.VideoVersion`, the watch playlist's Song / Video counterpart, signed
+   in only) is another recording, so it is offered as an item of its own, never synced to the song.
 
 yt-dlp and Deno are installed by the app into `%LOCALAPPDATA%\HushMusic\tools\<tool>\<version>\` from their official
 GitHub releases, checked against the published SHA-256, and replaced side by side when a new version comes out (a

@@ -7,6 +7,8 @@ using HushMusic.App.Services.Windowing.TaskbarWidget;
 using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.RadioMatch;
 using HushMusic.App.ViewModels.Shell;
+using HushMusic.App.ViewModels.YearInReview;
+using HushMusic.Playback.Pulse;
 
 namespace HushMusic.App.Hosting;
 
@@ -32,6 +34,9 @@ internal static class ShellServiceRegistration
         services.AddSingleton<GlobalHotkeyService>();
         services.AddSingleton<IGlobalHotkeyService>(sp => sp.GetRequiredService<GlobalHotkeyService>());
         services.AddSingleton<TrackNotificationService>();
+
+        // "Pulse to the music": captures the app's own audio only while Now Playing shows the effect.
+        services.AddSingleton<IMusicPulse, MusicPulse>();
         services.AddAppUpdates();
 
         services.AddSingleton<AccountViewModel>();
@@ -46,9 +51,11 @@ internal static class ShellServiceRegistration
         services.AddSingleton<PlayerViewModel>();
         services.AddSingleton<NowPlayingViewModel>();
         services.AddSingleton<SearchBoxViewModel>();
+        services.AddSingleton<YearInReviewViewModel>();
         services.AddSingleton<ShellViewModel>();
 
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<SmartSkipSettingsViewModel>();
         pages.Register<SettingsPage>(PageKey.Settings);
         return services;
     }

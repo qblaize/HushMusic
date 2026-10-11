@@ -49,6 +49,21 @@ public sealed record Track : MediaItem
     public FeedbackTokens? FeedbackTokens { get; init; }
 
     /// <summary>
+    /// The other half of YouTube Music's Song / Video switch: the music video of a song, or the song of a music video.
+    /// Only up-next and radio queues carry it, and only in signed-in responses.
+    /// </summary>
+    public Track? Counterpart { get; init; }
+
+    /// <summary>A music video (official or uploaded) rather than a song: its picture belongs to its own sound.</summary>
+    public bool IsMusicVideo => Type == TrackType.Video && !IsLiveRadio;
+
+    /// <summary>
+    /// The music video of this song, when the queue named one (<see cref="Counterpart"/>). Its sound is a different
+    /// recording or edit, so it plays instead of the song, never in step with it.
+    /// </summary>
+    public Track? VideoVersion => !IsMusicVideo && !IsLiveRadio && Counterpart is { Type: TrackType.Video } video ? video : null;
+
+    /// <summary>
     /// Set when this item is a live internet radio station rather than a YouTube track (see <see cref="LiveRadio"/>):
     /// <see cref="VideoId"/> is then "radio:…" and must never reach YouTube.
     /// </summary>

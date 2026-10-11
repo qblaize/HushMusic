@@ -11,6 +11,13 @@ public sealed partial class StatsPage : Page
     public StatsPage()
     {
         InitializeComponent();
+
+        // Automated screenshots can't scroll: HUSHMUSIC_TEST_STATS_SCROLL=end keeps the page at the bottom (achievements).
+        if (Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_STATS_SCROLL") == "end")
+        {
+            Scroller.SizeChanged += (_, _) => ScrollToEnd();
+            ((FrameworkElement)Scroller.Content).SizeChanged += (_, _) => ScrollToEnd();
+        }
     }
 
     public StatsViewModel ViewModel { get; } = App.GetService<StatsViewModel>();
@@ -39,6 +46,19 @@ public sealed partial class StatsPage : Page
     }
 
     private void OnPeriodUnchecked(object sender, RoutedEventArgs e) => ToggleGroup.OnUnchecked((ToggleButton)sender);
+
+    private void OnReviewYearClick(object sender, RoutedEventArgs e)
+    {
+        // The chosen year stays checked; picking another one rebuilds the chips.
+        if (sender is ToggleButton { Tag: int year } chip)
+        {
+            chip.IsChecked = true;
+            ViewModel.SelectReviewYear(year);
+        }
+    }
+
+    private void ScrollToEnd() =>
+        DispatcherQueue.TryEnqueue(() => Scroller.ChangeView(null, Scroller.ScrollableHeight, null, disableAnimation: true));
 
     private void OnRankItemClick(object sender, RoutedEventArgs e)
     {

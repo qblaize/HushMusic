@@ -3,6 +3,8 @@ using HushMusic.App.Services.Pages;
 using HushMusic.App.Services.Radio;
 using HushMusic.App.ViewModels.Pages;
 using HushMusic.App.Views.Pages;
+using HushMusic.Core.Features;
+using HushMusic.Core.Radio;
 
 namespace HushMusic.App.Hosting;
 
@@ -21,6 +23,8 @@ internal static class PageServiceRegistration
         services.AddSingleton<IRecentSearches, RecentSearches>();
         services.AddSingleton<IPlaylistDropTarget, PlaylistDropTarget>();
         services.AddSingleton<IStationLogos, StationLogos>();
+        services.AddRadioAutoSave();
+        services.AddStationOfTheDay();
         services.AddSingleton<IConfirmDialogService, ConfirmDialogService>();
         services.AddSingleton<PageServices>();
 
@@ -38,6 +42,8 @@ internal static class PageServiceRegistration
         Register<ExploreCategoryPage, ExploreCategoryViewModel>(PageKey.ExploreCategory);
         Register<ArtistDiscographyPage, ArtistDiscographyViewModel>(PageKey.ArtistDiscography);
         Register<StatsPage, StatsViewModel>(PageKey.Stats);
+        Register<FreshMixPage, FreshMixViewModel>(PageKey.FreshMix);
+        services.AddTransient<FreshMixCardViewModel>();
 
         return services;
 

@@ -103,7 +103,9 @@ internal static class WatchParser
 
             if (ParseTrack(video, scope) is { } track)
             {
-                tracks.Add(track);
+                tracks.Add(Counterpart(row) is { } twin && ParseTrack(twin, scope) is { } counterpart
+                    ? track with { Counterpart = counterpart }
+                    : track);
             }
         }
 
@@ -111,12 +113,16 @@ internal static class WatchParser
     }
 
     /// <summary>
-    /// The video of a queue row. Wrapped rows hold an audio/video twin in <c>counterpart</c>; only the primary
-    /// renderer is used (the model has no counterpart field).
+    /// The video of a queue row. Wrapped rows (<c>playlistPanelVideoWrapperRenderer</c>) hold the song/video twin of
+    /// their primary renderer in <c>counterpart</c>, see <see cref="Counterpart"/>.
     /// </summary>
     private static JsonObject? PanelVideo(JsonObject row) =>
         row.Obj("playlistPanelVideoRenderer")
         ?? row.Obj("playlistPanelVideoWrapperRenderer", "primaryRenderer", "playlistPanelVideoRenderer");
+
+    /// <summary>The other half of YouTube Music's Song / Video switch (ytmusicapi: first <c>counterpartRenderer</c>).</summary>
+    private static JsonObject? Counterpart(JsonObject row) =>
+        row.Obj("playlistPanelVideoWrapperRenderer", "counterpart", 0, "counterpartRenderer", "playlistPanelVideoRenderer");
 
     private static Track? ParseTrack(JsonObject video, ParseScope scope)
     {

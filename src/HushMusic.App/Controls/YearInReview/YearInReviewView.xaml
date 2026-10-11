@@ -1,0 +1,847 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.YearInReview.YearInReviewView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:radio="using:HushMusic.App.Controls.Radio"
+    xmlns:vm="using:HushMusic.App.ViewModels.YearInReview"
+    xmlns:yir="using:HushMusic.App.Controls.YearInReview"
+    IsTabStop="False"
+    RequestedTheme="Dark">
+
+    <UserControl.Resources>
+        <!--  The recap's accent: the top song's cover colour (recoloured in place when the view opens).  -->
+        <SolidColorBrush x:Key="RecapAccentBrush" Color="#9D7BFA" />
+
+        <!--  Legibility over the artwork (even white covers): dark at the top, a little less in the middle, darkest at the footer.  -->
+        <LinearGradientBrush x:Key="RecapScrimBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Offset="0" Color="#8C000000" />
+            <GradientStop Offset="0.55" Color="#73000000" />
+            <GradientStop Offset="1" Color="#CC000000" />
+        </LinearGradientBrush>
+
+        <!--  ===== Type: the app's ramp, scaled up for a poster-sized card =====  -->
+        <Style x:Key="RecapEyebrowStyle" BasedOn="{StaticResource EyebrowStyle}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource RecapAccentBrush}" />
+        </Style>
+        <Style x:Key="RecapDisplayStyle" BasedOn="{StaticResource LargeTitleStyle}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="128" />
+            <Setter Property="CharacterSpacing" Value="-50" />
+            <Setter Property="LineHeight" Value="128" />
+        </Style>
+        <Style x:Key="RecapNumberStyle" BasedOn="{StaticResource LargeTitleStyle}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="68" />
+            <Setter Property="CharacterSpacing" Value="-40" />
+        </Style>
+        <Style x:Key="RecapHeadingStyle" BasedOn="{StaticResource LargeTitleStyle}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="32" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MaxLines" Value="2" />
+        </Style>
+        <Style x:Key="RecapTitleStyle" BasedOn="{StaticResource Title1Style}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MaxLines" Value="2" />
+        </Style>
+        <Style x:Key="RecapLeadStyle" BasedOn="{StaticResource BodyStyle}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        </Style>
+        <Style x:Key="RecapBodyStyle" BasedOn="{StaticResource BodyStyle}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextTrimming" Value="None" />
+        </Style>
+        <Style x:Key="RecapDetailStyle" BasedOn="{StaticResource HeadlineStyle}" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{StaticResource RecapAccentBrush}" />
+        </Style>
+
+        <!--  ===== Chrome around the card =====  -->
+        <Style x:Key="RecapRoundButtonStyle" BasedOn="{StaticResource IconButtonStyle}" TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Background" Value="{ThemeResource HoverFillBrush}" />
+            <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        </Style>
+        <Style x:Key="RecapChevronButtonStyle" BasedOn="{StaticResource RecapRoundButtonStyle}" TargetType="Button">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="CornerRadius" Value="22" />
+        </Style>
+
+        <!--  The two halves of the card: invisible, they only take the clicks.  -->
+        <Style x:Key="RecapZoneButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="{TemplateBinding Background}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  ===== Slides =====  -->
+
+        <!--  The year, and how long it all lasted.  -->
+        <DataTemplate x:Key="IntroTemplate" x:DataType="vm:IntroSlide">
+            <Grid>
+                <StackPanel VerticalAlignment="Top">
+                    <TextBlock
+                        yir:RecapMotion.Order="0"
+                        Style="{StaticResource RecapEyebrowStyle}"
+                        Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                    <TextBlock
+                        Margin="-6,14,0,0"
+                        yir:RecapMotion.Order="1"
+                        Style="{StaticResource RecapDisplayStyle}"
+                        Text="{x:Bind YearText}"
+                        Typography.NumeralAlignment="Tabular" />
+                </StackPanel>
+                <StackPanel VerticalAlignment="Bottom" Spacing="2">
+                    <TextBlock
+                        yir:RecapMotion.Order="3"
+                        Style="{StaticResource RecapLeadStyle}"
+                        Text="You listened for" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock
+                            yir:RecapMotion.CountTo="{x:Bind Minutes}"
+                            yir:RecapMotion.Order="4"
+                            Style="{StaticResource RecapNumberStyle}"
+                            Typography.NumeralAlignment="Tabular" />
+                        <TextBlock
+                            Margin="0,0,0,11"
+                            VerticalAlignment="Bottom"
+                            yir:RecapMotion.Order="4"
+                            Style="{StaticResource RecapLeadStyle}"
+                            Text="minutes" />
+                    </StackPanel>
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        yir:RecapMotion.Order="5"
+                        Style="{StaticResource RecapBodyStyle}"
+                        Text="{x:Bind Caption}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <!--  The top song or the top album: a big cover.  -->
+        <DataTemplate x:Key="FeatureTemplate" x:DataType="vm:FeatureSlide">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    yir:RecapMotion.Order="0"
+                    Style="{StaticResource RecapEyebrowStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                <Grid
+                    Grid.Row="1"
+                    Width="276"
+                    Height="276"
+                    VerticalAlignment="Center"
+                    yir:RecapMotion.Effect="Zoom"
+                    yir:RecapMotion.Order="1">
+                    <Grid
+                        Background="{ThemeResource Surface2Brush}"
+                        CornerRadius="16"
+                        Shadow="{StaticResource ShellShadow}"
+                        Translation="0,0,40">
+                        <FontIcon
+                            FontSize="56"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            Glyph="{x:Bind Glyph}" />
+                        <Image
+                            helpers:ImageLoader.DecodeWidth="560"
+                            helpers:ImageLoader.Url="{x:Bind CoverUrl}"
+                            Stretch="UniformToFill" />
+                        <Border
+                            BorderBrush="{ThemeResource SeparatorBrush}"
+                            BorderThickness="1"
+                            CornerRadius="16" />
+                    </Grid>
+                </Grid>
+                <StackPanel Grid.Row="2" Spacing="4">
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="2"
+                        Style="{StaticResource RecapTitleStyle}"
+                        Text="{x:Bind Title}"
+                        TextAlignment="Center" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="3"
+                        Style="{StaticResource RecapLeadStyle}"
+                        Text="{x:Bind Subtitle}" />
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="4"
+                        Style="{StaticResource RecapDetailStyle}"
+                        Text="{x:Bind Detail}"
+                        Typography.NumeralAlignment="Tabular" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <!--  The top artist: a round picture in an accent ring.  -->
+        <DataTemplate x:Key="ArtistTemplate" x:DataType="vm:ArtistSlide">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    yir:RecapMotion.Order="0"
+                    Style="{StaticResource RecapEyebrowStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                <Border
+                    Grid.Row="1"
+                    Width="268"
+                    Height="268"
+                    Padding="6"
+                    VerticalAlignment="Center"
+                    yir:RecapMotion.Effect="Zoom"
+                    yir:RecapMotion.Order="1"
+                    BorderBrush="{StaticResource RecapAccentBrush}"
+                    BorderThickness="3"
+                    CornerRadius="134">
+                    <Grid Background="{ThemeResource Surface2Brush}" CornerRadius="128">
+                        <FontIcon
+                            FontSize="56"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            Glyph="&#xE77B;" />
+                        <Image
+                            helpers:ImageLoader.DecodeWidth="520"
+                            helpers:ImageLoader.Url="{x:Bind PictureUrl}"
+                            Stretch="UniformToFill" />
+                    </Grid>
+                </Border>
+                <StackPanel Grid.Row="2" Spacing="4">
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="2"
+                        Style="{StaticResource RecapTitleStyle}"
+                        Text="{x:Bind ArtistName}"
+                        TextAlignment="Center" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="3"
+                        Style="{StaticResource RecapDetailStyle}"
+                        Text="{x:Bind Detail}"
+                        Typography.NumeralAlignment="Tabular" />
+                    <TextBlock
+                        Margin="0,6,0,0"
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="4"
+                        Style="{StaticResource RecapBodyStyle}"
+                        Text="{x:Bind Caption}"
+                        TextAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <!--  A top five: rank, art, name, plays.  -->
+        <DataTemplate x:Key="RankingTemplate" x:DataType="vm:RankingSlide">
+            <StackPanel>
+                <TextBlock
+                    yir:RecapMotion.Order="0"
+                    Style="{StaticResource RecapEyebrowStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                <TextBlock
+                    Margin="0,10,0,20"
+                    yir:RecapMotion.Order="1"
+                    Style="{StaticResource RecapHeadingStyle}"
+                    Text="{x:Bind Heading}" />
+                <ItemsControl IsTabStop="False" ItemsSource="{x:Bind Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RecapRankItem">
+                            <Grid
+                                Height="66"
+                                yir:RecapMotion.Order="{x:Bind Order}"
+                                ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="22" />
+                                    <ColumnDefinition Width="52" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{StaticResource RecapAccentBrush}"
+                                    Style="{StaticResource Title2Style}"
+                                    Text="{x:Bind Rank}"
+                                    Typography.NumeralAlignment="Tabular" />
+                                <Grid
+                                    Grid.Column="1"
+                                    Width="52"
+                                    Height="52"
+                                    Background="{ThemeResource Surface2Brush}"
+                                    CornerRadius="{x:Bind ArtCorners}">
+                                    <Image
+                                        helpers:ImageLoader.DecodeWidth="104"
+                                        helpers:ImageLoader.Url="{x:Bind ArtUrl}"
+                                        Stretch="UniformToFill" />
+                                </Grid>
+                                <StackPanel
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Spacing="2">
+                                    <TextBlock
+                                        FontSize="16"
+                                        Style="{StaticResource HeadlineStyle}"
+                                        Text="{x:Bind Title}" />
+                                    <TextBlock
+                                        FontSize="14"
+                                        Style="{StaticResource SubheadStyle}"
+                                        Text="{x:Bind Subtitle}"
+                                        Visibility="{x:Bind helpers:Format.VisibleIf(HasSubtitle)}" />
+                                </StackPanel>
+                                <TextBlock
+                                    Grid.Column="3"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource FootnoteStyle}"
+                                    Text="{x:Bind Detail}"
+                                    Typography.NumeralAlignment="Tabular" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
+
+        <!--  When: a 24-hour clock of the listening, and the days of the week.  -->
+        <DataTemplate x:Key="ClockTemplate" x:DataType="vm:ClockSlide">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    yir:RecapMotion.Order="0"
+                    Style="{StaticResource RecapEyebrowStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                <TextBlock
+                    Grid.Row="1"
+                    Margin="0,10,0,0"
+                    yir:RecapMotion.Order="1"
+                    Style="{StaticResource RecapHeadingStyle}"
+                    Text="{x:Bind Persona}" />
+                <TextBlock
+                    Grid.Row="2"
+                    Margin="0,4,0,0"
+                    yir:RecapMotion.Order="2"
+                    Style="{StaticResource RecapLeadStyle}"
+                    Text="{x:Bind Caption}" />
+                <Grid
+                    Grid.Row="3"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                    <yir:ListeningClock
+                        yir:RecapMotion.Order="3"
+                        Accent="{StaticResource RecapAccentBrush}"
+                        Slide="{x:Bind}" />
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        yir:RecapMotion.Effect="Fade"
+                        yir:RecapMotion.Order="5">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource Title2Style}"
+                            Text="{x:Bind PeakLabel}" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource FootnoteStyle}"
+                            Text="peak" />
+                    </StackPanel>
+                </Grid>
+                <Grid
+                    Grid.Row="4"
+                    ColumnSpacing="20"
+                    yir:RecapMotion.Order="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        VerticalAlignment="Bottom"
+                        Style="{StaticResource RecapBodyStyle}"
+                        Text="{x:Bind WeekdayCaption}" />
+                    <ItemsControl
+                        Grid.Column="1"
+                        IsTabStop="False"
+                        ItemsSource="{x:Bind Weekdays}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RecapBar">
+                                <StackPanel Width="20" Spacing="6">
+                                    <Grid Height="52">
+                                        <Border
+                                            Height="{x:Bind Height}"
+                                            VerticalAlignment="Bottom"
+                                            Background="{StaticResource RecapAccentBrush}"
+                                            CornerRadius="3"
+                                            Opacity="{x:Bind Opacity}" />
+                                    </Grid>
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        Style="{StaticResource FootnoteStyle}"
+                                        Text="{x:Bind Label}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
+        <!--  Days with music: the count, the year as a grid, the longest streak and the biggest day.  -->
+        <DataTemplate x:Key="DaysTemplate" x:DataType="vm:DaysSlide">
+            <StackPanel>
+                <TextBlock
+                    yir:RecapMotion.Order="0"
+                    Style="{StaticResource RecapEyebrowStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                <TextBlock
+                    Margin="-2,6,0,0"
+                    yir:RecapMotion.Order="1"
+                    Style="{StaticResource RecapNumberStyle}"
+                    Text="{x:Bind DaysText}"
+                    Typography.NumeralAlignment="Tabular" />
+                <TextBlock
+                    yir:RecapMotion.Order="2"
+                    Style="{StaticResource RecapLeadStyle}"
+                    Text="{x:Bind Caption}" />
+                <yir:YearHeatmap
+                    Margin="0,22,0,0"
+                    yir:RecapMotion.Order="3"
+                    Accent="{StaticResource RecapAccentBrush}"
+                    Slide="{x:Bind}" />
+                <StackPanel
+                    Margin="0,24,0,0"
+                    yir:RecapMotion.Order="5"
+                    Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <FontIcon
+                            FontSize="16"
+                            Foreground="{StaticResource RecapAccentBrush}"
+                            Glyph="&#xE787;" />
+                        <TextBlock
+                            FontSize="15"
+                            Style="{StaticResource BodyStyle}"
+                            Text="{x:Bind StreakText}" />
+                    </StackPanel>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="10"
+                        Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(BiggestDayText)}">
+                        <FontIcon
+                            FontSize="16"
+                            Foreground="{StaticResource RecapAccentBrush}"
+                            Glyph="&#xE7C1;" />
+                        <TextBlock
+                            FontSize="15"
+                            Style="{StaticResource BodyStyle}"
+                            Text="{x:Bind BiggestDayText}" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+
+        <!--  Live radio: the top station's logo, the hours.  -->
+        <DataTemplate x:Key="RadioTemplate" x:DataType="vm:RadioSlide">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    yir:RecapMotion.Order="0"
+                    Style="{StaticResource RecapEyebrowStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                <radio:StationArt
+                    Grid.Row="1"
+                    Width="220"
+                    Height="220"
+                    VerticalAlignment="Center"
+                    yir:RecapMotion.Effect="Zoom"
+                    yir:RecapMotion.Order="1"
+                    CornerRadius="24"
+                    LogoUrl="{x:Bind LogoUrl}"
+                    StationName="{x:Bind StationName}" />
+                <StackPanel Grid.Row="2" Spacing="4">
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="2"
+                        Style="{StaticResource RecapTitleStyle}"
+                        Text="{x:Bind StationName}"
+                        TextAlignment="Center" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="3"
+                        Style="{StaticResource RecapDetailStyle}"
+                        Text="{x:Bind Detail}"
+                        Typography.NumeralAlignment="Tabular" />
+                    <TextBlock
+                        Margin="0,6,0,0"
+                        HorizontalAlignment="Center"
+                        yir:RecapMotion.Order="4"
+                        Style="{StaticResource RecapBodyStyle}"
+                        Text="{x:Bind Caption}"
+                        TextAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <!--  The summary card: made to be saved and shared.  -->
+        <DataTemplate x:Key="OutroTemplate" x:DataType="vm:OutroSlide">
+            <StackPanel>
+                <TextBlock
+                    yir:RecapMotion.Order="0"
+                    Style="{StaticResource RecapEyebrowStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader(Eyebrow)}" />
+                <Grid Margin="0,16,0,0" ColumnSpacing="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid
+                        Width="112"
+                        Height="112"
+                        yir:RecapMotion.Effect="Zoom"
+                        yir:RecapMotion.Order="1"
+                        Background="{ThemeResource Surface2Brush}"
+                        CornerRadius="12">
+                        <FontIcon
+                            FontSize="32"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            Glyph="&#xE8D6;" />
+                        <Image
+                            helpers:ImageLoader.DecodeWidth="224"
+                            helpers:ImageLoader.Url="{x:Bind CoverUrl}"
+                            Stretch="UniformToFill" />
+                        <Border
+                            BorderBrush="{ThemeResource SeparatorBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12" />
+                    </Grid>
+                    <TextBlock
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        yir:RecapMotion.Order="2"
+                        Style="{StaticResource RecapHeadingStyle}"
+                        Text="{x:Bind Heading}" />
+                </Grid>
+                <ItemsControl
+                    Margin="0,26,0,0"
+                    yir:RecapMotion.Order="3"
+                    IsTabStop="False"
+                    ItemsSource="{x:Bind Stats}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="36" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RecapStat">
+                            <StackPanel Spacing="2">
+                                <TextBlock
+                                    FontSize="30"
+                                    Style="{StaticResource Title1Style}"
+                                    Text="{x:Bind Value}"
+                                    Typography.NumeralAlignment="Tabular" />
+                                <TextBlock Style="{StaticResource FootnoteStyle}" Text="{x:Bind Label}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid Margin="0,32,0,0" ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel yir:RecapMotion.Order="4" Spacing="8">
+                        <TextBlock Style="{StaticResource RecapEyebrowStyle}" Text="{x:Bind helpers:Format.SectionHeader('Top artists')}" />
+                        <ItemsControl IsTabStop="False" ItemsSource="{x:Bind TopArtists}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RecapRankItem">
+                                    <Grid Height="30" ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource RecapAccentBrush}"
+                                            Style="{StaticResource HeadlineStyle}"
+                                            Text="{x:Bind Rank}"
+                                            Typography.NumeralAlignment="Tabular" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource HeadlineStyle}"
+                                            Text="{x:Bind Title}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel
+                        Grid.Column="1"
+                        yir:RecapMotion.Order="5"
+                        Spacing="8">
+                        <TextBlock Style="{StaticResource RecapEyebrowStyle}" Text="{x:Bind helpers:Format.SectionHeader('Top songs')}" />
+                        <ItemsControl IsTabStop="False" ItemsSource="{x:Bind TopSongs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RecapRankItem">
+                                    <Grid Height="30" ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource RecapAccentBrush}"
+                                            Style="{StaticResource HeadlineStyle}"
+                                            Text="{x:Bind Rank}"
+                                            Typography.NumeralAlignment="Tabular" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource HeadlineStyle}"
+                                            Text="{x:Bind Title}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
+        <yir:RecapSlideTemplateSelector
+            x:Key="SlideTemplates"
+            Artist="{StaticResource ArtistTemplate}"
+            Clock="{StaticResource ClockTemplate}"
+            Days="{StaticResource DaysTemplate}"
+            Feature="{StaticResource FeatureTemplate}"
+            Intro="{StaticResource IntroTemplate}"
+            Outro="{StaticResource OutroTemplate}"
+            Radio="{StaticResource RadioTemplate}"
+            Ranking="{StaticResource RankingTemplate}" />
+    </UserControl.Resources>
+
+    <!--  Over the whole window, always dark: the year's top song blurred behind a story-style card.  -->
+    <Grid
+        x:Name="Root"
+        AutomationProperties.AutomationId="YearInReview"
+        AutomationProperties.Name="{x:Bind ViewModel.Title, Mode=OneWay}"
+        Background="{ThemeResource AppBackgroundBrush}">
+        <Image
+            Margin="-80"
+            helpers:ImageLoader.DecodeWidth="12"
+            helpers:ImageLoader.Url="{x:Bind ViewModel.BackdropUrl, Mode=OneWay}"
+            IsHitTestVisible="False"
+            Opacity="0.55"
+            Stretch="UniformToFill" />
+        <Rectangle
+            Fill="{ThemeResource AppBackgroundBrush}"
+            IsHitTestVisible="False"
+            Opacity="0.5" />
+
+        <!--  Below the title band, which stays the window's drag area.  -->
+        <Grid
+            x:Name="Stage"
+            Margin="0,48,0,0"
+            SizeChanged="OnStageSizeChanged">
+            <Grid
+                x:Name="Column"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                RowSpacing="14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!--  Progress through the slides, the title, and the actions.  -->
+                <StackPanel Spacing="12">
+                    <Grid
+                        x:Name="Segments"
+                        Height="3"
+                        AutomationProperties.AccessibilityView="Raw"
+                        ColumnSpacing="4" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource HeadlineStyle}"
+                            Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+                        <Button
+                            x:Name="SaveButton"
+                            Grid.Column="1"
+                            Height="36"
+                            MinWidth="0"
+                            Padding="14,0,16,0"
+                            AutomationProperties.AutomationId="YearInReviewSave"
+                            AutomationProperties.Name="Save image"
+                            Click="OnSaveClick"
+                            Style="{StaticResource PillSecondaryButtonStyle}"
+                            ToolTipService.ToolTip="Save this slide as a picture">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="14" Glyph="&#xE74E;" />
+                                <TextBlock Text="Save image" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            Grid.Column="2"
+                            AutomationProperties.AutomationId="YearInReviewPause"
+                            AutomationProperties.Name="{x:Bind ViewModel.PauseLabel, Mode=OneWay}"
+                            Command="{x:Bind ViewModel.TogglePauseCommand}"
+                            Content="{x:Bind ViewModel.PauseGlyph, Mode=OneWay}"
+                            Style="{StaticResource RecapRoundButtonStyle}"
+                            ToolTipService.ToolTip="{x:Bind ViewModel.PauseLabel, Mode=OneWay}" />
+                        <Button
+                            x:Name="CloseButton"
+                            Grid.Column="3"
+                            AutomationProperties.AutomationId="YearInReviewClose"
+                            AutomationProperties.Name="Close"
+                            Command="{x:Bind ViewModel.CloseCommand}"
+                            Content="&#xE711;"
+                            Style="{StaticResource RecapRoundButtonStyle}"
+                            ToolTipService.ToolTip="Close (Esc)" />
+                    </Grid>
+                </StackPanel>
+
+                <!--  The card, sized to the window (CardHost) and drawn at one fixed size inside (CardSurface).  -->
+                <Grid
+                    x:Name="CardHost"
+                    Grid.Row="1"
+                    Width="480"
+                    Height="600">
+                    <Viewbox>
+                        <Grid
+                            x:Name="CardFrame"
+                            Width="480"
+                            Height="600">
+                            <!--  Drawn into saved images: nothing in it may reach past its edges.  -->
+                            <Grid x:Name="CardSurface" Background="{ThemeResource AppBackgroundBrush}">
+                                <Grid.Clip>
+                                    <RectangleGeometry Rect="0,0,480,600" />
+                                </Grid.Clip>
+                                <Image
+                                    x:Name="CardArtA"
+                                    helpers:ImageLoader.DecodeWidth="12"
+                                    Stretch="UniformToFill" />
+                                <Image
+                                    x:Name="CardArtB"
+                                    helpers:ImageLoader.DecodeWidth="12"
+                                    Stretch="UniformToFill" />
+                                <Rectangle x:Name="AccentWash">
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop x:Name="WashStart" Offset="0" Color="#B39D7BFA" />
+                                            <GradientStop x:Name="WashEnd" Offset="1" Color="#1A9D7BFA" />
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <Rectangle Fill="{StaticResource RecapScrimBrush}" />
+
+                                <!--  The current slide; screen readers hear each one as it comes.  -->
+                                <Grid
+                                    x:Name="SlideHost"
+                                    Margin="36,40,36,76"
+                                    AutomationProperties.LiveSetting="Polite" />
+
+                                <Grid Margin="36,0,36,28" VerticalAlignment="Bottom">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Image
+                                            Width="18"
+                                            Height="18"
+                                            Source="{ThemeResource AppMarkImage}" />
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource HeadlineStyle}"
+                                            Text="Hush" />
+                                    </StackPanel>
+                                    <TextBlock
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource FootnoteStyle}"
+                                        Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+                                </Grid>
+                            </Grid>
+                            <Border
+                                BorderBrush="{ThemeResource SeparatorBrush}"
+                                BorderThickness="1"
+                                CornerRadius="24"
+                                IsHitTestVisible="False" />
+                        </Grid>
+                    </Viewbox>
+
+                    <!--  Click the left half to go back, the right half to go on.  -->
+                    <Grid AutomationProperties.AccessibilityView="Raw">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Command="{x:Bind ViewModel.PreviousCommand}" Style="{StaticResource RecapZoneButtonStyle}" />
+                        <Button
+                            Grid.Column="1"
+                            Command="{x:Bind ViewModel.NextCommand}"
+                            Style="{StaticResource RecapZoneButtonStyle}" />
+                    </Grid>
+
+                    <Button
+                        Margin="-68,0,0,0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="YearInReviewPrevious"
+                        AutomationProperties.Name="Previous slide"
+                        Command="{x:Bind ViewModel.PreviousCommand}"
+                        Content="&#xE76B;"
+                        Style="{StaticResource RecapChevronButtonStyle}"
+                        ToolTipService.ToolTip="Previous (Left)" />
+                    <Button
+                        x:Name="NextButton"
+                        Margin="0,0,-68,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="YearInReviewNext"
+                        AutomationProperties.Name="Next slide"
+                        Command="{x:Bind ViewModel.NextCommand}"
+                        Content="&#xE76C;"
+                        Style="{StaticResource RecapChevronButtonStyle}"
+                        ToolTipService.ToolTip="Next (Right)" />
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

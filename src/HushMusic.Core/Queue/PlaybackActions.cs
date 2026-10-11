@@ -9,6 +9,7 @@ namespace HushMusic.Core.Queue;
 /// Unavailable tracks are skipped. Player errors surface through <see cref="IPlayer.PlaybackFailed"/>;
 /// errors fetching what to play are thrown to the caller.
 /// "Add to queue" goes after the user's own songs but before songs autoplay suggested (<see cref="IQueueAutoplay"/>).
+/// The Up next or radio that fills in after a single song leaves out the songs the user keeps skipping (<see cref="ISmartSkip"/>).
 /// </summary>
 public sealed class PlaybackActions(
     IQueueService queue,
@@ -17,7 +18,8 @@ public sealed class PlaybackActions(
     IBrowseApi browseApi,
     INotificationService notifications,
     ILogger<PlaybackActions> logger,
-    IQueueAutoplay? autoplay = null) : IPlaybackActions
+    IQueueAutoplay? autoplay = null,
+    ISmartSkip? smartSkip = null) : IPlaybackActions
 {
     private readonly object _gate = new();
     private CancellationTokenSource? _fillCts;
@@ -127,7 +129,7 @@ public sealed class PlaybackActions(
 
             // The watch queue starts with the seed itself, which is already playing.
             var upNext = watch.Tracks.Count > 0 && watch.Tracks[0].VideoId == seed.VideoId ? watch.Tracks.Skip(1) : watch.Tracks;
-            var tracks = upNext.Where(t => t.IsAvailable).ToList();
+            var tracks = smartSkip.WithoutLeftOut(upNext.Where(t => t.IsAvailable));
 
             cancellationToken.ThrowIfCancellationRequested();
             if (!ReferenceEquals(queue.Source, source))

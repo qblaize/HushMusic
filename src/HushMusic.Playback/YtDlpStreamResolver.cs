@@ -11,7 +11,8 @@ namespace HushMusic.Playback;
 
 /// <summary>
 /// Resolves audio stream URLs by running yt-dlp.exe. Results are cached until shortly before they expire,
-/// and concurrent requests for the same track share one yt-dlp process. yt-dlp's JavaScript runtime (normally the
+/// and concurrent requests for the same track share one yt-dlp process. Each run also lists the track's video formats,
+/// kept in memory for <see cref="ResolveVideoAsync"/>. yt-dlp's JavaScript runtime (normally the
 /// app's own Deno) comes from <see cref="JsRuntimeProvider"/>.
 /// </summary>
 public sealed class YtDlpStreamResolver(
@@ -23,6 +24,7 @@ public sealed class YtDlpStreamResolver(
     ILogger<YtDlpStreamResolver> logger) : IStreamResolver
 {
     private const int MaxCacheEntries = 256;
+    private const int MaxVideoEntries = 64;
     private static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan VersionTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ExpiryMargin = TimeSpan.FromMinutes(10);
@@ -32,6 +34,9 @@ public sealed class YtDlpStreamResolver(
     private const string PersistedCacheVersion = "webm-1";
 
     private readonly ConcurrentDictionary<string, ResolvedStream> _cache = new(StringComparer.Ordinal);
+
+    // The playable video formats each run listed (memory only; empty when a track has none).
+    private readonly ConcurrentDictionary<string, IReadOnlyList<ResolvedStream>> _videoFormats = new(StringComparer.Ordinal);
     private Task? _cacheLoad;
     private int _savePending;
     private readonly Dictionary<string, Resolution> _inFlight = new(StringComparer.Ordinal);
@@ -73,6 +78,42 @@ public sealed class YtDlpStreamResolver(
             await NotifyIfStillSettingUpAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        return await RunAsync(videoId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The music video's picture, picked from the formats the last yt-dlp run for the track listed (an audio resolve
+    /// brings them along). Only when the audio link came from the disk cache does this run yt-dlp itself.
+    /// </summary>
+    public async Task<ResolvedStream> ResolveVideoAsync(string videoId, int maxHeight, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(videoId);
+        if (!TryGetVideoFormats(videoId, out var formats))
+        {
+            await RunAsync(videoId, cancellationToken).ConfigureAwait(false);
+            if (!TryGetVideoFormats(videoId, out formats))
+            {
+                throw new StreamResolutionException(videoId, "yt-dlp listed no video for this track.");
+            }
+        }
+
+        var stream = VideoFormats.Pick(formats, maxHeight)
+            ?? throw new StreamResolutionException(videoId, "This video has no picture in a format Windows can play.");
+        logger.LogDebug(
+            "Video for {VideoId}: {Width}x{Height} {Codec} {FrameRate} fps, {Bitrate} kbps (at most {MaxHeight}p)",
+            videoId,
+            stream.Width,
+            stream.Height,
+            stream.Codec,
+            stream.FrameRate,
+            stream.BitrateKbps,
+            maxHeight);
+        return stream;
+    }
+
+    // Runs yt-dlp for the track, or joins the run already going for it.
+    private async Task<ResolvedStream> RunAsync(string videoId, CancellationToken cancellationToken)
+    {
         Resolution resolution;
         lock (_inFlightGate)
         {
@@ -108,6 +149,7 @@ public sealed class YtDlpStreamResolver(
 
     public void Invalidate(string videoId)
     {
+        _videoFormats.TryRemove(videoId, out _);
         if (_cache.TryRemove(videoId, out _))
         {
             ScheduleSave();
@@ -338,7 +380,7 @@ public sealed class YtDlpStreamResolver(
             // WebM/Opus first: YouTube's M4A audio is fragmented (DASH) MP4, which Media Foundation opens over
             // HTTP but then jumps straight to MediaEnded without playing (verified 2026-10-07).
             "-f", "bestaudio[ext=webm]/bestaudio[acodec=opus]/bestaudio/best",
-            // The HLS manifest is only needed for video; skipping it saves ~0.3 s per resolve.
+            // Skipping the HLS manifest saves ~0.3 s per resolve. Video comes from the https (DASH) formats, which stay.
             "--extractor-args", "youtube:skip=hls",
             "-j",
             "--no-playlist",
@@ -399,7 +441,10 @@ public sealed class YtDlpStreamResolver(
             logger.LogDebug("yt-dlp stderr for {VideoId}: {StdErr}", videoId, result.StandardError.Trim());
         }
 
-        var stream = YtDlpOutput.ParseStream(videoId, result.StandardOutput, DateTimeOffset.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+        var info = YtDlpOutput.ParseInfo(videoId, result.StandardOutput);
+        var stream = YtDlpOutput.ParseStream(videoId, info, now);
+        RememberVideoFormats(videoId, YtDlpOutput.ParseVideoFormats(videoId, info, now));
         logger.LogInformation(
             "Resolved {VideoId} in {ElapsedMs} ms: {Container}/{Codec} {Bitrate} kbps, expires {ExpiresAt:u}{Account}",
             videoId,
@@ -458,6 +503,37 @@ public sealed class YtDlpStreamResolver(
         }
 
         return false;
+    }
+
+    private bool TryGetVideoFormats(string videoId, out IReadOnlyList<ResolvedStream> formats)
+    {
+        if (_videoFormats.TryGetValue(videoId, out formats!))
+        {
+            if (formats.Count == 0 || formats.Min(f => f.ExpiresAt) - ExpiryMargin > DateTimeOffset.UtcNow)
+            {
+                return true;
+            }
+
+            _videoFormats.TryRemove(KeyValuePair.Create(videoId, formats));
+        }
+
+        return false;
+    }
+
+    private void RememberVideoFormats(string videoId, IReadOnlyList<ResolvedStream> formats)
+    {
+        _videoFormats[videoId] = formats;
+        if (_videoFormats.Count > MaxVideoEntries)
+        {
+            // Tracks without a video and the earliest expiry go first.
+            foreach (var entry in _videoFormats
+                .OrderBy(e => e.Value.Count == 0 ? DateTimeOffset.MinValue : e.Value.Min(f => f.ExpiresAt))
+                .Take(_videoFormats.Count - (MaxVideoEntries / 2))
+                .ToList())
+            {
+                _videoFormats.TryRemove(entry);
+            }
+        }
     }
 
     private void AddToCache(ResolvedStream stream)

@@ -143,6 +143,13 @@
                                 IsEnabled="{x:Bind ViewModel.IsArtStyleAvailable, Mode=OneWay}"
                                 IsOn="{x:Bind ViewModel.AnimateNowPlayingBackground, Mode=TwoWay}" />
                         </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Pulse to the music" Description="{x:Bind ViewModel.PulseDescription, Mode=OneWay}">
+                            <ToggleSwitch
+                                AutomationProperties.AutomationId="PulseToMusicToggle"
+                                IsEnabled="{x:Bind ViewModel.IsPulseAvailable, Mode=OneWay}"
+                                IsOn="{x:Bind ViewModel.PulseToMusic, Mode=TwoWay}" />
+                        </settings:SettingsRow>
                     </StackPanel>
                 </Border>
 
@@ -217,6 +224,24 @@
                         <settings:SettingsRow Title="Keep playing when the queue ends" Description="After an album or playlist, continue with similar songs.">
                             <ToggleSwitch AutomationProperties.AutomationId="AutoplayToggle" IsOn="{x:Bind ViewModel.AutoplayWhenQueueEnds, Mode=TwoWay}" />
                         </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Smart skip" Description="Songs you skip in the first seconds three times stop showing up in radio and autoplay. Songs you pick yourself still play.">
+                            <ToggleSwitch AutomationProperties.AutomationId="SmartSkipToggle" IsOn="{x:Bind ViewModel.SmartSkip.IsEnabled, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <!--  The songs smart skip leaves out, right under its switch.  -->
+                        <Grid
+                            MinHeight="0"
+                            Padding="16,0,16,12"
+                            Style="{StaticResource SettingsRowStyle}">
+                            <Button
+                                Margin="-6,0,0,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="SkippedSongsButton"
+                                Command="{x:Bind ViewModel.SmartSkip.ShowSongsCommand}"
+                                Content="{x:Bind ViewModel.SmartSkip.ButtonText, Mode=OneWay}"
+                                Style="{StaticResource TextActionButtonStyle}" />
+                        </Grid>
                         <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Resume where I left off" Description="Opens with your last queue and song, paused at the same spot.">
                             <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeLastSession, Mode=TwoWay}" />

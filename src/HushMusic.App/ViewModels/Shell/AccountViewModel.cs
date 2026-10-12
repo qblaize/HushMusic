@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using HushMusic.App.Services;
 using HushMusic.App.Services.Shell;
 using HushMusic.Core.Abstractions;
 
@@ -16,6 +17,7 @@ public sealed partial class AccountViewModel : ObservableObject
     private readonly ISignInCoordinator _signIn;
     private readonly INotificationService _notifications;
     private readonly IUiDispatcher _dispatcher;
+    private readonly INavigationService _navigation;
     private readonly ILogger<AccountViewModel> _logger;
     private CancellationTokenSource? _accountInfoCts;
     private bool _initialized;
@@ -26,6 +28,7 @@ public sealed partial class AccountViewModel : ObservableObject
         ISignInCoordinator signIn,
         INotificationService notifications,
         IUiDispatcher dispatcher,
+        INavigationService navigation,
         ILogger<AccountViewModel> logger)
     {
         _auth = auth;
@@ -33,6 +36,7 @@ public sealed partial class AccountViewModel : ObservableObject
         _signIn = signIn;
         _notifications = notifications;
         _dispatcher = dispatcher;
+        _navigation = navigation;
         _logger = logger;
 
         // Every successful sign-in raises SignedIn, even when already signed in (account switch): always refresh.
@@ -138,6 +142,9 @@ public sealed partial class AccountViewModel : ObservableObject
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     private Task SignInWithCookieHeaderAsync() => RunSignInAsync(_signIn.SignInWithCookieHeaderAsync);
+
+    [RelayCommand]
+    private void OpenStats() => _navigation.NavigateTo(PageKey.Stats);
 
     [RelayCommand]
     private async Task SignOutAsync()

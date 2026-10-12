@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.System;
 
 namespace HushMusic.App.Controls.Items;
@@ -28,7 +29,7 @@ public sealed partial class Carousel : UserControl
     private readonly ItemsPanelTemplate _cardsPanel;
     private readonly Thickness _cardsPadding;
     private ScrollViewer? _scroller;
-    private UIElement? _wheelPanel;
+    private double _tallestCard;
     private bool _isPointerOver;
 
     public Carousel()
@@ -58,6 +59,8 @@ public sealed partial class Carousel : UserControl
         // Carousels are recycled by virtualizing parents: start every new shelf at its beginning.
         var carousel = (Carousel)d;
         carousel._scroller?.ChangeView(0, null, null, disableAnimation: true);
+        carousel._tallestCard = 0;
+        carousel.List.ClearValue(MinHeightProperty);
         carousel.UpdateButtons();
     }
 
@@ -101,22 +104,33 @@ public sealed partial class Carousel : UserControl
             _scroller = scroller;
             _scroller.ViewChanged += (_, _) => UpdateButtons();
             _scroller.SizeChanged += (_, _) => UpdateButtons();
+            if (VisualTreeHelper.GetChildrenCount(scroller) > 0 && VisualTreeHelper.GetChild(scroller, 0) is UIElement root)
+            {
+                root.PointerWheelChanged += OnWheelChanged;
+            }
         }
 
         UpdateButtons();
     }
 
+    // A horizontal ItemsStackPanel takes the row's height from the first cards it lays out, so a card further along
+    // with a two-line title would lose its last line. Each card is checked once it has been measured, and the row
+    // grows to fit the tallest one.
     private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
     {
-        if (!ReferenceEquals(_wheelPanel, List.ItemsPanelRoot) && List.ItemsPanelRoot is { } panel)
+        if (!args.InRecycleQueue && args.Phase == 0 && !ShowAsRows)
         {
-            if (_wheelPanel is not null)
-            {
-                _wheelPanel.PointerWheelChanged -= OnPanelWheelChanged;
-            }
+            args.RegisterUpdateCallback(1, OnContainerMeasured);
+        }
+    }
 
-            _wheelPanel = panel;
-            panel.PointerWheelChanged += OnPanelWheelChanged;
+    private void OnContainerMeasured(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        var height = args.ItemContainer.DesiredSize.Height;
+        if (height > _tallestCard + 0.5)
+        {
+            _tallestCard = height;
+            List.MinHeight = height + List.Padding.Top + List.Padding.Bottom;
         }
     }
 
@@ -128,10 +142,11 @@ public sealed partial class Carousel : UserControl
 
     /// <summary>
     /// A horizontal-only ScrollViewer turns the vertical mouse wheel into horizontal scrolling, which would
-    /// trap the page scroll on every carousel. Vertical wheel input is handled here (below the inner
-    /// ScrollViewer) and forwarded to the page's ScrollViewer. Shift+wheel and tilt wheels still scroll the row.
+    /// trap the page scroll on every carousel. Vertical wheel input is handled here, on the root inside the inner
+    /// ScrollViewer (so the whole row counts, including the space under the cards), and forwarded to the page's
+    /// ScrollViewer. Shift+wheel and tilt wheels still scroll the row.
     /// </summary>
-    private void OnPanelWheelChanged(object sender, PointerRoutedEventArgs e)
+    private void OnWheelChanged(object sender, PointerRoutedEventArgs e)
     {
         var point = e.GetCurrentPoint(this);
         if (point.Properties.IsHorizontalMouseWheel || e.KeyModifiers.HasFlag(VirtualKeyModifiers.Shift))

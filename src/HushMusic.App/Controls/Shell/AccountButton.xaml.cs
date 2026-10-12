@@ -29,5 +29,5 @@ public sealed partial class AccountButton : UserControl
         }
     }
 
-    private void OnSignOutClick(object sender, RoutedEventArgs e) => AccountFlyout.Hide();
+    private void OnMenuItemClick(object sender, RoutedEventArgs e) => AccountFlyout.Hide();
 }

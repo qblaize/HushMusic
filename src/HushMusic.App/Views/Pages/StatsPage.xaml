@@ -272,13 +272,9 @@
 
     <Grid>
         <ScrollViewer x:Name="Scroller">
-            <!-- Full width up to a comfortable maximum, kept on the left like the other pages. -->
+            <!-- Full width up to a comfortable maximum, centred in wider windows. -->
             <Grid Padding="{StaticResource PagePadding}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MaxWidth="1160" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
+                <StackPanel MaxWidth="1160" HorizontalAlignment="Stretch">
                     <!-- Title, period and the privacy note. -->
                     <Grid ColumnSpacing="16" RowSpacing="12">
                         <Grid.ColumnDefinitions>

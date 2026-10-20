@@ -1,0 +1,118 @@
+{
+  "playabilityStatus": {
+    "status": "OK"
+  },
+  "captions": {
+    "playerCaptionsTracklistRenderer": {
+      "captionTracks": [
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=kJQP7kiw5Fk&ei=ey3XatD4JIr71PIPsJmNsQs&opi=112496729&xoaf=5&xowf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1792511979&sparams=ip,ipbits,expire,v,ei,opi,xoaf&signature=81E84452D3645B1CAD2BA03568ED761A8477D595.13BF4D2541BA01FEE205B8B1CC3A9AC998D239FD&key=yt8&lang=en&name=en",
+          "name": {
+            "runs": [
+              {
+                "text": "English - en"
+              }
+            ]
+          },
+          "vssId": ".en.nP7-2PuUl7o",
+          "languageCode": "en",
+          "isTranslatable": true,
+          "trackName": "en"
+        },
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=kJQP7kiw5Fk&ei=ey3XatD4JIr71PIPsJmNsQs&opi=112496729&xoaf=5&xowf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1792511979&sparams=ip,ipbits,expire,v,ei,opi,xoaf&signature=81E84452D3645B1CAD2BA03568ED761A8477D595.13BF4D2541BA01FEE205B8B1CC3A9AC998D239FD&key=yt8&lang=en&name=English",
+          "name": {
+            "runs": [
+              {
+                "text": "English - English"
+              }
+            ]
+          },
+          "vssId": ".en.eEY6OEpapPo",
+          "languageCode": "en",
+          "isTranslatable": true,
+          "trackName": "English"
+        },
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=kJQP7kiw5Fk&ei=ey3XatD4JIr71PIPsJmNsQs&opi=112496729&xoaf=5&xowf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1792511979&sparams=ip,ipbits,expire,v,ei,opi,xoaf&signature=81E84452D3645B1CAD2BA03568ED761A8477D595.13BF4D2541BA01FEE205B8B1CC3A9AC998D239FD&key=yt8&lang=en-US&name=English+-+United+States",
+          "name": {
+            "runs": [
+              {
+                "text": "English (United States) - English - United States"
+              }
+            ]
+          },
+          "vssId": ".en-US.njLgzgtehjs",
+          "languageCode": "en-US",
+          "isTranslatable": true,
+          "trackName": "English - United States"
+        },
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=kJQP7kiw5Fk&ei=ey3XatD4JIr71PIPsJmNsQs&opi=112496729&xoaf=5&xowf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1792511979&sparams=ip,ipbits,expire,v,ei,opi,xoaf&signature=81E84452D3645B1CAD2BA03568ED761A8477D595.13BF4D2541BA01FEE205B8B1CC3A9AC998D239FD&key=yt8&lang=ja",
+          "name": {
+            "runs": [
+              {
+                "text": "Japanese"
+              }
+            ]
+          },
+          "vssId": ".ja",
+          "languageCode": "ja",
+          "isTranslatable": true,
+          "trackName": ""
+        },
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=kJQP7kiw5Fk&ei=ey3XatD4JIr71PIPsJmNsQs&opi=112496729&xoaf=5&xowf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1792511979&sparams=ip,ipbits,expire,v,ei,opi,xoaf&signature=81E84452D3645B1CAD2BA03568ED761A8477D595.13BF4D2541BA01FEE205B8B1CC3A9AC998D239FD&key=yt8&lang=es",
+          "name": {
+            "runs": [
+              {
+                "text": "Spanish"
+              }
+            ]
+          },
+          "vssId": ".es",
+          "languageCode": "es",
+          "isTranslatable": true,
+          "trackName": ""
+        },
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=kJQP7kiw5Fk&ei=ey3XatD4JIr71PIPsJmNsQs&opi=112496729&xoaf=5&xowf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1792511979&sparams=ip,ipbits,expire,v,ei,opi,xoaf&signature=81E84452D3645B1CAD2BA03568ED761A8477D595.13BF4D2541BA01FEE205B8B1CC3A9AC998D239FD&key=yt8&lang=es-ES&name=Spanish+-+Spain",
+          "name": {
+            "runs": [
+              {
+                "text": "Spanish (Spain) - Spanish - Spain"
+              }
+            ]
+          },
+          "vssId": ".es-ES.7eCR4kqQbL4",
+          "languageCode": "es-ES",
+          "isTranslatable": true,
+          "trackName": "Spanish - Spain"
+        }
+      ],
+      "audioTracks": [
+        {
+          "captionTrackIndices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "defaultCaptionTrackIndex": 2,
+          "hasDefaultTrack": true,
+          "captionsInitialState": "CAPTIONS_INITIAL_STATE_OFF_RECOMMENDED"
+        }
+      ],
+      "defaultAudioTrackIndex": 0
+    }
+  },
+  "videoDetails": {
+    "videoId": "kJQP7kiw5Fk",
+    "title": "Despacito",
+    "lengthSeconds": "282",
+    "author": "Luis Fonsi & Daddy Yankee",
+    "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+  }
+}

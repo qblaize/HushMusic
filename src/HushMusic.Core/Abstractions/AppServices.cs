@@ -99,6 +99,15 @@ public sealed class AppSettings
     /// </summary>
     public bool PulseToMusic { get; set; }
 
+    /// <summary>
+    /// Lyrics sources in the user's order, each switched on or off. Empty uses the default order; entries missing here
+    /// are merged in by <see cref="Lyrics.ILyricsService.GetSourceOrder"/>.
+    /// </summary>
+    public List<Lyrics.LyricsSourceSetting> LyricsSources { get; set; } = [];
+
+    /// <summary>Light up line-synced lyrics word by word, spreading each line's time over its words.</summary>
+    public bool EstimateWordTiming { get; set; } = true;
+
     /// <summary>"Hush" (the app's own design) or "Windows" (stock Windows 11 / Fluent look with Mica). Applied at startup.</summary>
     public string DesignSystem { get; set; } = "Hush";
 

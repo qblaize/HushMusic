@@ -89,6 +89,46 @@ internal sealed partial class InnerTubeClient(
         throw new InnerTubeException(TrackingLabel, $"YouTube returned HTTP {status} ({response.ReasonPhrase}) for the playback ping.", status);
     }
 
+    public async Task<JsonNode?> GetPublicJsonAsync(Uri url, string label, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        if (url.Scheme != Uri.UriSchemeHttps
+            || !(url.Host.Equals("youtube.com", StringComparison.OrdinalIgnoreCase)
+                 || url.Host.EndsWith(".youtube.com", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InnerTubeException(label, $"Refusing to send a request to unexpected host '{url.Host}'.");
+        }
+
+        var visitorId = await visitorIds.GetAsync(cancellationToken).ConfigureAwait(false);
+        using var response = await SendWithRetryAsync(
+            label,
+            allowRetry: true,
+            withAccount: false,
+            () => CreateMessageAsync(HttpMethod.Get, url, null, visitorId, withAccount: false, cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        var status = (int)response.StatusCode;
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InnerTubeException(label, $"YouTube returned HTTP {status} ({response.ReasonPhrase}) for '{label}'.", status);
+        }
+
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonNode.Parse(text);
+        }
+        catch (JsonException ex)
+        {
+            throw new InnerTubeException(label, $"YouTube returned an invalid response for '{label}'.", status, ex);
+        }
+    }
+
     private Uri BuildUri(InnerTubeRequest request, bool authenticated)
     {
         var url = new StringBuilder(InnerTubeConstants.BaseApi)

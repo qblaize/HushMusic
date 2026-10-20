@@ -8,6 +8,7 @@ using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.RadioMatch;
 using HushMusic.App.ViewModels.Shell;
 using HushMusic.App.ViewModels.YearInReview;
+using HushMusic.Core.Lyrics;
 using HushMusic.Playback.Pulse;
 
 namespace HushMusic.App.Hosting;
@@ -41,6 +42,9 @@ internal static class ShellServiceRegistration
 
         services.AddSingleton<AccountViewModel>();
         services.AddSingleton<TrackBrowseIds>();
+
+        // Lyrics look up their browse id through the same "next" call as the Related tab.
+        services.AddSingleton<ILyricsBrowseIdSource>(sp => new WatchLyricsBrowseIds(sp.GetRequiredService<TrackBrowseIds>().GetAsync));
         services.AddSingleton<QueuePanelViewModel>();
         services.AddSingleton<LyricsViewModel>();
         services.AddSingleton<RelatedViewModel>();

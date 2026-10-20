@@ -1,53 +1,80 @@
-using Microsoft.UI.Xaml.Media.Animation;
-using Windows.UI.ViewManagement;
+using System.Numerics;
+using Microsoft.UI.Composition;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Media;
+using HushMusic.App.ViewModels.Shell;
 
 namespace HushMusic.App.Controls.NowPlaying;
 
-/// <summary>A synced lyric line: bright while it is being sung, dimmed otherwise. Clicking it seeks there.</summary>
+/// <summary>
+/// One item of the synced lyrics: a line's words (with backing vocals in smaller type under them) or an instrumental
+/// break's dots. Clicking it seeks there. <see cref="LyricsStage"/> decides how bright it is; the element is reused
+/// for another line when new lyrics come in.
+/// </summary>
 public sealed partial class LyricLineButton : Button
 {
-    public static readonly DependencyProperty IsCurrentProperty = DependencyProperty.Register(
-        nameof(IsCurrent), typeof(bool), typeof(LyricLineButton), new PropertyMetadata(false, (d, _) => ((LyricLineButton)d).Update(animate: true)));
+    private readonly Grid _root = new();
+    private readonly Brush _dotFill;
+    private LyricsDots? _dots;
 
-    private const double DimOpacity = 0.34;
-    private static readonly TimeSpan FadeDuration = TimeSpan.FromMilliseconds(260);
-    private static readonly UISettings UiSettings = new();
-
-    private Storyboard? _fade;
-
-    public LyricLineButton()
+    internal LyricLineButton(Style buttonStyle, Style wordStyle, Style backingStyle, Brush dotFill)
     {
-        Opacity = DimOpacity;
-        Loaded += (_, _) => Update(animate: false);
+        Style = buttonStyle;
+        _dotFill = dotFill;
+        Main = new LyricsWordPanel { WordStyle = wordStyle };
+        Backing = new LyricsWordPanel { WordStyle = backingStyle, Margin = new Thickness(0, 2, 0, 0), Visibility = Visibility.Collapsed };
+        var stack = new StackPanel();
+        stack.Children.Add(Main);
+        stack.Children.Add(Backing);
+        _root.Children.Add(stack);
+        Content = _root;
+
+        // Lines scale from their left edge, so the start of the line stays put.
+        RootVisual = ElementCompositionPreview.GetElementVisual(_root);
+        _root.SizeChanged += (_, e) => RootVisual.CenterPoint = new Vector3(0, (float)e.NewSize.Height / 2, 0);
     }
 
-    public bool IsCurrent
-    {
-        get => (bool)GetValue(IsCurrentProperty);
-        set => SetValue(IsCurrentProperty, value);
-    }
+    internal LyricLineViewModel? Line { get; private set; }
 
-    private void Update(bool animate)
+    internal LyricsWordPanel Main { get; }
+
+    internal LyricsWordPanel Backing { get; }
+
+    /// <summary>The dots of an instrumental break (null for a sung line).</summary>
+    internal LyricsDots? Dots => Line?.IsInstrumental == true ? _dots : null;
+
+    /// <summary>The line's content: its opacity dims the line, its scale shrinks it a little while it isn't current.</summary>
+    internal Visual RootVisual { get; }
+
+    internal void Show(LyricLineViewModel line)
     {
-        var target = IsCurrent ? 1 : DimOpacity;
-        _fade?.Stop();
-        _fade = null;
-        if (!animate || !IsLoaded || !UiSettings.AnimationsEnabled)
+        Line = line;
+        AutomationProperties.SetName(this, line.Text);
+        if (line.IsInstrumental)
         {
-            Opacity = target;
+            _dots ??= new LyricsDots(_dotFill);
+            if (_dots.Parent is null)
+            {
+                _root.Children.Add(_dots);
+            }
+
+            _dots.Visibility = Visibility.Visible;
+            Main.Visibility = Visibility.Collapsed;
+            Backing.Visibility = Visibility.Collapsed;
+            Main.SetWords([]);
+            Backing.SetWords([]);
             return;
         }
 
-        var animation = new DoubleAnimation
+        if (_dots is not null)
         {
-            To = target,
-            Duration = FadeDuration,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut },
-        };
-        Storyboard.SetTarget(animation, this);
-        Storyboard.SetTargetProperty(animation, nameof(Opacity));
-        _fade = new Storyboard();
-        _fade.Children.Add(animation);
-        _fade.Begin();
+            _dots.Visibility = Visibility.Collapsed;
+        }
+
+        Main.Visibility = Visibility.Visible;
+        Main.SetWords(line.Words);
+        Backing.SetWords(line.BackingWords);
+        Backing.Visibility = line.BackingWords.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 }

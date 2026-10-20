@@ -1,0 +1,41 @@
+{
+  "playabilityStatus": {
+    "status": "OK"
+  },
+  "captions": {
+    "playerCaptionsTracklistRenderer": {
+      "captionTracks": [
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=9bZkp7q19f0&ei=fS3XapPNErHV1PIPgvCQiAw&caps=asr&opi=112496729&xoaf=5&xowf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1792511981&sparams=ip,ipbits,expire,v,ei,caps,opi,xoaf&signature=304CF1A87B3D8F9D84F44E79E4A260EE5D46C7E9.24306B93EFB16549CA0263C2FBFD4C3D36207F8F&key=yt8&kind=asr&lang=ko",
+          "name": {
+            "runs": [
+              {
+                "text": "Korean (auto-generated)"
+              }
+            ]
+          },
+          "vssId": "a.ko",
+          "languageCode": "ko",
+          "kind": "asr",
+          "isTranslatable": true,
+          "trackName": ""
+        }
+      ],
+      "audioTracks": [
+        {
+          "captionTrackIndices": [
+            0
+          ]
+        }
+      ],
+      "defaultAudioTrackIndex": 0
+    }
+  },
+  "videoDetails": {
+    "videoId": "9bZkp7q19f0",
+    "title": "Gangnam Style",
+    "lengthSeconds": "252",
+    "author": "Psy",
+    "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+  }
+}

@@ -17,4 +17,12 @@ internal interface IInnerTubeClient
     /// <c>add_history_item</c> does. Only https *.youtube.com URLs are allowed.
     /// </summary>
     Task SendTrackingPingAsync(Uri url, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Anonymous GET of a public YouTube JSON resource (a caption track on www.youtube.com/api/timedtext): web headers
+    /// and the consent cookie, never the account. Only https *.youtube.com URLs are allowed. Returns null when the body
+    /// is empty (how YouTube refuses a caption request it won't serve); throws <see cref="Core.InnerTubeException"/> on
+    /// an HTTP error.
+    /// </summary>
+    Task<JsonNode?> GetPublicJsonAsync(Uri url, string label, CancellationToken cancellationToken);
 }

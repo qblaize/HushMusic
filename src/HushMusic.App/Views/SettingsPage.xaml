@@ -257,6 +257,116 @@
                     </StackPanel>
                 </Border>
 
+                <!--  ===== Lyrics =====  -->
+                <TextBlock
+                    x:Name="LyricsSectionHeader"
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader('Lyrics')}" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <StackPanel>
+                        <Grid Style="{StaticResource SettingsRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="Sources" />
+                                <TextBlock Style="{StaticResource SettingsRowDescriptionStyle}" Text="A song shows the lyrics of the first source in this list that has them. Drag a source to change the order, or right-click it to move it." />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="1"
+                                Margin="0,0,-6,0"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="ResetLyricsSourcesButton"
+                                Command="{x:Bind ViewModel.ResetLyricsSourceOrderCommand}"
+                                Content="Reset order"
+                                Style="{StaticResource TextActionButtonStyle}" />
+                        </Grid>
+                        <!--  One row per source: drag to reorder; the context menu moves it with the keyboard.  -->
+                        <ListView
+                            x:Name="LyricsSourcesList"
+                            AllowDrop="True"
+                            AutomationProperties.AutomationId="LyricsSourcesList"
+                            AutomationProperties.Name="Lyrics sources"
+                            CanDragItems="True"
+                            CanReorderItems="True"
+                            ContainerContentChanging="OnLyricsSourceContainerChanging"
+                            DragItemsCompleted="OnLyricsSourcesDragged"
+                            ItemsSource="{x:Bind ViewModel.LyricsSources}"
+                            ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                            ScrollViewer.VerticalScrollMode="Disabled"
+                            SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="MinHeight" Value="0" />
+                                    <Setter Property="CornerRadius" Value="0" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="viewmodels:LyricsSourceItem">
+                                    <StackPanel AutomationProperties.Name="{x:Bind AutomationName}">
+                                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" Visibility="{x:Bind HasSeparator, Mode=OneWay}" />
+                                        <Grid
+                                            Padding="16,8,16,8"
+                                            Background="Transparent"
+                                            ColumnSpacing="12"
+                                            MinHeight="48">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon
+                                                VerticalAlignment="Center"
+                                                FontSize="14"
+                                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                                Glyph="&#xE76F;" />
+                                            <StackPanel
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Orientation="Horizontal"
+                                                Spacing="8">
+                                                <TextBlock
+                                                    VerticalAlignment="Center"
+                                                    Style="{StaticResource SettingsRowLabelStyle}"
+                                                    Text="{x:Bind ProviderName}" />
+                                                <Border
+                                                    Padding="7,1,7,2"
+                                                    VerticalAlignment="Center"
+                                                    Background="{ThemeResource Surface2Brush}"
+                                                    CornerRadius="{StaticResource RadiusSmall}">
+                                                    <TextBlock Style="{StaticResource FootnoteStyle}" Text="{x:Bind SyncLabel}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <ToggleSwitch
+                                                Grid.Column="2"
+                                                VerticalAlignment="Center"
+                                                AutomationProperties.AutomationId="{x:Bind Key}"
+                                                AutomationProperties.Name="{x:Bind AutomationName}"
+                                                IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Light up words" Description="For lyrics timed per line, light up the words one by one. Timing is estimated.">
+                            <ToggleSwitch AutomationProperties.AutomationId="EstimateWordTimingToggle" IsOn="{x:Bind ViewModel.EstimateWordTiming, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource SettingsFooterStyle}">
+                    <Run Text="Lyrics display inspired by" />
+                    <Hyperlink NavigateUri="https://github.com/better-lyrics/better-lyrics">Better Lyrics</Hyperlink><Run Text=". Lyrics from" />
+                    <Hyperlink NavigateUri="https://music.youtube.com">YouTube</Hyperlink>
+                    <Run Text="and" />
+                    <Hyperlink NavigateUri="https://lrclib.net">LRCLIB</Hyperlink><Run Text="." />
+                </TextBlock>
+
                 <!--  ===== Window =====  -->
                 <TextBlock
                     AutomationProperties.HeadingLevel="Level2"

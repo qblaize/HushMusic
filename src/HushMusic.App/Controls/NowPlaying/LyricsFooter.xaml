@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="HushMusic.App.Controls.NowPlaying.LyricsFooter"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:HushMusic.App.Helpers"
+    IsTabStop="False">
+
+    <!--  Under the lyrics: the songwriters, where the lyrics come from, and the other sources that have them.  -->
+    <StackPanel Spacing="2">
+        <TextBlock
+            Margin="0,0,0,6"
+            Foreground="{ThemeResource TextTertiaryBrush}"
+            Style="{StaticResource FootnoteStyle}"
+            Text="{x:Bind ViewModel.Credits, Mode=OneWay}"
+            TextTrimming="None"
+            TextWrapping="Wrap"
+            Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.Credits), Mode=OneWay}" />
+        <Grid ColumnSpacing="6" Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.HasSource), Mode=OneWay}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                VerticalAlignment="Center"
+                AutomationProperties.AutomationId="LyricsSource"
+                Foreground="{ThemeResource TextTertiaryBrush}"
+                Style="{StaticResource FootnoteStyle}"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.HasSourceLink), Mode=OneWay}">
+                <Run Text="Lyrics from" />
+                <Hyperlink
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    NavigateUri="{x:Bind ViewModel.SourceUri, Mode=OneWay}"
+                    UnderlineStyle="None">
+                    <Run Text="{x:Bind ViewModel.SourceName, Mode=OneWay}" />
+                </Hyperlink>
+            </TextBlock>
+            <TextBlock
+                VerticalAlignment="Center"
+                AutomationProperties.AutomationId="LyricsSourceName"
+                Foreground="{ThemeResource TextTertiaryBrush}"
+                Style="{StaticResource FootnoteStyle}"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.HasPlainSourceName), Mode=OneWay}">
+                <Run Text="Lyrics from" />
+                <Run Foreground="{ThemeResource TextSecondaryBrush}" Text="{x:Bind ViewModel.SourceName, Mode=OneWay}" />
+            </TextBlock>
+            <Button
+                Grid.Column="1"
+                Padding="6,2"
+                VerticalAlignment="Center"
+                AutomationProperties.AutomationId="LyricsSwitchSource"
+                AutomationProperties.Name="Switch lyrics source"
+                Content="Switch source"
+                FontSize="12"
+                Foreground="{ThemeResource TextSecondaryBrush}"
+                Style="{StaticResource TextActionButtonStyle}"
+                ToolTipService.ToolTip="Show this song's lyrics from another source">
+                <Button.Flyout>
+                    <MenuFlyout
+                        x:Name="SourceMenu"
+                        Closed="OnSourceMenuClosed"
+                        Opening="OnSourceMenuOpening"
+                        Placement="TopEdgeAlignedLeft" />
+                </Button.Flyout>
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>

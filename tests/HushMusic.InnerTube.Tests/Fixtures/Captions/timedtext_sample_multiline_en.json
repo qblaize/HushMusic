@@ -1,0 +1,232 @@
+{
+  "wireMagic": "pb3",
+  "pens": [
+    {}
+  ],
+  "wsWinStyles": [
+    {},
+    {
+      "juJustifCode": 2
+    }
+  ],
+  "wpWinPositions": [
+    {},
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 1,
+      "ccCols": 3
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 1,
+      "ccCols": 24
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 21
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 23
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 25
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 1,
+      "ccCols": 21
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 27
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 29
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 26
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 1,
+      "ccCols": 17
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 1,
+      "ccCols": 27
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 22
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 24
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 3,
+      "ccCols": 24
+    },
+    {
+      "apPoint": 7,
+      "ahHorPos": 50,
+      "avVerPos": 100,
+      "rcRows": 2,
+      "ccCols": 20
+    }
+  ],
+  "events": [
+    {
+      "tStartMs": 29200,
+      "dDurationMs": 19966,
+      "segs": [
+        {
+          "utf8": "♪♪♪"
+        }
+      ],
+      "wpWinPosId": 1,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 49200,
+      "dDurationMs": 1433,
+      "segs": [
+        {
+          "utf8": "♪ I'VE GOT A TEST LINE ♪"
+        }
+      ],
+      "wpWinPosId": 2,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 52133,
+      "dDurationMs": 2500,
+      "segs": [
+        {
+          "utf8": "♪ I'M THE SECOND LINE\nOF THE SAMPLE ♪"
+        }
+      ],
+      "wpWinPosId": 3,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 54666,
+      "dDurationMs": 4734,
+      "segs": [
+        {
+          "utf8": "♪ THIS THIRD LINE IS\nALSO MADE UP, OK ♪"
+        }
+      ],
+      "wpWinPosId": 4,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 60433,
+      "dDurationMs": 1833,
+      "segs": [
+        {
+          "utf8": "♪ FOURTH LINE\nOF PLACEHOLDERS ♪"
+        }
+      ],
+      "wpWinPosId": 3,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 63300,
+      "dDurationMs": 2866,
+      "segs": [
+        {
+          "utf8": "♪ FIFTH LINE OF\nTHE TEST FILE ♪"
+        }
+      ],
+      "wpWinPosId": 3,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 66200,
+      "dDurationMs": 4433,
+      "segs": [
+        {
+          "utf8": "♪ SIXTH LINE IS HERE\nWITH A COMMA, TOO ♪"
+        }
+      ],
+      "wpWinPosId": 5,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 71600,
+      "dDurationMs": 1100,
+      "segs": [
+        {
+          "utf8": "♪ SEVENTH LINE AND ♪"
+        }
+      ],
+      "wpWinPosId": 6,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 72733,
+      "dDurationMs": 2767,
+      "segs": [
+        {
+          "utf8": "♪ EIGHTH LINE OF THE SAMPLE\n(OH) ♪"
+        }
+      ],
+      "wpWinPosId": 7,
+      "wsWinStyleId": 1
+    },
+    {
+      "tStartMs": 75533,
+      "dDurationMs": 2867,
+      "segs": [
+        {
+          "utf8": "♪ NINTH LINE OF THE SAMPLE\n(OH) ♪"
+        }
+      ],
+      "wpWinPosId": 8,
+      "wsWinStyleId": 1
+    }
+  ]
+}

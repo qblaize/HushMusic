@@ -1,0 +1,104 @@
+{
+  "wireMagic": "pb3",
+  "pens": [
+    {}
+  ],
+  "wsWinStyles": [
+    {}
+  ],
+  "wpWinPositions": [
+    {}
+  ],
+  "events": [
+    {
+      "tStartMs": 1360,
+      "dDurationMs": 1680,
+      "segs": [
+        {
+          "utf8": "[♪♪♪]"
+        }
+      ]
+    },
+    {
+      "tStartMs": 18640,
+      "dDurationMs": 3240,
+      "segs": [
+        {
+          "utf8": "♪ Line one of the test song ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 22640,
+      "dDurationMs": 4320,
+      "segs": [
+        {
+          "utf8": "♪ Second test line\nwith a break inside ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 27040,
+      "dDurationMs": 4000,
+      "segs": [
+        {
+          "utf8": "♪ A third sample line\nfor the parser ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 31120,
+      "dDurationMs": 3960,
+      "segs": [
+        {
+          "utf8": "♪ Fourth line of\nplaceholder text ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 35160,
+      "dDurationMs": 4360,
+      "segs": [
+        {
+          "utf8": "♪ Fifth line, still\njust a sample ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 40520,
+      "dDurationMs": 2400,
+      "segs": [
+        {
+          "utf8": "♪ Sixth test line here ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 43000,
+      "dDurationMs": 2120,
+      "segs": [
+        {
+          "utf8": "♪ Seventh placeholder line ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 45200,
+      "dDurationMs": 1880,
+      "segs": [
+        {
+          "utf8": "♪ Eighth line of the sample ♪"
+        }
+      ]
+    },
+    {
+      "tStartMs": 47320,
+      "dDurationMs": 3800,
+      "segs": [
+        {
+          "utf8": "♪ Ninth and last\ntest line ♪"
+        }
+      ]
+    }
+  ]
+}

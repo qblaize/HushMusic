@@ -12,7 +12,9 @@ namespace HushMusic.InnerTube.Api;
 /// Watch queue, radio, lyrics, related and loudness (ytmusicapi <c>mixins/watch.py</c>, <c>get_lyrics</c>,
 /// <c>get_song_related</c>, <c>get_song</c>).
 /// </summary>
-internal sealed partial class WatchApi(IInnerTubeClient client, TimeProvider timeProvider, ILogger<WatchApi> logger) : IWatchApi
+/// <param name="captionTracks">Receives the caption tracks of each loudness <c>player</c> response, for <see cref="CaptionsApi"/>.</param>
+internal sealed partial class WatchApi(IInnerTubeClient client, TimeProvider timeProvider, ILogger<WatchApi> logger, CaptionTrackCache? captionTracks = null)
+    : IWatchApi
 {
     private const int LoudnessCacheCapacity = 512;
 
@@ -120,6 +122,7 @@ internal sealed partial class WatchApi(IInnerTubeClient client, TimeProvider tim
             new InnerTubeRequest(PlayerRequest.Endpoint, PlayerRequest.Body(videoId, timeProvider.GetUtcNow())) { Anonymous = true },
             cancellationToken).ConfigureAwait(false);
         var loudness = PlayerParser.ParseLoudnessDb(response, logger);
+        captionTracks?.Store(videoId, CaptionsParser.ParseTracks(response));
 
         lock (_loudnessGate)
         {

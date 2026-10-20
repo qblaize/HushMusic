@@ -49,7 +49,9 @@ internal sealed partial class JsonLinesPlayLog : IPlayLog
     internal const string FolderName = "history";
     private const string FilePrefix = "plays-";
     private const string FileExtension = ".jsonl";
-    private const int WriteAttempts = 40;
+
+    // How long a write keeps retrying while another copy of the app (or a virus scanner) holds the file.
+    private static readonly TimeSpan WriteTimeout = TimeSpan.FromSeconds(5);
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -87,6 +89,7 @@ internal sealed partial class JsonLinesPlayLog : IPlayLog
         try
         {
             Directory.CreateDirectory(Folder);
+            var deadline = Environment.TickCount64 + (long)WriteTimeout.TotalMilliseconds;
             for (var attempt = 1; ; attempt++)
             {
                 try
@@ -94,10 +97,10 @@ internal sealed partial class JsonLinesPlayLog : IPlayLog
                     WriteLine(path, line);
                     break;
                 }
-                catch (IOException ex) when (attempt < WriteAttempts && ex is not DirectoryNotFoundException)
+                catch (IOException ex) when (Environment.TickCount64 < deadline && ex is not DirectoryNotFoundException)
                 {
                     // A sharing violation: another copy of the app (or a scanner) has the file for a moment.
-                    await Task.Delay(5 + Random.Shared.Next(20), cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(Math.Min(5 * attempt, 50) + Random.Shared.Next(10), cancellationToken).ConfigureAwait(false);
                 }
             }
         }

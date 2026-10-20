@@ -68,7 +68,11 @@ Windows taskbar.
 
 - A full-window view with a large cover over a softly blurred copy of it, and **Up next** (drag to reorder),
   **Lyrics** and **Related** beside it.
-- Synced lyrics when YouTube has them: the current line follows the song, and clicking a line jumps to it.
+- **Lyrics** that glide with the song: the current line lights up word by word, the rest fade back, and dots fill
+  instrumental breaks. Click a line to jump to it. Lyrics come from YouTube, YouTube captions and
+  [LRCLIB](https://lrclib.net); Settings → Lyrics → Sources sets their order and turns each one on or off, and
+  "Switch source" under the lyrics picks another for the song playing. The look is modelled on
+  [Better Lyrics](https://github.com/better-lyrics/better-lyrics).
 - **Cover Flow**: earlier and later songs stack behind the current cover and glide into place when the song changes.
   Click one to play it. Settings → Appearance → Now Playing artwork switches between Single and Cover Flow.
 - **Video mode** (optional): the camera button in Now Playing plays the music video in place of the cover, in sync with
@@ -177,6 +181,7 @@ work:
 | `accounts.google.com` | Only in the sign-in window | Google's own sign-in. |
 | `github.com` | On first run, then now and then | Downloading and updating yt-dlp and Deno, and checking for Hush updates. |
 | Radio Browser (`*.api.radio-browser.info`) and the stations you play | When you open Radio | The station directory, station logos and streams. Playing a station counts one "click" with Radio Browser, as its API asks. |
+| `lrclib.net` | When you open the lyrics of a song, if LRCLIB is on in Settings → Lyrics → Sources | The song's title, artist, album and length, to find its lyrics. |
 | `ws.audioscrobbler.com`, `last.fm` | Only if you connect Last.fm | Scrobbles and "now playing". |
 
 ## Where your data lives
@@ -191,6 +196,7 @@ Everything is in `%LOCALAPPDATA%\HushMusic`. The app itself is installed in `%LO
 | `secure\tmp\` | A short-lived cookie file for yt-dlp, only while "Use my account when resolving streams" is on. Readable only by you and deleted as soon as yt-dlp exits. |
 | `webview-signin\` | The sign-in window's browser profile, deleted after sign-in. |
 | `cache\images\` | Album art (trimmed to 384 MB once it passes 512 MB). |
+| `cache\lyrics\` | Lyrics already looked up (kept for 7 days, at most 1,000 songs), so replays don't fetch them again. |
 | `cache\streams.json` | Resolved stream links, reused until shortly before they expire (about 6 hours). |
 | `cache\playback-session.json` | Last queue, song and position, for "Resume where I left off". |
 | `cache\lastfm-queue.json` | Scrobbles waiting to be sent. |

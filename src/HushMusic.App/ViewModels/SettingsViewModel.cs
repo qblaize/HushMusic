@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,6 +15,7 @@ using HushMusic.App.Services.Windowing.TaskbarWidget;
 using HushMusic.App.ViewModels.NowPlaying;
 using HushMusic.App.ViewModels.Shell;
 using HushMusic.Core.Abstractions;
+using HushMusic.Core.Lyrics;
 using HushMusic.Core.Services;
 using HushMusic.Playback;
 using HushMusic.Playback.Pulse;
@@ -34,6 +36,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     private readonly IUpdateService _appUpdates;
     private readonly IGlobalHotkeyService _hotkeys;
     private readonly IMusicPulse _pulse;
+    private readonly ILyricsService _lyrics;
     private readonly ILogger<SettingsViewModel> _logger;
     private CancellationTokenSource? _updateCts;
     private CancellationTokenSource? _lastFmCts;
@@ -59,6 +62,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         IUpdateService appUpdates,
         IGlobalHotkeyService hotkeys,
         IMusicPulse pulse,
+        ILyricsService lyrics,
         SmartSkipSettingsViewModel smartSkip,
         INotificationService notifications,
         ILogger<SettingsViewModel> logger)
@@ -74,6 +78,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         _appUpdates = appUpdates;
         _hotkeys = hotkeys;
         _pulse = pulse;
+        _lyrics = lyrics;
         _logger = logger;
         Account = account;
         SmartSkip = smartSkip;
@@ -221,6 +226,14 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     /// <summary>Index into <see cref="TaskbarDisplayOptions"/> (a ComboBox's SelectedIndex).</summary>
     [ObservableProperty]
     public partial int TaskbarDisplayIndex { get; set; }
+
+    // ===== Lyrics =====
+
+    /// <summary>The lyrics sources in the user's order (a song shows the first enabled one that has its lyrics).</summary>
+    public ObservableCollection<LyricsSourceItem> LyricsSources { get; } = [];
+
+    [ObservableProperty]
+    public partial bool EstimateWordTiming { get; set; } = true;
 
     // ===== Global shortcuts =====
 
@@ -394,6 +407,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         StartWithWindows = current.StartWithWindows;
         ShowTaskbarWidget = current.ShowTaskbarWidget;
         RefreshTaskbarDisplays();
+        EstimateWordTiming = current.EstimateWordTiming;
+        RefreshLyricsSources();
         GlobalHotkeysEnabled = current.GlobalHotkeysEnabled;
         LastFmScrobbling = current.LastFmScrobbling;
         CheckYtDlpUpdatesOnStartup = current.CheckYtDlpUpdatesOnStartup;
@@ -412,6 +427,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             _settings.Changed += OnSettingsChanged;
             _appUpdates.StateChanged += OnAppUpdateStateChanged;
             _hotkeys.StatusChanged += OnHotkeyStatusChanged;
+            _lyrics.SourceOrderChanged += OnLyricsSourceOrderChanged;
         }
 
         AccentSwatches = BuildAccentSwatches();
@@ -436,6 +452,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             _settings.Changed -= OnSettingsChanged;
             _appUpdates.StateChanged -= OnAppUpdateStateChanged;
             _hotkeys.StatusChanged -= OnHotkeyStatusChanged;
+            _lyrics.SourceOrderChanged -= OnLyricsSourceOrderChanged;
         }
 
         foreach (var hotkey in Hotkeys)
@@ -536,6 +553,49 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     // Missing actions use the defaults, so an empty map is "all defaults".
     [RelayCommand]
     private void ResetHotkeys() => Save(s => s.GlobalHotkeys = []);
+
+    /// <summary>Moves a lyrics source up (-1) or down (+1) in the order (its context menu).</summary>
+    public void MoveLyricsSource(LyricsSourceItem item, int delta)
+    {
+        var from = LyricsSources.IndexOf(item);
+        var to = from + delta;
+        if (from < 0 || to < 0 || to >= LyricsSources.Count)
+        {
+            return;
+        }
+
+        LyricsSources.Move(from, to);
+        CommitLyricsSourceOrder();
+    }
+
+    /// <summary>The list was reordered (dragged, or moved from a menu) or a switch changed: saves it.</summary>
+    public void CommitLyricsSourceOrder()
+    {
+        UpdateLyricsSourcePositions();
+        var order = CurrentLyricsSourceOrder();
+        if (!_loading && !SameOrder(order, _lyrics.GetSourceOrder()))
+        {
+            _ = SaveLyricsSourcesAsync(order);
+        }
+    }
+
+    // Back to the default order; the switches stay as they are.
+    [RelayCommand]
+    private void ResetLyricsSourceOrder()
+    {
+        var defaults = _lyrics.Sources.Select((s, i) => (s.Key, i)).ToDictionary(p => p.Key, p => p.i, StringComparer.Ordinal);
+        var sorted = LyricsSources.OrderBy(item => defaults.GetValueOrDefault(item.Key, int.MaxValue)).ToList();
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            var from = LyricsSources.IndexOf(sorted[i]);
+            if (from != i)
+            {
+                LyricsSources.Move(from, i);
+            }
+        }
+
+        CommitLyricsSourceOrder();
+    }
 
     [RelayCommand]
     private async Task OpenLastFmApiAccountPageAsync() => await LaunchAsync(LastFmApiAccountPage);
@@ -700,6 +760,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     partial void OnGlobalHotkeysEnabledChanged(bool value) => Save(s => s.GlobalHotkeysEnabled = value);
 
+    partial void OnEstimateWordTimingChanged(bool value) => Save(s => s.EstimateWordTiming = value);
+
     partial void OnLastFmScrobblingChanged(bool value) => Save(s => s.LastFmScrobbling = value);
 
     partial void OnCheckYtDlpUpdatesOnStartupChanged(bool value) => Save(s => s.CheckYtDlpUpdatesOnStartup = value);
@@ -779,6 +841,58 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     // Raised on the UI thread.
     private void OnHotkeyStatusChanged(object? sender, EventArgs e) => RefreshHotkeys();
+
+    private static bool SameOrder(IReadOnlyList<LyricsSourceSetting> a, IReadOnlyList<LyricsSourceSetting> b) =>
+        a.Count == b.Count && a.Zip(b).All(pair => pair.First == pair.Second);
+
+    // Our own saves come back through here too (then nothing changed). May arrive on a background thread.
+    private void OnLyricsSourceOrderChanged(object? sender, EventArgs e) => _dispatcher.Run(RefreshLyricsSources);
+
+    private void RefreshLyricsSources()
+    {
+        var order = _lyrics.GetSourceOrder();
+        if (SameOrder(order, CurrentLyricsSourceOrder()))
+        {
+            return;
+        }
+
+        var sources = _lyrics.Sources.ToDictionary(s => s.Key, StringComparer.Ordinal);
+        LyricsSources.Clear();
+        foreach (var setting in order)
+        {
+            if (sources.TryGetValue(setting.Key, out var source))
+            {
+                LyricsSources.Add(new LyricsSourceItem(source, setting.Enabled, OnLyricsSourceToggled));
+            }
+        }
+
+        UpdateLyricsSourcePositions();
+    }
+
+    private void OnLyricsSourceToggled(LyricsSourceItem item) => CommitLyricsSourceOrder();
+
+    private List<LyricsSourceSetting> CurrentLyricsSourceOrder() =>
+        [.. LyricsSources.Select(item => new LyricsSourceSetting(item.Key, item.IsEnabled))];
+
+    private void UpdateLyricsSourcePositions()
+    {
+        for (var i = 0; i < LyricsSources.Count; i++)
+        {
+            LyricsSources[i].SetPosition(i, LyricsSources.Count);
+        }
+    }
+
+    private async Task SaveLyricsSourcesAsync(IReadOnlyList<LyricsSourceSetting> order)
+    {
+        try
+        {
+            await _lyrics.SetSourceOrderAsync(order);
+        }
+        catch (Exception ex)
+        {
+            Notifications.ShowError("Could not save the lyrics sources", ex);
+        }
+    }
 
     private void RefreshHotkeys()
     {
@@ -1057,4 +1171,51 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
             Notifications.ShowError("Could not save settings", ex);
         }
     }
+}
+
+/// <summary>One lyrics source in Settings: its name, how precisely it is timed, and its switch.</summary>
+public sealed partial class LyricsSourceItem : ObservableObject
+{
+    private readonly Action<LyricsSourceItem>? _toggled;
+
+    internal LyricsSourceItem(LyricsSourceInfo source, bool enabled, Action<LyricsSourceItem> toggled)
+    {
+        Key = source.Key;
+        ProviderName = source.ProviderName;
+        SyncLabel = LyricsViewModel.SyncLabel(source.Sync);
+        IsEnabled = enabled;
+        _toggled = toggled;
+    }
+
+    public string Key { get; }
+
+    public string ProviderName { get; }
+
+    /// <summary>"Syllable", "Word", "Line" or "Unsynced".</summary>
+    public string SyncLabel { get; }
+
+    /// <summary>"LRCLIB, Line": the row and its switch for screen readers.</summary>
+    public string AutomationName => $"{ProviderName}, {SyncLabel}";
+
+    [ObservableProperty]
+    public partial bool IsEnabled { get; set; }
+
+    /// <summary>The row has a hairline above it (every row but the first).</summary>
+    [ObservableProperty]
+    public partial bool HasSeparator { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanMoveUp { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanMoveDown { get; set; }
+
+    internal void SetPosition(int index, int count)
+    {
+        HasSeparator = index > 0;
+        CanMoveUp = index > 0;
+        CanMoveDown = index < count - 1;
+    }
+
+    partial void OnIsEnabledChanged(bool value) => _toggled?.Invoke(this);
 }

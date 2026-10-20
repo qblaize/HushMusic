@@ -66,23 +66,36 @@
         <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
     </Style>
 
-    <!--  Synced lyrics: big bold lines, Apple Music style.  -->
-    <Style x:Key="LyricLineTextStyle" BasedOn="{StaticResource AppTextBlockBaseStyle}" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="24" />
+    <!--
+        Synced lyrics, one TextBlock per word (LyricsWordPanel wraps them): big bold lines like Better Lyrics and Apple
+        Music. The words keep the full text colour; LyricsStage dims whole lines and lights the sung words.
+    -->
+    <Style x:Key="LyricWordTextStyle" BasedOn="{StaticResource AppTextBlockBaseStyle}" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="28" />
         <Setter Property="FontWeight" Value="Bold" />
-        <Setter Property="CharacterSpacing" Value="-14" />
-        <Setter Property="LineHeight" Value="30" />
+        <Setter Property="CharacterSpacing" Value="-16" />
+        <Setter Property="LineHeight" Value="36" />
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="OpticalMarginAlignment" Value="None" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="TextTrimming" Value="None" />
     </Style>
 
-    <!--  Unsynced lyrics: readable, a little smaller.  -->
-    <Style x:Key="LyricsPlainTextStyle" BasedOn="{StaticResource AppTextBlockBaseStyle}" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="20" />
+    <!--  Backing vocals under a line: three quarters the size, lighter.  -->
+    <Style x:Key="LyricBackingWordTextStyle" BasedOn="{StaticResource LyricWordTextStyle}" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="21" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="CharacterSpacing" Value="-10" />
+        <Setter Property="LineHeight" Value="27" />
+    </Style>
+
+    <!--  Unsynced lyrics: calm and readable, a little smaller, nothing lit (a RichTextBlock of one paragraph per line).  -->
+    <Style x:Key="LyricsPlainTextStyle" TargetType="RichTextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="21" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="CharacterSpacing" Value="-10" />
-        <Setter Property="LineHeight" Value="32" />
+        <Setter Property="LineHeight" Value="29" />
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
         <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -182,9 +195,10 @@
         </Setter>
     </Style>
 
-    <!--  A synced lyric line (np:LyricLineButton dims itself; the hover fill is subtle).  -->
+    <!--  A synced lyric line (np:LyricLineButton; LyricsStage dims it): click seeks there, the hover fill is subtle.  -->
     <Style x:Key="LyricLineButtonStyle" BasedOn="{StaticResource NowPlayingRowButtonStyle}" TargetType="Button">
-        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="Margin" Value="0,0,0,6" />
         <Setter Property="IsTabStop" Value="False" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
     </Style>

@@ -12,7 +12,7 @@ src/
   HushMusic.App/        WinUI 3 shell, pages, view models, mini player, tray icon, taskbar player, updates
 tests/
   HushMusic.InnerTube.Tests/  parser tests on saved real responses (Fixtures/) and HTTP request tests
-  HushMusic.Core.Tests/       queue, playback actions, features, radio, Last.fm
+  HushMusic.Core.Tests/       queue, playback actions, features, radio, Last.fm, lyrics
   HushMusic.Playback.Tests/   yt-dlp output parsing, Deno installer, JavaScript runtime choice
 ```
 
@@ -34,7 +34,7 @@ changes something the fix lives in one project:
 
 | Concern | Interfaces (in Core) | Only implementation |
 |---|---|---|
-| YouTube Music's private API | `IBrowseApi`, `IExploreApi`, `ISearchApi`, `ILibraryApi`, `IWatchApi`, `IAccountApi` | `HushMusic.InnerTube` |
+| YouTube Music's private API | `IBrowseApi`, `IExploreApi`, `ISearchApi`, `ILibraryApi`, `IWatchApi`, `IAccountApi`, `ICaptionLyricsApi` | `HushMusic.InnerTube` |
 | Finding a playable stream | `IStreamResolver` | `HushMusic.Playback` (yt-dlp); live radio uses its own resolver in Core, never yt-dlp |
 | Signing in and signing requests | `IAuthService`, `IRequestAuthenticator` | `HushMusic.Auth` |
 
@@ -77,6 +77,42 @@ Rules that follow from this:
    song keeps its cover: its music video (`Track.VideoVersion`, the watch playlist's Song / Video counterpart, signed
    in only) is another recording, so it is offered as an item of its own, never synced to the song.
 
+## Lyrics
+
+`ILyricsService` (Core, `Lyrics/`) gets lyrics from several sources, in an order the user can change and with each
+entry switched on or off (Settings → Lyrics). The entries, best first by default:
+
+| Key | Source | Timing |
+|---|---|---|
+| `youtube-synced` | YouTube Music's own lyrics (`IWatchApi.GetLyricsAsync`, timed through the mobile client) | line |
+| `ytcaptions-synced` | the video's own caption track, for music videos with lyric captions (`ICaptionLyricsApi`) | line |
+| `lrclib-word` | [LRCLIB](https://lrclib.net), enhanced LRC word tags | word |
+| `lrclib-synced` | LRCLIB, LRC | line |
+| `youtube-plain` | YouTube Music, plain text | none |
+| `lrclib-plain` | LRCLIB, plain text | none |
+
+- The first enabled entry that has lyrics for the track wins; `GetLyricsAsync(track, key)` asks one entry directly
+  (the "switch source" button). One request to a source fills all of its entries.
+- Sources are only asked when lyrics are on screen, never for the rest of the queue, and never for live radio. Episodes
+  only go to YouTube Music.
+- Every source's answer is cached per track: the last 50 tracks in memory, and one small JSON file per track in
+  `%LOCALAPPDATA%\HushMusic\cache\lyrics\` (lyrics for 7 days, "no lyrics" for an hour; at most 1,000 files). Two
+  callers asking at once share one request, and a track change doesn't cancel it, so its answer is still cached.
+- LRCLIB is a free, open lyrics database with no key (`LrcLibClient`, in Core like the other open-web clients). The
+  app asks `/api/get` for an exact match on title, first artist, album and length (LRCLIB allows ±2 s) and falls back
+  to `/api/search` when that finds nothing, a placeholder entry, or plain lyrics only; a search result must be within
+  3 s of the track's length, have the same artist and a similar title. Titles are cleaned first ("(Official Video)",
+  "[Lyrics]", "feat." parts, an "Artist - " prefix). Requests carry the User-Agent LRCLIB asks for:
+  `Hush/<version> (https://github.com/qblaize/HushMusic)`.
+- Captions are beyond ytmusicapi; [innertube-requests.md](innertube-requests.md#65c-captions-as-lyrics-player--timedtext-not-in-ytmusicapi)
+  has the requests.
+- Every source goes through `LyricsCleanup`: lines in time order with end times (the next line's start when the source
+  has none), no empty, credit or section-header lines, caption noise ("♪", "[Music]", all capitals) removed, a caption
+  repeated while still showing merged. `LrcParser` reads LRC, including several timestamps on a line, `[offset:]` and
+  enhanced word tags.
+- The order is stored in `AppSettings.LyricsSources` and merged with the built-in list, so sources added later show up
+  in their default place (as Better Lyrics' `mergePreferredProviders` does).
+
 yt-dlp and Deno are installed by the app into `%LOCALAPPDATA%\HushMusic\tools\<tool>\<version>\` from their official
 GitHub releases, checked against the published SHA-256, and replaced side by side when a new version comes out (a
 version folder that a running process still uses is cleaned up later).
@@ -107,6 +143,7 @@ Hooks available to a feature:
 | `ISleepTimer` | start, end of track, cancel; `Changed` |
 | `ILastFmService` | Last.fm connection state, user name, pending scrobbles |
 | `IRadioNowPlaying` | the song on air for live radio (ICY metadata) |
+| `ILyricsService` | lyrics of a track from the best enabled source, or from a chosen one; the user's source order (`SourceOrderChanged`) |
 | `INotificationService` | show an InfoBar message |
 | `IThemeService`, `IAccentColorService`, `IWindowModeService` (App) | theme and accent changes; mini player; show the window; whether it is shown, minimized or hidden in the notification area (`VisibilityChanged`) |
 

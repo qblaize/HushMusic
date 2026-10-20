@@ -4,6 +4,7 @@ using HushMusic.Core.Abstractions;
 using HushMusic.Core.Features;
 using HushMusic.Core.Features.LastFm;
 using HushMusic.Core.Features.Stats;
+using HushMusic.Core.Lyrics;
 using HushMusic.Core.Queue;
 using HushMusic.Core.Radio;
 using HushMusic.Core.Services;
@@ -69,6 +70,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRadioNowPlaying>(sp => sp.GetRequiredService<RadioNowPlayingService>());
         services.AddHostedService<RadioClickReporter>();
         services.AddSingleton<IRadioTrackMatcher, RadioTrackMatcher>();
+
+        // Lyrics from YouTube Music, a video's own captions and LRCLIB, in the user's order. The app replaces the
+        // browse-id lookup with one shared with the "Related" tab.
+        services.AddHttpClient(LrcLibClient.HttpClientName, LrcLibClient.Configure);
+        services.AddSingleton<LrcLibClient>();
+        services.TryAddSingleton<ILyricsBrowseIdSource>(sp => new WatchLyricsBrowseIds(sp.GetRequiredService<IWatchApi>()));
+        services.AddSingleton<ILyricsService, LyricsService>();
         return services;
     }
 }

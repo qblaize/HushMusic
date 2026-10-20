@@ -5,7 +5,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:HushMusic.App.Helpers"
     xmlns:local="using:HushMusic.App.Controls.NowPlaying"
-    xmlns:vm="using:HushMusic.App.ViewModels.Shell"
     IsTabStop="False">
 
     <UserControl.Resources>
@@ -71,6 +70,7 @@
                 Glyph="&#xE8BD;" />
             <TextBlock
                 HorizontalAlignment="Center"
+                AutomationProperties.AutomationId="NowPlayingLyricsMessage"
                 Style="{StaticResource HeadlineStyle}"
                 Text="{x:Bind ViewModel.Message, Mode=OneWay}"
                 TextAlignment="Center"
@@ -78,61 +78,40 @@
                 TextWrapping="Wrap" />
         </StackPanel>
 
-        <!--  Synced: the current line is bright and kept about a third of the way down.  -->
-        <ScrollViewer
+        <!--
+            Synced: big bold lines; the current one bright and kept about a third of the way down, its words lighting up as
+            they are sung (LyricsStage). The lines are built in code and reused for the next song.
+        -->
+        <ScrollView
             x:Name="SyncedScroller"
             AutomationProperties.AutomationId="NowPlayingSyncedLyrics"
             AutomationProperties.Name="Lyrics"
+            HorizontalScrollBarVisibility="Hidden"
             HorizontalScrollMode="Disabled"
-            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsSynced), Mode=OneWay}">
-            <StackPanel x:Name="SyncedContent" Padding="12,16,12,0">
-                <ItemsControl
-                    x:Name="LinesList"
-                    IsTabStop="False"
-                    ItemsSource="{x:Bind ViewModel.Lines, Mode=OneWay}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:LyricLineViewModel">
-                            <local:LyricLineButton
-                                Margin="0,0,0,4"
-                                AutomationProperties.Name="{x:Bind Text}"
-                                Click="OnLineClick"
-                                IsCurrent="{x:Bind IsCurrent, Mode=OneWay}"
-                                Style="{StaticResource LyricLineButtonStyle}">
-                                <TextBlock Style="{StaticResource LyricLineTextStyle}" Text="{x:Bind Text}" />
-                            </local:LyricLineButton>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock
-                    Margin="12,24,12,0"
-                    Foreground="{ThemeResource TextTertiaryBrush}"
-                    Style="{StaticResource FootnoteStyle}"
-                    Text="{x:Bind ViewModel.Source, Mode=OneWay}"
-                    TextTrimming="None"
-                    TextWrapping="Wrap"
-                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.Source), Mode=OneWay}" />
+            VerticalScrollBarVisibility="Hidden"
+            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsSynced), Mode=OneWay}"
+            ZoomMode="Disabled">
+            <StackPanel x:Name="SyncedContent" Padding="8,16,12,0">
+                <StackPanel x:Name="LinesHost" />
+                <local:LyricsFooter x:Name="SyncedFooter" Margin="12,28,12,0" />
             </StackPanel>
-        </ScrollViewer>
+        </ScrollView>
 
-        <!--  Unsynced: plain, selectable text.  -->
+        <!--  Unsynced: calm, plain, selectable text.  -->
         <ScrollViewer
             x:Name="PlainScroller"
-            Padding="24,12,24,32"
+            Padding="20,12,24,32"
             AutomationProperties.AutomationId="NowPlayingPlainLyrics"
             HorizontalScrollMode="Disabled"
             Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsPlain), Mode=OneWay}">
-            <StackPanel Spacing="24">
-                <TextBlock
+            <StackPanel Spacing="28">
+                <!--  One paragraph per lyric line, so a wrapped line reads as one; a blank line opens a new verse.  -->
+                <RichTextBlock
+                    x:Name="PlainText"
+                    AutomationProperties.AutomationId="NowPlayingPlainLyricsText"
                     IsTextSelectionEnabled="True"
-                    Style="{StaticResource LyricsPlainTextStyle}"
-                    Text="{x:Bind ViewModel.Text, Mode=OneWay}" />
-                <TextBlock
-                    Foreground="{ThemeResource TextTertiaryBrush}"
-                    Style="{StaticResource FootnoteStyle}"
-                    Text="{x:Bind ViewModel.Source, Mode=OneWay}"
-                    TextTrimming="None"
-                    TextWrapping="Wrap"
-                    Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.Source), Mode=OneWay}" />
+                    Style="{StaticResource LyricsPlainTextStyle}" />
+                <local:LyricsFooter />
             </StackPanel>
         </ScrollViewer>
     </Grid>

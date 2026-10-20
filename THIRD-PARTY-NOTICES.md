@@ -72,6 +72,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Design reference: Better Lyrics
+
+The lyrics view in Now Playing (lines that glide into place, words that light up as they're sung, dots through
+instrumental breaks) is modelled on [Better Lyrics](https://github.com/better-lyrics/better-lyrics), a browser
+extension for YouTube Music licensed under the GNU General Public License v3.0, the same licence as Hush. Hush takes its
+look, timings and easing curves from it; the code is written for WinUI and contains no code from the extension.
+
+## Online services
+
+| Service | Used for |
+|---|---|
+| [Radio Browser](https://www.radio-browser.info) | The directory of live radio stations. |
+| [LRCLIB](https://lrclib.net) | Synced and plain lyrics when the user's source order picks it. Hush identifies itself with its own User-Agent, as LRCLIB asks. |
+
 ## Velopack licence
 
 ```

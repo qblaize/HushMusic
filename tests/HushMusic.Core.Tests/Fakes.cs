@@ -192,7 +192,7 @@ internal sealed class FakeWatchApi : IWatchApi
         return OnContinuation(continuation, cancellationToken);
     }
 
-    public Task<Lyrics?> GetLyricsAsync(string lyricsBrowseId, bool timestamps = false, CancellationToken cancellationToken = default) => Task.FromResult<Lyrics?>(null);
+    public Task<Models.Lyrics?> GetLyricsAsync(string lyricsBrowseId, bool timestamps = false, CancellationToken cancellationToken = default) => Task.FromResult<Models.Lyrics?>(null);
 
     public Task<IReadOnlyList<Shelf>> GetRelatedAsync(string relatedBrowseId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Shelf>>([]);
 

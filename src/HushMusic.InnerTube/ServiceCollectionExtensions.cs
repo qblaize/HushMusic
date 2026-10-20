@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using HushMusic.Core.Abstractions;
+using HushMusic.Core.Lyrics;
 using HushMusic.InnerTube.Api;
 using HushMusic.InnerTube.Http;
 
@@ -39,6 +40,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IWatchApi, WatchApi>();
         services.AddSingleton<IExploreApi, ExploreApi>();
         services.AddSingleton<IAccountApi, AccountApi>();
+
+        // A video's captions as lyrics; the caption list rides along with the loudness "player" response.
+        services.AddSingleton<CaptionTrackCache>();
+        services.AddSingleton<ICaptionLyricsApi, CaptionsApi>();
         return services;
     }
 }

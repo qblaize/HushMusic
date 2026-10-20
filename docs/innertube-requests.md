@@ -565,6 +565,35 @@ The same `player` request as `get_song` (see 6.10 for the body). The app reads `
 - Age-gated (`LOGIN_REQUIRED`) and unavailable tracks have no `playerConfig`, so they get no gain.
 - Results are cached per video in memory.
 
+### 6.5c Captions as lyrics (`player` + `timedtext`, not in ytmusicapi)
+
+**[not-ytm]** ytmusicapi has no captions call. The app reads a video's own caption track as line-synced lyrics (a
+lyrics source next to 6.5 and LRCLIB, see [ARCHITECTURE.md](ARCHITECTURE.md#lyrics)), because many music videos carry
+lyric captions. It uses only what the app already sends, so nothing new is needed: no account, no proof-of-origin token.
+
+1. **Track list:** the anonymous `player` request of 6.5b / 6.10 (same body). The tracks are at
+   `captions.playerCaptionsTracklistRenderer.captionTracks[]`: `baseUrl`, `languageCode`, `name.runs`, `vssId`, and
+   `kind: "asr"` for auto-generated tracks. The app keeps the list from the loudness request it already makes for every
+   played track, so captions usually cost no extra `player` call (the list is kept for an hour: the URLs are signed and
+   expire).
+2. **Track choice:** never `kind: "asr"`. The song's language is the auto-generated track's language (it follows what
+   is sung); the written track in that language (or its base language, `es-419` for `es`) is used. Without an
+   auto-generated track, a video whose written tracks are all one language uses it; several languages are ambiguous and
+   skipped. When the language was not confirmed, a non-Latin title with Latin-script captions is taken for a
+   translation and skipped.
+3. **Cues:** an anonymous GET of the track's `baseUrl` (`https://www.youtube.com/api/timedtext?...`, signed; the query
+   is kept as is) with `&fmt=json3`, sent with the web headers and the `SOCS=CAI` consent cookie only. The answer is
+   `{"events": [{"tStartMs", "dDurationMs", "segs": [{"utf8"}]}]}`; events without `segs` are window definitions,
+   `aAppend: 1` continues the previous cue, and a `"\n"` inside a cue is a line break.
+- **[live]** 2026-10-20, anonymous WEB_REMIX `player` with the visitor id, as the app sends it: caption tracks came
+  back for the music videos tried (five), and `fmt=json3` returned HTTP 200 with the cues for every written track
+  fetched (four). Album tracks (`MUSIC_VIDEO_TYPE_ATV`) had no captions.
+- **[uncertain]** yt-dlp reports that YouTube sometimes adds `exp=xpe` to caption URLs and then only answers with a
+  PO token (an empty body otherwise). The app skips such tracks and treats an empty body as "no captions"; neither was
+  seen in the probes.
+- Captions are timed to the video's own sound. Hush plays that same video's audio, so they line up; a song's (ATV)
+  lyrics never come from its music video's captions.
+
 ### 6.6 Like / dislike / remove like
 
 `rate_song(videoId, rating)` (`mixins/library.py`). Body `{"target": {"videoId": "<id>"}}`. Auth required. The endpoint comes from `mixins/_utils.py:prepare_like_endpoint`:

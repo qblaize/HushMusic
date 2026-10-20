@@ -85,10 +85,10 @@ public interface IWatchApi
 
     /// <summary>
     /// Returns null when the track has no lyrics. With <paramref name="timestamps"/> the request is sent as the mobile
-    /// client (ytmusicapi <c>get_lyrics(timestamps=True)</c>) and <see cref="Lyrics.TimedLines"/> is filled when
+    /// client (ytmusicapi <c>get_lyrics(timestamps=True)</c>) and <see cref="Models.Lyrics.TimedLines"/> is filled when
     /// YouTube has synced lyrics; otherwise the plain text comes back.
     /// </summary>
-    Task<Lyrics?> GetLyricsAsync(string lyricsBrowseId, bool timestamps = false, CancellationToken cancellationToken = default);
+    Task<Models.Lyrics?> GetLyricsAsync(string lyricsBrowseId, bool timestamps = false, CancellationToken cancellationToken = default);
 
     /// <summary>"Related" tab of the player (<see cref="WatchPlaylist.RelatedBrowseId"/>, ytmusicapi <c>get_song_related</c>).</summary>
     Task<IReadOnlyList<Shelf>> GetRelatedAsync(string relatedBrowseId, CancellationToken cancellationToken = default);

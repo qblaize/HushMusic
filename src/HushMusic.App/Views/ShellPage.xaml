@@ -127,93 +127,121 @@
             Grid.ColumnSpan="2"
             x:Load="{x:Bind ViewModel.YearInReview.IsRealized, Mode=OneWay}" />
 
-        <!--  Errors and messages as floating toasts above the player bar and Now Playing: never silent.  -->
-        <ItemsControl
+        <!--
+            Errors and messages as floating toasts above the player bar and Now Playing: never silent. The newest is at the
+            bottom; when each comes and goes is up to the view model (NotificationStack).
+        -->
+        <shell:ToastStack
+            x:Name="Toasts"
             Grid.RowSpan="2"
             Grid.ColumnSpan="2"
             Width="{StaticResource ToastWidth}"
             Margin="0,0,24,100"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
-            IsTabStop="False"
-            ItemsSource="{x:Bind ViewModel.Notifications}">
-            <ItemsControl.ItemContainerTransitions>
-                <TransitionCollection>
-                    <AddDeleteThemeTransition />
-                </TransitionCollection>
-            </ItemsControl.ItemContainerTransitions>
+            ItemsSource="{x:Bind ViewModel.Toasts.Items}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <shell:ToastPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:NotificationViewModel">
-                    <Border
-                        Margin="0,8,0,0"
-                        Padding="14,12,6,12"
-                        AutomationProperties.LiveSetting="{x:Bind LiveSetting}"
-                        AutomationProperties.Name="{x:Bind Title}"
-                        Background="{ThemeResource GlassStrongBrush}"
-                        BorderBrush="{ThemeResource SeparatorBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{StaticResource RadiusLarge}"
-                        Shadow="{StaticResource ShellShadow}"
-                        Translation="0,0,32">
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon
-                                Margin="0,1,0,0"
-                                VerticalAlignment="Top"
-                                FontSize="16"
-                                Foreground="{x:Bind shell:ShellBindings.SeverityBrush(Severity)}"
-                                Glyph="{x:Bind Glyph}" />
-                            <StackPanel
-                                Grid.Column="1"
-                                VerticalAlignment="Center"
-                                Spacing="2">
-                                <TextBlock
-                                    MaxLines="2"
-                                    Style="{StaticResource HeadlineStyle}"
-                                    Text="{x:Bind Title}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    MaxLines="4"
-                                    IsTextSelectionEnabled="True"
-                                    Style="{StaticResource SubheadStyle}"
-                                    Text="{x:Bind Message}"
-                                    TextWrapping="Wrap"
-                                    Visibility="{x:Bind helpers:Format.VisibleIf(HasMessage)}" />
+                    <!--  The gap above each toast is part of it, so the pointer stays on the stack between toasts.  -->
+                    <Grid Padding="0,8,0,0" Background="Transparent">
+                        <Border
+                            Padding="14,12,6,12"
+                            AutomationProperties.LiveSetting="{x:Bind LiveSetting}"
+                            AutomationProperties.Name="{x:Bind Title}"
+                            Background="{ThemeResource GlassStrongBrush}"
+                            BorderBrush="{ThemeResource SeparatorBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource RadiusLarge}"
+                            Shadow="{StaticResource ShellShadow}"
+                            Translation="0,0,32">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    Margin="0,1,0,0"
+                                    VerticalAlignment="Top"
+                                    FontSize="16"
+                                    Foreground="{x:Bind shell:ShellBindings.SeverityBrush(Severity)}"
+                                    Glyph="{x:Bind Glyph}" />
                                 <StackPanel
-                                    Margin="0,8,0,0"
-                                    Orientation="Horizontal"
-                                    Spacing="8"
-                                    Visibility="{x:Bind helpers:Format.VisibleIf(HasAction)}">
-                                    <Button
-                                        Click="{x:Bind InvokeAction}"
-                                        Content="{x:Bind ActionLabel}"
-                                        Style="{StaticResource PillButtonStyle}" />
-                                    <Button
-                                        Click="{x:Bind InvokeSecondaryAction}"
-                                        Content="{x:Bind SecondaryActionLabel}"
-                                        Style="{StaticResource PillSecondaryButtonStyle}"
-                                        Visibility="{x:Bind helpers:Format.VisibleIf(HasSecondaryAction)}" />
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Spacing="2">
+                                    <Grid HorizontalAlignment="Left" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            MaxLines="2"
+                                            Style="{StaticResource HeadlineStyle}"
+                                            Text="{x:Bind Title}"
+                                            TextWrapping="Wrap" />
+                                        <!--
+                                            The same message again: counted here instead of another card. The negative
+                                            margin keeps the title row's height, so a merge doesn't nudge the stack.
+                                        -->
+                                        <Border
+                                            Grid.Column="1"
+                                            Margin="0,0,0,-6"
+                                            Padding="6,1,6,2"
+                                            VerticalAlignment="Top"
+                                            Background="{ThemeResource Surface3Brush}"
+                                            CornerRadius="{StaticResource RadiusSmall}"
+                                            Visibility="{x:Bind helpers:Format.VisibleIf(HasCount), Mode=OneWay}">
+                                            <TextBlock
+                                                AutomationProperties.Name="{x:Bind CountDescription, Mode=OneWay}"
+                                                Style="{StaticResource FootnoteStyle}"
+                                                Text="{x:Bind CountText, Mode=OneWay}" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock
+                                        MaxLines="4"
+                                        IsTextSelectionEnabled="True"
+                                        Style="{StaticResource SubheadStyle}"
+                                        Text="{x:Bind Message}"
+                                        TextWrapping="Wrap"
+                                        Visibility="{x:Bind helpers:Format.VisibleIf(HasMessage)}" />
+                                    <StackPanel
+                                        Margin="0,8,0,0"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        Visibility="{x:Bind helpers:Format.VisibleIf(HasAction)}">
+                                        <Button
+                                            Click="{x:Bind InvokeAction}"
+                                            Content="{x:Bind ActionLabel}"
+                                            Style="{StaticResource PillButtonStyle}" />
+                                        <Button
+                                            Click="{x:Bind InvokeSecondaryAction}"
+                                            Content="{x:Bind SecondaryActionLabel}"
+                                            Style="{StaticResource PillSecondaryButtonStyle}"
+                                            Visibility="{x:Bind helpers:Format.VisibleIf(HasSecondaryAction)}" />
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                            <Button
-                                Grid.Column="2"
-                                Width="28"
-                                Height="28"
-                                VerticalAlignment="Top"
-                                AutomationProperties.Name="Dismiss"
-                                Click="{x:Bind Dismiss}"
-                                Content="&#xE711;"
-                                FontSize="10"
-                                Style="{StaticResource IconButtonStyle}" />
-                        </Grid>
-                    </Border>
+                                <Button
+                                    Grid.Column="2"
+                                    Width="28"
+                                    Height="28"
+                                    VerticalAlignment="Top"
+                                    AutomationProperties.Name="Dismiss"
+                                    Click="{x:Bind Dismiss}"
+                                    Content="&#xE711;"
+                                    FontSize="10"
+                                    Style="{StaticResource IconButtonStyle}" />
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        </shell:ToastStack>
 
         <!--  Search modal: above everything, including the rail, the title band and Now Playing.  -->
         <shell:SearchOverlay

@@ -41,6 +41,7 @@
             ItemTemplate="{StaticResource PlaylistDropCardTemplate}"
             ItemsSource="{x:Bind ViewModel.Playlists}"
             SelectionMode="None"
+            items:ItemMotion.Mode="None"
             items:Reveal.IsShown="{x:Bind ViewModel.HasContent, Mode=OneWay}" />
 
         <items:Skeleton

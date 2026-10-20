@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using HushMusic.App.Services.Windowing.TaskbarWidget;
+using HushMusic.Core.Abstractions;
 
 namespace HushMusic.App.Hosting;
 
@@ -39,6 +40,7 @@ internal static class TestWindowPlacement
     {
         RunTaskbarTestHooks(window);
         RunWindowScript(window);
+        RunToastScript(window);
         var mini = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_MINI");
         if (mini is not ("1" or "controls"))
         {
@@ -136,6 +138,56 @@ internal static class TestWindowPlacement
             s_windowTimers.Add(timer);
             timer.Start();
         }
+    }
+
+    /// <summary>
+    /// HUSHMUSIC_TEST_TOASTS=&lt;n&gt; raises n sample toasts, one every 1.2 s from 4 s after startup: an error, a message and
+    /// the same message again (merged as "×2"), a success, one with a button, a warning, then more messages. From the fifth
+    /// on, older ones wait for room. "&lt;n&gt;@&lt;seconds&gt;" sets another interval (e.g. "60@0.05" for a burst).
+    /// </summary>
+    private static void RunToastScript(MainWindow window)
+    {
+        var spec = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_TOASTS")?.Split('@');
+        if (spec is null || !int.TryParse(spec[0], out var count) || count <= 0)
+        {
+            return;
+        }
+
+        var every = spec.Length > 1 && double.TryParse(spec[1], System.Globalization.CultureInfo.InvariantCulture, out var seconds) && seconds > 0
+            ? TimeSpan.FromSeconds(seconds)
+            : TimeSpan.FromSeconds(1.2);
+
+        AppNotification[] samples =
+        [
+            new(NotificationSeverity.Error, "Couldn't load your library", "Network error. Check your connection and try again."),
+            new(NotificationSeverity.Informational, "Added to queue", "3 songs will play next."),
+            new(NotificationSeverity.Informational, "Added to queue", "3 songs will play next."),
+            new(NotificationSeverity.Success, "Playlist created", "Road trip"),
+            new(NotificationSeverity.Informational, "A new version is ready", "Hush 9.9.9 can be downloaded now.")
+            {
+                Action = new NotificationAction("Download", () => { }),
+                SecondaryAction = new NotificationAction("Skip", () => { }),
+            },
+            new(NotificationSeverity.Warning, "No lyrics for this song", "None of the lyrics sources has it."),
+        ];
+        var notifications = App.GetService<INotificationService>();
+        var raised = 0;
+        var timer = window.DispatcherQueue.CreateTimer();
+        timer.Interval = TimeSpan.FromSeconds(4);
+        timer.Tick += (sender, _) =>
+        {
+            sender.Interval = every;
+            var sample = raised < samples.Length
+                ? samples[raised]
+                : new AppNotification(NotificationSeverity.Informational, $"Message {raised + 1}", "One more sample message.");
+            notifications.Show(sample);
+            if (++raised >= count)
+            {
+                sender.Stop();
+            }
+        };
+        s_windowTimers.Add(timer);
+        timer.Start();
     }
 
     private static void LogNextFrame(ILogger logger, System.Diagnostics.Stopwatch clock, string action)

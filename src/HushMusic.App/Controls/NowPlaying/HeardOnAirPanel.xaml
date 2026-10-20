@@ -61,88 +61,93 @@
             Text="{x:Bind ViewModel.Caption, Mode=OneWay}"
             Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.IsEmpty), Mode=OneWay}" />
 
-        <!--  Newest first; a click finds the song on YouTube Music.  -->
-        <ScrollViewer
-            Grid.Row="2"
-            AutomationProperties.AutomationId="NowPlayingHeard"
-            AutomationProperties.Name="Heard on air"
-            HorizontalScrollMode="Disabled"
-            Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.IsEmpty), Mode=OneWay}">
-            <ItemsControl
-                Margin="8,0,8,16"
-                IsTabStop="False"
-                ItemsSource="{x:Bind ViewModel.Items}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:HeardSongViewModel">
-                        <Button
-                            AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}"
-                            Click="OnSongClick"
-                            Style="{StaticResource NowPlayingRowButtonStyle}"
-                            ToolTipService.ToolTip="Find on YouTube Music">
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid
-                                    Width="40"
-                                    Height="40"
-                                    Background="{ThemeResource Surface2Brush}"
-                                    CornerRadius="{StaticResource RadiusSmall}">
-                                    <FontIcon
-                                        FontSize="14"
-                                        Foreground="{ThemeResource TextTertiaryBrush}"
-                                        Glyph="&#xEC4F;" />
-                                    <Image
-                                        helpers:ImageLoader.DecodeWidth="40"
-                                        helpers:ImageLoader.Url="{x:Bind ArtworkUrl}"
-                                        Stretch="UniformToFill" />
-                                </Grid>
-                                <StackPanel
-                                    Grid.Column="1"
-                                    VerticalAlignment="Center"
-                                    Spacing="1">
-                                    <TextBlock Style="{StaticResource BodyStyle}" Text="{x:Bind Title}" />
-                                    <TextBlock
-                                        Style="{StaticResource FootnoteStyle}"
-                                        Text="{x:Bind Artist}"
-                                        Visibility="{x:Bind HasArtist}" />
-                                </StackPanel>
-                                <StackPanel
-                                    Grid.Column="2"
-                                    VerticalAlignment="Center"
-                                    Orientation="Horizontal"
-                                    Spacing="6">
-                                    <!--  Saved to the station's playlist.  -->
-                                    <FontIcon
-                                        VerticalAlignment="Center"
-                                        FontSize="11"
-                                        Foreground="{ThemeResource AccentTextBrush}"
-                                        Glyph="&#xE73E;"
-                                        ToolTipService.ToolTip="Saved to the station's playlist"
-                                        Visibility="{x:Bind IsSaved, Mode=OneWay}" />
-                                    <Grid VerticalAlignment="Center">
-                                        <TextBlock
+        <!--
+            Newest first; a click finds the song on YouTube Music. Dissolves into the backdrop at the top and bottom
+            (EdgeFade draws it through HeardHost).
+        -->
+        <Grid x:Name="HeardHost" Grid.Row="2">
+            <ScrollViewer
+                x:Name="HeardScroller"
+                AutomationProperties.AutomationId="NowPlayingHeard"
+                AutomationProperties.Name="Heard on air"
+                HorizontalScrollMode="Disabled"
+                Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.IsEmpty), Mode=OneWay}">
+                <ItemsControl
+                    Margin="8,24,8,48"
+                    IsTabStop="False"
+                    ItemsSource="{x:Bind ViewModel.Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HeardSongViewModel">
+                            <Button
+                                AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}"
+                                Click="OnSongClick"
+                                Style="{StaticResource NowPlayingRowButtonStyle}"
+                                ToolTipService.ToolTip="Find on YouTube Music">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid
+                                        Width="40"
+                                        Height="40"
+                                        Background="{ThemeResource Surface2Brush}"
+                                        CornerRadius="{StaticResource RadiusSmall}">
+                                        <FontIcon
+                                            FontSize="14"
                                             Foreground="{ThemeResource TextTertiaryBrush}"
-                                            Style="{StaticResource FootnoteStyle}"
-                                            Text="{x:Bind TimeText}"
-                                            Typography.NumeralAlignment="Tabular"
-                                            Visibility="{x:Bind IsNotOnAir, Mode=OneWay}" />
-                                        <TextBlock
-                                            FontWeight="SemiBold"
-                                            Foreground="{ThemeResource AccentTextBrush}"
-                                            Style="{StaticResource FootnoteStyle}"
-                                            Text="On air"
-                                            Visibility="{x:Bind IsOnAir, Mode=OneWay}" />
+                                            Glyph="&#xEC4F;" />
+                                        <Image
+                                            helpers:ImageLoader.DecodeWidth="40"
+                                            helpers:ImageLoader.Url="{x:Bind ArtworkUrl}"
+                                            Stretch="UniformToFill" />
                                     </Grid>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                                    <StackPanel
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Spacing="1">
+                                        <TextBlock Style="{StaticResource BodyStyle}" Text="{x:Bind Title}" />
+                                        <TextBlock
+                                            Style="{StaticResource FootnoteStyle}"
+                                            Text="{x:Bind Artist}"
+                                            Visibility="{x:Bind HasArtist}" />
+                                    </StackPanel>
+                                    <StackPanel
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Spacing="6">
+                                        <!--  Saved to the station's playlist.  -->
+                                        <FontIcon
+                                            VerticalAlignment="Center"
+                                            FontSize="11"
+                                            Foreground="{ThemeResource AccentTextBrush}"
+                                            Glyph="&#xE73E;"
+                                            ToolTipService.ToolTip="Saved to the station's playlist"
+                                            Visibility="{x:Bind IsSaved, Mode=OneWay}" />
+                                        <Grid VerticalAlignment="Center">
+                                            <TextBlock
+                                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                                Style="{StaticResource FootnoteStyle}"
+                                                Text="{x:Bind TimeText}"
+                                                Typography.NumeralAlignment="Tabular"
+                                                Visibility="{x:Bind IsNotOnAir, Mode=OneWay}" />
+                                            <TextBlock
+                                                FontWeight="SemiBold"
+                                                Foreground="{ThemeResource AccentTextBrush}"
+                                                Style="{StaticResource FootnoteStyle}"
+                                                Text="On air"
+                                                Visibility="{x:Bind IsOnAir, Mode=OneWay}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
 
         <StackPanel
             Grid.Row="1"

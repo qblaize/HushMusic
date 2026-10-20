@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
     Title="Add to playlist"
     CloseButtonText="Cancel">
 
@@ -51,7 +52,8 @@
             ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
             ItemTemplate="{StaticResource MediaRowTemplate}"
             ItemsSource="{x:Bind ViewModel.Playlists}"
-            SelectionMode="None" />
+            SelectionMode="None"
+            items:ItemMotion.Mode="None" />
 
         <ProgressRing
             Grid.Row="1"

@@ -16,6 +16,7 @@
             ItemsSource="{x:Bind ViewModel.Tracks}"
             SelectionMode="None"
             Visibility="{x:Bind helpers:Format.CollapsedIfAny(ViewModel.ShowError, ViewModel.IsEmpty), Mode=OneWay}"
+            items:ItemMotion.Mode="None"
             items:TrackDrag.IsEnabled="True"
             items:TrackMenu.IsEnabled="True"
             items:TrackSelectionList.Selection="{x:Bind ViewModel.Selection}">

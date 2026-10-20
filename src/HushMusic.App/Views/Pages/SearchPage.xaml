@@ -159,6 +159,7 @@
                 ItemsSource="{x:Bind GroupsSource.View, Mode=OneWay}"
                 SelectionMode="None"
                 Visibility="{x:Bind ViewModel.ShowGroupedResults, Mode=OneWay}"
+                items:ItemMotion.Mode="None"
                 items:TrackDrag.IsEnabled="True"
                 items:TrackMenu.IsEnabled="True">
                 <ListView.Header>
@@ -193,6 +194,7 @@
                 ItemsSource="{x:Bind ViewModel.Results}"
                 SelectionMode="None"
                 Visibility="{x:Bind ViewModel.ShowFlatResults, Mode=OneWay}"
+                items:ItemMotion.Mode="None"
                 items:TrackDrag.IsEnabled="True"
                 items:TrackMenu.IsEnabled="True">
                 <ListView.Header>

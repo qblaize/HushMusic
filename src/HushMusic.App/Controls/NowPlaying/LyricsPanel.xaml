@@ -25,13 +25,13 @@
             IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
             Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLoading), Mode=OneWay}" />
 
-        <!--  Error  -->
+        <!--  Error (never together with lyrics, see ShowsError)  -->
         <StackPanel
             Margin="32,0,32,48"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
             Spacing="8"
-            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.HasError), Mode=OneWay}">
+            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.ShowsError), Mode=OneWay}">
             <FontIcon
                 Margin="0,0,0,6"
                 FontSize="28"
@@ -56,13 +56,13 @@
                 Style="{StaticResource PillSecondaryButtonStyle}" />
         </StackPanel>
 
-        <!--  Empty  -->
+        <!--  Empty (likewise, see ShowsMessage)  -->
         <StackPanel
             Margin="32,0,32,48"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
             Spacing="6"
-            Visibility="{x:Bind helpers:Format.VisibleIfNotEmpty(ViewModel.Message), Mode=OneWay}">
+            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.ShowsMessage), Mode=OneWay}">
             <FontIcon
                 Margin="0,0,0,6"
                 FontSize="28"
@@ -78,41 +78,50 @@
                 TextWrapping="Wrap" />
         </StackPanel>
 
-        <!--
-            Synced: big bold lines; the current one bright and kept about a third of the way down, its words lighting up as
-            they are sung (LyricsStage). The lines are built in code and reused for the next song.
-        -->
-        <ScrollView
-            x:Name="SyncedScroller"
-            AutomationProperties.AutomationId="NowPlayingSyncedLyrics"
-            AutomationProperties.Name="Lyrics"
-            HorizontalScrollBarVisibility="Hidden"
-            HorizontalScrollMode="Disabled"
-            VerticalScrollBarVisibility="Hidden"
-            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsSynced), Mode=OneWay}"
-            ZoomMode="Disabled">
-            <StackPanel x:Name="SyncedContent" Padding="8,16,12,0">
-                <StackPanel x:Name="LinesHost" />
-                <local:LyricsFooter x:Name="SyncedFooter" Margin="12,28,12,0" />
-            </StackPanel>
-        </ScrollView>
+        <!--  The lyrics dissolve into the backdrop at the top and bottom (EdgeFade draws them through FadeHost).  -->
+        <Grid x:Name="FadeHost">
+            <Grid x:Name="LyricsArea">
+                <!--
+                    Synced: big bold lines; the current one bright and kept in the middle, its words lighting up as they
+                    are sung (LyricsStage). The lines are built in code and reused for the next song. The padding above
+                    and below (half the view, set in code) lets the first and last lines reach the middle.
+                -->
+                <ScrollView
+                    x:Name="SyncedScroller"
+                    AutomationProperties.AutomationId="NowPlayingSyncedLyrics"
+                    AutomationProperties.Name="Lyrics"
+                    HorizontalScrollBarVisibility="Hidden"
+                    HorizontalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Hidden"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsSynced), Mode=OneWay}"
+                    ZoomMode="Disabled">
+                    <StackPanel x:Name="SyncedContent" Padding="8,0,12,0">
+                        <StackPanel x:Name="LinesHost" />
+                        <local:LyricsFooter x:Name="SyncedFooter" Margin="12,28,12,0" />
+                    </StackPanel>
+                </ScrollView>
 
-        <!--  Unsynced: calm, plain, selectable text.  -->
-        <ScrollViewer
-            x:Name="PlainScroller"
-            Padding="20,12,24,32"
-            AutomationProperties.AutomationId="NowPlayingPlainLyrics"
-            HorizontalScrollMode="Disabled"
-            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsPlain), Mode=OneWay}">
-            <StackPanel Spacing="28">
-                <!--  One paragraph per lyric line, so a wrapped line reads as one; a blank line opens a new verse.  -->
-                <RichTextBlock
-                    x:Name="PlainText"
-                    AutomationProperties.AutomationId="NowPlayingPlainLyricsText"
-                    IsTextSelectionEnabled="True"
-                    Style="{StaticResource LyricsPlainTextStyle}" />
-                <local:LyricsFooter />
-            </StackPanel>
-        </ScrollViewer>
+                <!--
+                    Unsynced: calm, plain, selectable text. Its margin (part of what scrolls) clears the top fade at
+                    first and lets the end scroll up out of the bottom one.
+                -->
+                <ScrollViewer
+                    x:Name="PlainScroller"
+                    Padding="20,0,24,0"
+                    AutomationProperties.AutomationId="NowPlayingPlainLyrics"
+                    HorizontalScrollMode="Disabled"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsPlain), Mode=OneWay}">
+                    <StackPanel Margin="0,88,0,112" Spacing="28">
+                        <!--  One paragraph per lyric line, so a wrapped line reads as one; a blank line opens a new verse.  -->
+                        <RichTextBlock
+                            x:Name="PlainText"
+                            AutomationProperties.AutomationId="NowPlayingPlainLyricsText"
+                            IsTextSelectionEnabled="True"
+                            Style="{StaticResource LyricsPlainTextStyle}" />
+                        <local:LyricsFooter />
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
     </Grid>
 </UserControl>

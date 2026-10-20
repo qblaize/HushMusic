@@ -144,7 +144,7 @@ Hooks available to a feature:
 | `ILastFmService` | Last.fm connection state, user name, pending scrobbles |
 | `IRadioNowPlaying` | the song on air for live radio (ICY metadata) |
 | `ILyricsService` | lyrics of a track from the best enabled source, or from a chosen one; the user's source order (`SourceOrderChanged`) |
-| `INotificationService` | show an InfoBar message |
+| `INotificationService` | show a toast (an in-app message; errors stay until closed) |
 | `IThemeService`, `IAccentColorService`, `IWindowModeService` (App) | theme and accent changes; mini player; show the window; whether it is shown, minimized or hidden in the notification area (`VisibilityChanged`) |
 
 Events are raised on background threads; marshal to the UI with `IUiDispatcher` in the App. Register a feature with
@@ -175,6 +175,12 @@ a blurred backdrop, a floating glass player bar and a full-window Now Playing vi
   bar with the essentials and a "…" menu; Now Playing shows the single cover). It applies live.
 - The typeface is [Inter](https://github.com/rsms/inter) (bundled, SIL OFL 1.1). Icons are Segoe Fluent Icons from
   Windows.
+- A page opens with one motion: the frame's slide, then a fade (`Reveal`) when the content replaces the skeleton. Page
+  ListViews and GridViews set `items:ItemMotion.Mode="None"` (or `"Reorder"` where rows can be dragged), so their items
+  don't slide in a second time.
+- Toasts (`INotificationService`) appear bottom right. `NotificationStack` (Core) decides when each one goes: in the
+  order they came, errors and toasts with a button only when closed, the same message again merged into a "×2", the
+  newest three on screen with older ones waiting for room, and nothing going while the pointer rests on them.
 
 ## Windows integration
 

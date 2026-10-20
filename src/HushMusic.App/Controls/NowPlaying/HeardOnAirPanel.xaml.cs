@@ -13,6 +13,9 @@ public sealed partial class HeardOnAirPanel : UserControl
     public HeardOnAirPanel()
     {
         InitializeComponent();
+
+        // The list's margin in the XAML clears the fades.
+        EdgeFade.Attach(HeardHost, HeardScroller, top: 24, bottom: 48);
     }
 
     public RadioHeardViewModel ViewModel { get; } = App.GetService<RadioHeardViewModel>();

@@ -9,6 +9,9 @@ public sealed partial class RelatedPanel : UserControl
     public RelatedPanel()
     {
         InitializeComponent();
+
+        // The shelves' margin in the XAML clears the fades.
+        EdgeFade.Attach(RelatedHost, Scroller, top: 24, bottom: 48);
         Loaded += (_, _) => ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         Unloaded += (_, _) => ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }

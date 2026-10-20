@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:HushMusic.App.Helpers"
+    xmlns:items="using:HushMusic.App.Controls.Items"
     xmlns:settings="using:HushMusic.App.Controls.Settings"
     xmlns:shell="using:HushMusic.App.Controls.Shell"
     xmlns:viewmodels="using:HushMusic.App.ViewModels">
@@ -296,7 +297,8 @@
                             ItemsSource="{x:Bind ViewModel.LyricsSources}"
                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
                             ScrollViewer.VerticalScrollMode="Disabled"
-                            SelectionMode="None">
+                            SelectionMode="None"
+                            items:ItemMotion.Mode="Reorder">
                             <ListView.ItemContainerStyle>
                                 <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
                                     <Setter Property="Padding" Value="0" />

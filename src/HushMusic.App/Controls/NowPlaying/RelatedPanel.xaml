@@ -78,127 +78,130 @@
                 TextWrapping="Wrap" />
         </StackPanel>
 
-        <ScrollViewer
-            x:Name="Scroller"
-            AutomationProperties.AutomationId="NowPlayingRelated"
-            AutomationProperties.Name="Related"
-            HorizontalScrollMode="Disabled"
-            Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.HasShelves), Mode=OneWay}">
-            <ItemsControl
-                Margin="12,0,12,24"
-                IsTabStop="False"
-                ItemsSource="{x:Bind ViewModel.Shelves, Mode=OneWay}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:RelatedShelfViewModel">
-                        <StackPanel Margin="0,8,0,16" Spacing="8">
-                            <TextBlock
-                                Margin="8,0"
-                                Style="{StaticResource Title3Style}"
-                                Text="{x:Bind Title}" />
-                            <TextBlock
-                                Margin="8,0"
-                                MaxLines="8"
-                                Style="{StaticResource SubheadStyle}"
-                                Text="{x:Bind Description}"
-                                TextWrapping="Wrap"
-                                Visibility="{x:Bind helpers:Format.VisibleIf(HasDescription)}" />
+        <!--  Dissolves into the backdrop at the top and bottom (EdgeFade draws it through RelatedHost).  -->
+        <Grid x:Name="RelatedHost">
+            <ScrollViewer
+                x:Name="Scroller"
+                AutomationProperties.AutomationId="NowPlayingRelated"
+                AutomationProperties.Name="Related"
+                HorizontalScrollMode="Disabled"
+                Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.HasShelves), Mode=OneWay}">
+                <ItemsControl
+                    Margin="12,24,12,48"
+                    IsTabStop="False"
+                    ItemsSource="{x:Bind ViewModel.Shelves, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RelatedShelfViewModel">
+                            <StackPanel Margin="0,8,0,16" Spacing="8">
+                                <TextBlock
+                                    Margin="8,0"
+                                    Style="{StaticResource Title3Style}"
+                                    Text="{x:Bind Title}" />
+                                <TextBlock
+                                    Margin="8,0"
+                                    MaxLines="8"
+                                    Style="{StaticResource SubheadStyle}"
+                                    Text="{x:Bind Description}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(HasDescription)}" />
 
-                            <!--  Songs: compact rows that play.  -->
-                            <ItemsControl
-                                IsTabStop="False"
-                                ItemsSource="{x:Bind Songs}"
-                                Visibility="{x:Bind helpers:Format.VisibleIf(HasSongs)}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:RelatedSongViewModel">
-                                        <Button
-                                            AutomationProperties.Name="{x:Bind Title}"
-                                            Command="{x:Bind PlayCommand}"
-                                            Style="{StaticResource NowPlayingRowButtonStyle}"
-                                            ToolTipService.ToolTip="Play">
-                                            <Grid ColumnSpacing="12">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <Grid
-                                                    Width="40"
-                                                    Height="40"
-                                                    Background="{ThemeResource Surface2Brush}"
-                                                    CornerRadius="{StaticResource RadiusSmall}">
-                                                    <FontIcon
-                                                        FontSize="14"
-                                                        Foreground="{ThemeResource TextTertiaryBrush}"
-                                                        Glyph="&#xEC4F;" />
-                                                    <Image
-                                                        helpers:ImageLoader.DecodeWidth="40"
-                                                        helpers:ImageLoader.Url="{x:Bind ArtUrl}"
-                                                        Stretch="UniformToFill" />
+                                <!--  Songs: compact rows that play.  -->
+                                <ItemsControl
+                                    IsTabStop="False"
+                                    ItemsSource="{x:Bind Songs}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(HasSongs)}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RelatedSongViewModel">
+                                            <Button
+                                                AutomationProperties.Name="{x:Bind Title}"
+                                                Command="{x:Bind PlayCommand}"
+                                                Style="{StaticResource NowPlayingRowButtonStyle}"
+                                                ToolTipService.ToolTip="Play">
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid
+                                                        Width="40"
+                                                        Height="40"
+                                                        Background="{ThemeResource Surface2Brush}"
+                                                        CornerRadius="{StaticResource RadiusSmall}">
+                                                        <FontIcon
+                                                            FontSize="14"
+                                                            Foreground="{ThemeResource TextTertiaryBrush}"
+                                                            Glyph="&#xEC4F;" />
+                                                        <Image
+                                                            helpers:ImageLoader.DecodeWidth="40"
+                                                            helpers:ImageLoader.Url="{x:Bind ArtUrl}"
+                                                            Stretch="UniformToFill" />
+                                                    </Grid>
+                                                    <StackPanel
+                                                        Grid.Column="1"
+                                                        VerticalAlignment="Center"
+                                                        Spacing="1">
+                                                        <TextBlock Style="{StaticResource BodyStyle}" Text="{x:Bind Title}" />
+                                                        <TextBlock Style="{StaticResource FootnoteStyle}" Text="{x:Bind Subtitle}" />
+                                                    </StackPanel>
                                                 </Grid>
-                                                <StackPanel
-                                                    Grid.Column="1"
-                                                    VerticalAlignment="Center"
-                                                    Spacing="1">
-                                                    <TextBlock Style="{StaticResource BodyStyle}" Text="{x:Bind Title}" />
-                                                    <TextBlock Style="{StaticResource FootnoteStyle}" Text="{x:Bind Subtitle}" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
 
-                            <!--  Albums, playlists, artists: small cards that open their page.  -->
-                            <ItemsControl
-                                IsTabStop="False"
-                                ItemsSource="{x:Bind Cards}"
-                                Visibility="{x:Bind helpers:Format.VisibleIf(HasCards)}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <local:CardGrid
-                                            ColumnSpacing="4"
-                                            Columns="3"
-                                            RowSpacing="4" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:RelatedCardViewModel">
-                                        <Button
-                                            Padding="6,6,6,8"
-                                            VerticalAlignment="Stretch"
-                                            VerticalContentAlignment="Top"
-                                            AutomationProperties.Name="{x:Bind AutomationName}"
-                                            Command="{x:Bind OpenCommand}"
-                                            Style="{StaticResource NowPlayingRowButtonStyle}">
-                                            <StackPanel Spacing="6">
-                                                <local:SquareGrid Background="{ThemeResource Surface2Brush}" CornerRadius="{x:Bind local:RelatedPanel.ArtCorner(IsRound)}">
-                                                    <FontIcon
-                                                        FontSize="22"
+                                <!--  Albums, playlists, artists: small cards that open their page.  -->
+                                <ItemsControl
+                                    IsTabStop="False"
+                                    ItemsSource="{x:Bind Cards}"
+                                    Visibility="{x:Bind helpers:Format.VisibleIf(HasCards)}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <local:CardGrid
+                                                ColumnSpacing="4"
+                                                Columns="3"
+                                                RowSpacing="4" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RelatedCardViewModel">
+                                            <Button
+                                                Padding="6,6,6,8"
+                                                VerticalAlignment="Stretch"
+                                                VerticalContentAlignment="Top"
+                                                AutomationProperties.Name="{x:Bind AutomationName}"
+                                                Command="{x:Bind OpenCommand}"
+                                                Style="{StaticResource NowPlayingRowButtonStyle}">
+                                                <StackPanel Spacing="6">
+                                                    <local:SquareGrid Background="{ThemeResource Surface2Brush}" CornerRadius="{x:Bind local:RelatedPanel.ArtCorner(IsRound)}">
+                                                        <FontIcon
+                                                            FontSize="22"
+                                                            Foreground="{ThemeResource TextTertiaryBrush}"
+                                                            Glyph="{x:Bind PlaceholderGlyph}" />
+                                                        <Image
+                                                            helpers:ImageLoader.DecodeWidth="120"
+                                                            helpers:ImageLoader.Url="{x:Bind ArtUrl}"
+                                                            Stretch="UniformToFill" />
+                                                    </local:SquareGrid>
+                                                    <TextBlock
+                                                        FontSize="13"
+                                                        MaxLines="2"
+                                                        Style="{StaticResource HeadlineStyle}"
+                                                        Text="{x:Bind Title}"
+                                                        TextWrapping="Wrap" />
+                                                    <TextBlock
                                                         Foreground="{ThemeResource TextTertiaryBrush}"
-                                                        Glyph="{x:Bind PlaceholderGlyph}" />
-                                                    <Image
-                                                        helpers:ImageLoader.DecodeWidth="120"
-                                                        helpers:ImageLoader.Url="{x:Bind ArtUrl}"
-                                                        Stretch="UniformToFill" />
-                                                </local:SquareGrid>
-                                                <TextBlock
-                                                    FontSize="13"
-                                                    MaxLines="2"
-                                                    Style="{StaticResource HeadlineStyle}"
-                                                    Text="{x:Bind Title}"
-                                                    TextWrapping="Wrap" />
-                                                <TextBlock
-                                                    Foreground="{ThemeResource TextTertiaryBrush}"
-                                                    Style="{StaticResource FootnoteStyle}"
-                                                    Text="{x:Bind Subtitle}" />
-                                            </StackPanel>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                                                        Style="{StaticResource FootnoteStyle}"
+                                                        Text="{x:Bind Subtitle}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>

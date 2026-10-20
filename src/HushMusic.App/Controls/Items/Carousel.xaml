@@ -42,6 +42,7 @@
             ScrollViewer.VerticalScrollBarVisibility="Disabled"
             ScrollViewer.VerticalScrollMode="Disabled"
             SelectionMode="None"
+            items:ItemMotion.Mode="None"
             items:TrackDrag.IsEnabled="True"
             items:TrackMenu.IsEnabled="True">
             <ListView.ItemsPanel>

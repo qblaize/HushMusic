@@ -19,8 +19,9 @@ namespace HushMusic.App.Controls.NowPlaying;
 /// <para>
 /// A lit word is a sprite over its TextBlock, painted through the text's alpha mask with a gradient: bright, a soft edge,
 /// then dim. The wipe slides that gradient across the word (Better Lyrics' swipe). While a line is lit its TextBlocks
-/// are hidden and the sprites draw the whole line, so a word can float up without leaving its dim copy behind. Long
-/// held words also glow (a white drop shadow of the word). Sprites are pooled and reused from line to line.
+/// are hidden and the sprites draw the whole line. The sprites always sit exactly on their words, so sung and unsung
+/// words share one baseline; only their brightness changes. Long held words also glow (a white drop shadow of the word,
+/// which doesn't move it). Sprites are pooled and reused from line to line.
 /// </para>
 /// <para>
 /// Running animations make the compositor draw every frame, so they only run while <see cref="IsRunning"/> (the tab is
@@ -34,8 +35,7 @@ internal sealed class LyricsStage
     private const float DimOpacity = 0.35f;
     private const float InactiveScale = 0.96f;
 
-    // Words float up by this fraction of the font size while sung; held words of a second or more glow.
-    private const float LiftRatio = 0.07f;
+    // Held words of a second or more glow.
     private const float GlowOpacity = 0.55f;
     private const float GlowRadius = 12f;
 
@@ -51,7 +51,6 @@ internal sealed class LyricsStage
 
     // Words light up a moment before they are heard (as in Better Lyrics): the eye is slower than the ear.
     private static readonly TimeSpan WordLead = TimeSpan.FromMilliseconds(150);
-    private static readonly TimeSpan MinLift = TimeSpan.FromMilliseconds(400);
     private static readonly TimeSpan GlowThreshold = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan GlowRise = TimeSpan.FromMilliseconds(350);
     private static readonly TimeSpan GlowFade = TimeSpan.FromMilliseconds(800);
@@ -401,12 +400,8 @@ internal sealed class LyricsStage
         var progress = Progress(now, timing.Start, timing.Duration);
         sprite.Fill.Offset = new Vector2(from + ((to - from) * progress), 0);
 
-        var lift = (float)(word.Panel.FontSize * LiftRatio);
-        var liftSpan = timing.Duration > MinLift ? timing.Duration : MinLift;
-        var lifted = Settle.Ease(Progress(now, timing.Start, liftSpan));
-        var rest = new Vector3((float)rect.X, (float)rect.Y, 0);
-        var up = rest - new Vector3(0, lift, 0);
-        sprite.Root.Offset = Vector3.Lerp(rest, up, lifted);
+        // Exactly over the word: lit and unlit words stay on one baseline.
+        sprite.Root.Offset = new Vector3((float)rect.X, (float)rect.Y, 0);
 
         var glowEnd = timing.End + GlowFade;
         if (word.Glows && sprite.Shadow is { } shadow)
@@ -428,17 +423,6 @@ internal sealed class LyricsStage
             wipe.InsertKeyFrame(1, new Vector2(to, 0), Steps(timing.End - startsAt));
             Time(wipe, timing.End - startsAt, delay);
             sprite.Fill.StartAnimation("Offset", wipe);
-        }
-
-        if (lifted < 1)
-        {
-            // Two hops of a pixel or so rather than a glide: the float adds two frames, not one per step.
-            var rise = _compositor.CreateVector3KeyFrameAnimation();
-            rise.InsertKeyFrame(0, sprite.Root.Offset, _linear);
-            rise.InsertKeyFrame(0.3f, Vector3.Lerp(sprite.Root.Offset, up, 0.6f), Steps(1));
-            rise.InsertKeyFrame(1, up, Steps(1));
-            Time(rise, timing.Start + liftSpan - startsAt, delay);
-            sprite.Root.StartAnimation("Offset", rise);
         }
 
         if (word.Glows && sprite.Shadow is { } glow && now < glowEnd)
@@ -465,8 +449,8 @@ internal sealed class LyricsStage
         }
     }
 
-    // The line is over: lit words fade back to dim and settle, then the sprites go back to the pool and the TextBlocks
-    // take over again (dimmed by the line).
+    // The line is over: lit words fade back to dim, then the sprites go back to the pool and the TextBlocks take over
+    // again (dimmed by the line).
     private void StopKaraoke(KaraokeLine karaoke, bool animate)
     {
         if (!animate)
@@ -487,10 +471,7 @@ internal sealed class LyricsStage
             sprite.Bright.StartAnimation("Color", dim);
 
             var rect = word.Panel.WordRect(word.Index);
-            var settle = _compositor.CreateVector3KeyFrameAnimation();
-            settle.InsertKeyFrame(1, new Vector3((float)rect.X, (float)rect.Y, 0), _settle);
-            settle.Duration = FadeOut;
-            sprite.Root.StartAnimation("Offset", settle);
+            sprite.Root.Offset = new Vector3((float)rect.X, (float)rect.Y, 0);
 
             if (sprite.Shadow is { } shadow && word.Glows)
             {
@@ -701,7 +682,6 @@ internal sealed class LyricsStage
         {
             Fill.StopAnimation("Offset");
             Bright.StopAnimation("Color");
-            Root.StopAnimation("Offset");
             Shadow?.StopAnimation("Opacity");
         }
 

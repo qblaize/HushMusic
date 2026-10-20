@@ -136,6 +136,7 @@
                             ScrollViewer.VerticalScrollMode="Disabled"
                             SelectionMode="None"
                             SizeChanged="OnChartGridSizeChanged"
+                            items:ItemMotion.Mode="None"
                             items:TrackDrag.IsEnabled="True"
                             items:TrackMenu.IsEnabled="True">
                             <GridView.ItemsPanel>

@@ -1,8 +1,6 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using Microsoft.UI.Xaml.Automation.Peers;
 using Windows.System;
 using HushMusic.App.Services.Shell;
 using HushMusic.App.ViewModels.NowPlaying;
@@ -14,8 +12,6 @@ namespace HushMusic.App.ViewModels;
 
 public sealed partial class ShellViewModel : ObservableObject
 {
-    private static readonly TimeSpan AutoDismissDelay = TimeSpan.FromSeconds(6);
-
     private readonly INavigationService _navigation;
     private readonly IUiDispatcher _dispatcher;
     private readonly ISignInCoordinator _signIn;
@@ -52,7 +48,7 @@ public sealed partial class ShellViewModel : ObservableObject
             CanGoBack = _navigation.CanGoBack;
             CurrentPage = key;
         };
-        notifications.Raised += (_, notification) => _dispatcher.Run(() => AddNotification(notification));
+        notifications.Raised += (_, notification) => _dispatcher.Run(() => Toasts.Add(notification));
     }
 
     public AccountViewModel Account { get; }
@@ -68,7 +64,8 @@ public sealed partial class ShellViewModel : ObservableObject
     /// <summary>"Your year in Hush", over the whole window (opened from the stats page).</summary>
     public YearInReviewViewModel YearInReview { get; }
 
-    public ObservableCollection<NotificationViewModel> Notifications { get; } = [];
+    /// <summary>Errors and messages as floating toasts.</summary>
+    public ToastsViewModel Toasts { get; } = new();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
@@ -225,71 +222,4 @@ public sealed partial class ShellViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenSearch() => Search.Open();
-
-    private void AddNotification(AppNotification notification)
-    {
-        var item = new NotificationViewModel(notification, n => Notifications.Remove(n));
-        Notifications.Add(item);
-        while (Notifications.Count > 3)
-        {
-            Notifications.RemoveAt(0);
-        }
-
-        if (notification.Severity != NotificationSeverity.Error && notification.Action is null)
-        {
-            _ = DismissLaterAsync(item);
-        }
-    }
-
-    private async Task DismissLaterAsync(NotificationViewModel item)
-    {
-        await Task.Delay(AutoDismissDelay);
-        _dispatcher.Run(() => Notifications.Remove(item));
-    }
-}
-
-/// <summary>One floating toast. Errors and toasts with an action stay until closed; everything else dismisses itself.</summary>
-public sealed class NotificationViewModel(AppNotification notification, Action<NotificationViewModel> onDismiss)
-{
-    public string Title { get; } = notification.Title;
-
-    public string Message { get; } = notification.Message;
-
-    public bool HasMessage => !string.IsNullOrWhiteSpace(Message);
-
-    public NotificationSeverity Severity { get; } = notification.Severity;
-
-    public string Glyph { get; } = notification.Severity switch
-    {
-        NotificationSeverity.Error => "",
-        NotificationSeverity.Warning => "",
-        NotificationSeverity.Success => "",
-        _ => "",
-    };
-
-    /// <summary>Errors interrupt the screen reader; the rest wait their turn.</summary>
-    public AutomationLiveSetting LiveSetting { get; } =
-        notification.Severity == NotificationSeverity.Error ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite;
-
-    public bool HasAction => notification.Action is not null;
-
-    public string ActionLabel { get; } = notification.Action?.Label ?? string.Empty;
-
-    public bool HasSecondaryAction => notification.SecondaryAction is not null;
-
-    public string SecondaryActionLabel { get; } = notification.SecondaryAction?.Label ?? string.Empty;
-
-    public void Dismiss() => onDismiss(this);
-
-    public void InvokeAction()
-    {
-        Dismiss();
-        notification.Action?.Invoke();
-    }
-
-    public void InvokeSecondaryAction()
-    {
-        Dismiss();
-        notification.SecondaryAction?.Invoke();
-    }
 }

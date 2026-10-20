@@ -33,6 +33,13 @@
             IsHitTestVisible="False"
             Opacity="0.2" />
 
+        <!--  Behind the side panel (it has no card): a soft shade for legibility, sized and faded with the panel in code.  -->
+        <Rectangle
+            x:Name="PanelScrim"
+            HorizontalAlignment="Right"
+            Fill="{StaticResource NowPlayingPanelScrimBrush}"
+            IsHitTestVisible="False" />
+
         <!--  Close: sits in the window's title band, which lets it through (ShellPage.TitleBarInteractiveElements).  -->
         <Button
             x:Name="CloseButton"
@@ -461,16 +468,16 @@
                 </Grid>
             </Grid>
 
-            <!--  ===== Right panel: Up next | Lyrics | Related =====  -->
+            <!--
+                ===== Right panel: Up next | Lyrics | Related =====
+                No card: the tabs and their content sit right on the backdrop, and the lists dissolve into it at the top
+                and bottom (EdgeFade).
+            -->
             <Border
                 x:Name="TabsPanel"
                 Grid.Column="1"
                 HorizontalAlignment="Left"
-                Margin="0,0,16,16"
-                Background="{StaticResource NowPlayingPanelBrush}"
-                BorderBrush="{ThemeResource SeparatorBrush}"
-                BorderThickness="1"
-                CornerRadius="{StaticResource RadiusXL}">
+                Margin="0,0,16,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />

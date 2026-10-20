@@ -24,21 +24,11 @@
             ItemsSource="{x:Bind ViewModel.Filter.Rows}"
             SelectionMode="None"
             Visibility="{x:Bind helpers:Format.CollapsedIf(ViewModel.ShowError), Mode=OneWay}"
+            items:ItemMotion.Mode="Reorder"
             items:ListFooter.FollowsItems="True"
             items:TrackDrag.IsEnabled="True"
             items:TrackMenu.IsEnabled="True"
             items:TrackSelectionList.Selection="{x:Bind ViewModel.Selection}">
-            <!--
-                The stock transitions without add/delete: filtering and sorting change many rows at once, and fading them
-                out and back in left the list blank for a moment.
-            -->
-            <ListView.ItemContainerTransitions>
-                <TransitionCollection>
-                    <ContentThemeTransition />
-                    <ReorderThemeTransition />
-                    <EntranceThemeTransition IsStaggeringEnabled="False" />
-                </TransitionCollection>
-            </ListView.ItemContainerTransitions>
             <ListView.Header>
                 <!-- Reaches the page edges (undoes the list padding) so the artwork wash spans the whole width. -->
                 <StackPanel>

@@ -25,6 +25,7 @@
             ItemsSource="{x:Bind DaysSource.View, Mode=OneWay}"
             SelectionMode="None"
             Visibility="{x:Bind helpers:Format.CollapsedIfAny(ViewModel.RequiresSignIn, ViewModel.ShowError), Mode=OneWay}"
+            items:ItemMotion.Mode="None"
             items:TrackDrag.IsEnabled="True"
             items:TrackMenu.IsEnabled="True">
             <ListView.Header>

@@ -20,7 +20,7 @@ public sealed record AppNotification(NotificationSeverity Severity, string Title
 /// <summary>A notification's button. <see cref="Invoke"/> runs on the UI thread.</summary>
 public sealed record NotificationAction(string Label, Action Invoke);
 
-/// <summary>User-visible messages. The shell shows each one as an InfoBar. Thread-safe.</summary>
+/// <summary>User-visible messages. The shell shows each one as a toast (<see cref="Services.NotificationStack"/>). Thread-safe.</summary>
 public interface INotificationService
 {
     event EventHandler<AppNotification>? Raised;

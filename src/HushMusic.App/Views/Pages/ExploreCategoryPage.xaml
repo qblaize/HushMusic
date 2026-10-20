@@ -137,6 +137,7 @@
             ItemTemplateSelector="{x:Bind pages:ExploreFormat.CardTemplates(ViewModel.IsVideoGrid), Mode=OneWay}"
             ItemsSource="{x:Bind ViewModel.GridItems}"
             SelectionMode="None"
+            items:ItemMotion.Mode="None"
             items:Reveal.IsShown="{x:Bind ViewModel.ShowGrid, Mode=OneWay}"
             items:TrackDrag.IsEnabled="True"
             items:TrackMenu.IsEnabled="True" />
@@ -161,7 +162,8 @@
                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
                         ScrollViewer.VerticalScrollMode="Disabled"
                         SelectionMode="None"
-                        SizeChanged="OnArtistGridSizeChanged">
+                        SizeChanged="OnArtistGridSizeChanged"
+                        items:ItemMotion.Mode="None">
                         <GridView.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <ItemsWrapGrid ItemHeight="{StaticResource RowHeight}" Orientation="Horizontal" />

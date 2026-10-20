@@ -14,8 +14,9 @@ namespace HushMusic.App.Controls.NowPlaying;
 
 /// <summary>
 /// The "Lyrics" tab. Logic lives in <see cref="LyricsViewModel"/> and the timing look in <see cref="LyricsStage"/>; this
-/// is glue: it builds the lines when they are first shown, keeps the current line about a third of the way down with a
-/// soft, spring-like scroll, and lets scrolling by hand pause that for a few seconds.
+/// is glue: it builds the lines when they are first shown, keeps the current line in the middle of the view with a
+/// soft, spring-like scroll, and lets scrolling by hand pause that for a few seconds. The lines dissolve into the
+/// backdrop near the top and bottom edges (<see cref="EdgeFade"/>).
 /// </summary>
 /// <remarks>
 /// The animations run only while they can be seen and the music plays (<see cref="AnimationGate"/>): the tab shown, the
@@ -26,8 +27,13 @@ public sealed partial class LyricsPanel : UserControl
     private static readonly TimeSpan ManualScrollPause = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan ScrollDuration = TimeSpan.FromMilliseconds(450);
 
-    // The current line's top sits this far down the view (Better Lyrics keeps it at 37 %).
-    private const double FocusRatio = 0.3;
+    // The current line's middle sits this far down the view.
+    private const double FocusRatio = 0.5;
+
+    // The fades at the top and bottom of the view; before the first line is sung, the lines start just below the top one
+    // (the plain lyrics' margin in the XAML matches).
+    private const double TopFade = 88;
+    private const double BottomFade = 112;
 
     // Unsynced lyrics: the space under a line, and under the last line of a verse.
     private const double PlainLineGap = 7;
@@ -74,6 +80,7 @@ public sealed partial class LyricsPanel : UserControl
             },
             textColor);
         _gate = new AnimationGate(this, _stage.SetRunning);
+        EdgeFade.Attach(FadeHost, LyricsArea, TopFade, BottomFade);
 
         SyncedScroller.AddHandler(PointerWheelChangedEvent, new PointerEventHandler((_, _) => PauseFollow()), handledEventsToo: true);
         SyncedScroller.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) => PauseFollow()), handledEventsToo: true);
@@ -234,11 +241,19 @@ public sealed partial class LyricsPanel : UserControl
         }
     }
 
-    // Room below so the last lines can also reach the focus point.
+    // Room above and below so the first and last lines can also reach the focus point; the current line stays there.
     private void UpdatePadding(double viewportHeight)
     {
         var padding = SyncedContent.Padding;
-        SyncedContent.Padding = new Thickness(padding.Left, padding.Top, padding.Right, Math.Round(viewportHeight * (1 - FocusRatio)));
+        SyncedContent.Padding = new Thickness(
+            padding.Left,
+            Math.Round(viewportHeight * FocusRatio),
+            padding.Right,
+            Math.Round(viewportHeight * (1 - FocusRatio)));
+        if (_isShown)
+        {
+            DispatcherQueue.TryEnqueue(() => ScrollToCurrent(animate: false));
+        }
     }
 
     private void ScrollToCurrent(bool animate)
@@ -248,20 +263,26 @@ public sealed partial class LyricsPanel : UserControl
             return;
         }
 
-        double target = 0;
         var index = ViewModel.CurrentIndex;
         var lines = _stage.Lines;
+        double target;
         if (s_testScrollToEnd)
         {
-            var footer = SyncedFooter.TransformToVisual(SyncedContent).TransformPoint(default).Y;
-            target = Math.Clamp(footer - (SyncedScroller.ViewportHeight / 2), 0, Math.Max(0, SyncedScroller.ScrollableHeight));
+            target = SyncedFooter.TransformToVisual(SyncedContent).TransformPoint(default).Y - (SyncedScroller.ViewportHeight / 2);
         }
         else if (index >= 0 && index < lines.Count)
         {
-            var top = lines[index].TransformToVisual(SyncedContent).TransformPoint(default).Y;
-            target = Math.Clamp(top - (SyncedScroller.ViewportHeight * FocusRatio), 0, Math.Max(0, SyncedScroller.ScrollableHeight));
+            var line = lines[index];
+            var top = line.TransformToVisual(SyncedContent).TransformPoint(default).Y;
+            target = top + (line.ActualHeight / 2) - (SyncedScroller.ViewportHeight * FocusRatio);
+        }
+        else
+        {
+            // Nothing sung yet: the first lines start at the top, just clear of the fade.
+            target = SyncedContent.Padding.Top - TopFade;
         }
 
+        target = Math.Clamp(target, 0, Math.Max(0, SyncedScroller.ScrollableHeight));
         if (Math.Abs(target - SyncedScroller.VerticalOffset) < 1)
         {
             return;

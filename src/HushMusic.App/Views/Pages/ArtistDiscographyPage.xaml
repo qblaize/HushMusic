@@ -33,6 +33,7 @@
             ItemTemplate="{StaticResource SquareCardTemplate}"
             ItemsSource="{x:Bind ViewModel.Albums}"
             SelectionMode="None"
+            items:ItemMotion.Mode="None"
             items:Reveal.IsShown="{x:Bind ViewModel.HasContent, Mode=OneWay}">
             <GridView.Footer>
                 <!-- The next page of a long discography is on its way. -->

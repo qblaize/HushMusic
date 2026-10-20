@@ -26,6 +26,7 @@ public sealed partial class ShellPage : Page
         InitializeComponent();
         App.GetService<INavigationService>().Initialize(ContentFrame);
         Rail.LabelRequested += OnRailLabelRequested;
+        Toasts.HeldChanged += (_, held) => ViewModel.Toasts.SetHeld(held);
         RailTip.OpacityTransition = new ScalarTransition { Duration = TipFade };
         BackButton.SizeChanged += (_, _) => TitleBarLayoutChanged?.Invoke(this, EventArgs.Empty);
         foreach (var button in NowPlaying.TitleBarButtons)

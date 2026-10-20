@@ -91,16 +91,17 @@ public sealed partial class LyricsViewModel : ObservableObject
     public event EventHandler? TimingChanged;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMessage))]
     public partial bool IsLoading { get; set; }
 
     /// <summary>Unsynced lyrics; null when there are none or they are synced.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsPlain))]
+    [NotifyPropertyChangedFor(nameof(IsPlain), nameof(ShowsMessage), nameof(ShowsError))]
     public partial string? Text { get; set; }
 
     /// <summary>Synced lines and instrumental breaks, in time order; empty when the lyrics aren't timed.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSynced))]
+    [NotifyPropertyChangedFor(nameof(IsSynced), nameof(ShowsMessage), nameof(ShowsError))]
     public partial IReadOnlyList<LyricLineViewModel> Lines { get; set; } = [];
 
     /// <summary>Index into <see cref="Lines"/> of the line (or break) being sung; -1 before the first one.</summary>
@@ -138,10 +139,11 @@ public sealed partial class LyricsViewModel : ObservableObject
 
     /// <summary>Empty-state text ("No lyrics for this song."); null while lyrics, loading or an error are shown.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsMessage))]
     public partial string? Message { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
+    [NotifyPropertyChangedFor(nameof(HasError), nameof(ShowsError), nameof(ShowsMessage))]
     public partial string? ErrorMessage { get; set; }
 
     public bool IsSynced => Lines.Count > 0;
@@ -149,6 +151,12 @@ public sealed partial class LyricsViewModel : ObservableObject
     public bool IsPlain => !string.IsNullOrWhiteSpace(Text);
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    /// <summary>The empty state shows: there is a message, and no lyrics, loading or error on screen.</summary>
+    public bool ShowsMessage => !string.IsNullOrEmpty(Message) && !IsLoading && !HasError && !IsSynced && !IsPlain;
+
+    /// <summary>The error shows: only while no lyrics are on screen (they stay up when something fails after them).</summary>
+    public bool ShowsError => HasError && !IsSynced && !IsPlain;
 
     public bool HasSource => !string.IsNullOrEmpty(SourceName);
 
@@ -406,7 +414,6 @@ public sealed partial class LyricsViewModel : ObservableObject
             // Live radio is not on YouTube: there is nothing to ask for.
             _cts?.Cancel();
             Clear();
-            IsLoading = false;
             _shownVideoId = track.VideoId;
             Message = "Lyrics aren't available for live radio.";
             return;
@@ -423,44 +430,47 @@ public sealed partial class LyricsViewModel : ObservableObject
 
         Clear();
         IsLoading = true;
+        LyricsDocument? document;
         try
         {
-            var document = sourceKey is null ? null : await _lyrics.GetLyricsAsync(track, sourceKey, cts.Token);
-            if (document is null)
+            document = sourceKey is null ? null : await _lyrics.GetLyricsAsync(track, sourceKey, cts.Token);
+            if (document is null && IsLatest(cts))
             {
                 // No choice for this song, or the chosen source has nothing now: the user's order decides.
                 _chosenSource.Remove(track.VideoId);
                 document = await _lyrics.GetLyricsAsync(track, cts.Token);
             }
-
-            if (cts.IsCancellationRequested)
-            {
-                return;
-            }
-
-            _shownVideoId = track.VideoId;
-            Show(document);
-            if (document is not null)
-            {
-                await ShowAvailableSourcesAsync(track, cts.Token);
-            }
-        }
-        catch (OperationCanceledException) when (cts.IsCancellationRequested)
-        {
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not load lyrics for {VideoId}", track.VideoId);
-            ErrorMessage = ex.Message;
-        }
-        finally
-        {
-            if (ReferenceEquals(_cts, cts))
+            // A load that was replaced (another song, another source, a retry) leaves the screen alone, even if it
+            // failed: the one that replaced it owns it now.
+            if (IsLatest(cts))
             {
+                _logger.LogWarning(ex, "Could not load lyrics for {VideoId}", track.VideoId);
                 IsLoading = false;
+                ErrorMessage = ex.Message;
             }
+
+            return;
+        }
+
+        if (!IsLatest(cts))
+        {
+            return;
+        }
+
+        IsLoading = false;
+        _shownVideoId = track.VideoId;
+        Show(document);
+        if (document is not null)
+        {
+            await ShowAvailableSourcesAsync(track, cts.Token);
         }
     }
+
+    // The load is still the one the screen waits for (not replaced, not cancelled).
+    private bool IsLatest(CancellationTokenSource cts) => ReferenceEquals(_cts, cts) && !cts.IsCancellationRequested;
 
     private void Show(LyricsDocument? document)
     {
@@ -469,6 +479,7 @@ public sealed partial class LyricsViewModel : ObservableObject
         CurrentIndex = -1;
         Text = null;
         Message = null;
+        ErrorMessage = null;
 
         if (document is null || document.Lines.Count == 0)
         {
@@ -507,10 +518,12 @@ public sealed partial class LyricsViewModel : ObservableObject
         UpdateTimer();
     }
 
+    // Nothing on screen (and nothing loading): a new load, another song, or a state without lyrics follows.
     private void Clear()
     {
         _document = null;
         HasSearchedSources = false;
+        IsLoading = false;
         Lines = [];
         CurrentIndex = -1;
         Text = null;
@@ -528,11 +541,11 @@ public sealed partial class LyricsViewModel : ObservableObject
     private void ShowEmptyState()
     {
         Clear();
-        IsLoading = false;
         Message = "Play a song to see its lyrics here.";
     }
 
-    // The "Switch source" list; failing to read it doesn't hide the lyrics on screen. True when it was updated.
+    // The "Switch source" list. It comes after the lyrics are shown, so failing (or being cancelled) here never touches
+    // what is on screen. True when it was updated.
     private async Task<bool> ShowAvailableSourcesAsync(Track track, CancellationToken cancellationToken)
     {
         IReadOnlyList<LyricsSourceInfo> available;
@@ -540,9 +553,13 @@ public sealed partial class LyricsViewModel : ObservableObject
         {
             available = await _lyrics.GetAvailableSourcesAsync(track, cancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Could not list the lyrics sources for {VideoId}", track.VideoId);
+            if (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "Could not list the lyrics sources for {VideoId}", track.VideoId);
+            }
+
             return false;
         }
 

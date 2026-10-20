@@ -26,6 +26,9 @@ public sealed partial class NowPlayingView : UserControl
     private const double MinArtSize = 120;
     private const double MinControlsWidth = 340;
 
+    // The shade behind the side panel starts this far left of it (NowPlayingPanelScrimBrush fades in over that width).
+    private const double ScrimReach = 180;
+
     // The pulse glow is this many times the cover's size, so a halo shows around it.
     private const double GlowSize = 1.8;
 
@@ -440,6 +443,9 @@ public sealed partial class NowPlayingView : UserControl
         TabsPanel.Width = Math.Max(0, _panelWidth - 16);
         TabsPanel.Opacity = _panelProgress;
         TabsPanel.Visibility = _panelProgress > 0.001 ? Visibility.Visible : Visibility.Collapsed;
+        PanelScrim.Width = _panelWidth + ScrimReach;
+        PanelScrim.Opacity = _panelProgress;
+        PanelScrim.Visibility = TabsPanel.Visibility;
     }
 
     private void OnPlayerAreaSizeChanged(object sender, SizeChangedEventArgs e)

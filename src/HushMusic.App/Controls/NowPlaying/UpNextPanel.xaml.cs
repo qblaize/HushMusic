@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 using HushMusic.App.Helpers;
@@ -13,11 +14,17 @@ namespace HushMusic.App.Controls.NowPlaying;
 /// </summary>
 public sealed partial class UpNextPanel : UserControl
 {
+    // The list's top and bottom fades (its padding in the XAML clears them).
+    private const double TopFade = 32;
+    private const double BottomFade = 48;
+
+    private ScrollViewer? _scroller;
     private bool _isShown;
 
     public UpNextPanel()
     {
         InitializeComponent();
+        EdgeFade.Attach(QueueHost, QueueList, TopFade, BottomFade);
         QueueList.AddHandler(DragOverEvent, new DragEventHandler(OnQueueDragOver), handledEventsToo: true);
         QueueList.AddHandler(DropEvent, new DragEventHandler(OnQueueDrop), handledEventsToo: true);
         QueueList.AddHandler(DragLeaveEvent, new DragEventHandler(OnQueueDragLeave), handledEventsToo: true);
@@ -69,10 +76,34 @@ public sealed partial class UpNextPanel : UserControl
 
     private void ScrollToCurrent()
     {
-        if (ViewModel.Current is { } current)
+        if (ViewModel.Current is not { } current)
         {
-            QueueList.ScrollIntoView(current, ScrollIntoViewAlignment.Leading);
+            return;
         }
+
+        // Leading puts the song at the very top, under the fade: bring it down to where the fade ends.
+        QueueList.ScrollIntoView(current, ScrollIntoViewAlignment.Leading);
+        QueueList.UpdateLayout();
+        _scroller ??= FindScroller(QueueList);
+        if (_scroller is { } scroller && QueueList.ContainerFromItem(current) is UIElement row)
+        {
+            var top = row.TransformToVisual(scroller).TransformPoint(default).Y;
+            scroller.ChangeView(null, Math.Max(0, scroller.VerticalOffset + top - TopFade), null, disableAnimation: true);
+        }
+    }
+
+    private static ScrollViewer? FindScroller(DependencyObject parent)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if ((child as ScrollViewer ?? FindScroller(child)) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private void OnItemClick(object sender, ItemClickEventArgs e)

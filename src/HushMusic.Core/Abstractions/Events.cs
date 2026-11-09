@@ -2,9 +2,15 @@ using HushMusic.Core.Models;
 
 namespace HushMusic.Core.Abstractions;
 
-public sealed class PlaybackStatusChangedEventArgs(PlaybackStatus status) : EventArgs
+public sealed class PlaybackStatusChangedEventArgs(PlaybackStatus status, bool isReconnecting = false) : EventArgs
 {
     public PlaybackStatus Status { get; } = status;
+
+    /// <summary>
+    /// A live radio station lost its stream and is connecting again (with <see cref="PlaybackStatus.Loading"/> or
+    /// <see cref="PlaybackStatus.Buffering"/>). Raised again, with the same status, when only this changes.
+    /// </summary>
+    public bool IsReconnecting { get; } = isReconnecting;
 }
 
 public sealed class TrackChangedEventArgs(Track? track, QueueItem? item) : EventArgs

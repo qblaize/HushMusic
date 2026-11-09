@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using HushMusic.App.Helpers;
@@ -10,7 +11,8 @@ namespace HushMusic.App.Controls.Radio;
 /// The "• LIVE" eyebrow shown above the title while a radio station plays: a small pill in the accent tint with accent
 /// text, its dot gently pulsing (static when Windows animations are off). Both come from the theme-aware accent brushes,
 /// so the badge reads on the light app and inside dark surfaces (Now Playing, mini player) alike.
-/// The dot pulses only while the station plays and the badge is on screen (<see cref="AnimationGate"/>).
+/// The dot pulses only while the station plays and the badge is on screen (<see cref="AnimationGate"/>). While the
+/// station connects again after losing its stream, the badge reads "RECONNECTING…".
 /// </summary>
 public sealed partial class LiveBadge : UserControl
 {
@@ -69,8 +71,19 @@ public sealed partial class LiveBadge : UserControl
 
     private void OnNowPlayingChanged(object? sender, EventArgs e) => UpdateWanted();
 
-    private void UpdateWanted() =>
+    private void UpdateWanted()
+    {
         _gate.IsWanted = Visibility == Visibility.Visible && AnimationsEnabled && _nowPlaying?.IsPlaying != false;
+
+        // While the station connects again after losing its stream, the badge says so instead of a bare spinner.
+        var reconnecting = _nowPlaying?.IsReconnecting == true;
+        var text = reconnecting ? "RECONNECTING…" : "LIVE";
+        if (Label.Text != text)
+        {
+            Label.Text = text;
+            AutomationProperties.SetName(Label, reconnecting ? "Reconnecting" : "Live");
+        }
+    }
 
     // An explicit storyboard (implicit transitions crash when they fire during layout). Stopping it leaves the dot solid.
     private void SetPulsing(bool pulse)

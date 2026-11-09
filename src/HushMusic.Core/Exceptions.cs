@@ -41,9 +41,28 @@ public sealed class AlreadyInPlaylistException(string playlistId, IReadOnlyList<
     public IReadOnlyList<string> VideoIds { get; } = videoIds;
 }
 
+/// <summary>Why no stream could be resolved, as far as the resolver can tell.</summary>
+public enum StreamFailureReason
+{
+    /// <summary>Anything else: a network problem, an outdated resolver, a video that is gone…</summary>
+    Other,
+
+    /// <summary>
+    /// YouTube only plays the video to a signed-in account that has confirmed its age. It stays that way, so the resolver
+    /// doesn't ask again for the same track until it would ask differently (with the account).
+    /// </summary>
+    AgeRestricted,
+}
+
 /// <summary>No playable stream could be resolved for a track.</summary>
-public sealed class StreamResolutionException(string videoId, string message, Exception? innerException = null)
+public sealed class StreamResolutionException(
+    string videoId,
+    string message,
+    Exception? innerException = null,
+    StreamFailureReason reason = StreamFailureReason.Other)
     : HushException(message, innerException)
 {
     public string VideoId { get; } = videoId;
+
+    public StreamFailureReason Reason { get; } = reason;
 }

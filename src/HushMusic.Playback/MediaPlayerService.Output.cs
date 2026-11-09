@@ -9,7 +9,9 @@ namespace HushMusic.Playback;
 
 // The audio output both players use (AppSettings.AudioOutputDeviceId). Null follows the Windows default output, which
 // MediaPlayer does by itself. A chosen output is watched while it is chosen: when it isn't connected, the players use
-// the system default, and they move back to it as soon as it is connected again. The choice itself never changes.
+// the system default, and they move back to it once it is connected again and has stayed for a moment
+// (OutputSwitchDebouncer), so a flapping Bluetooth speaker doesn't move them (and reconnect a live station) on every
+// change. The choice itself never changes.
 public sealed partial class MediaPlayerService
 {
     // Taken before _gate, never inside it.
@@ -17,8 +19,10 @@ public sealed partial class MediaPlayerService
 
     // Guarded by _outputGate.
     private AudioOutputWatcher? _outputs; // runs while a specific output is chosen
+    private OutputSwitchDebouncer? _outputSwitch; // with _outputs
     private string? _outputChoice;        // last seen AppSettings.AudioOutputDeviceId
     private string? _outputInUse;         // the chosen output while it is connected; null = the system default
+    private bool _outputDecided;          // the first decision since the choice was made is done
     private bool _outputMissing;          // the chosen output isn't connected (logged once)
     private bool _outputClosed;
 
@@ -39,6 +43,7 @@ public sealed partial class MediaPlayerService
     {
         var choice = AudioOutputChoice.Normalize(_settings.Current.AudioOutputDeviceId);
         AudioOutputWatcher? stopped = null;
+        OutputSwitchDebouncer? stoppedSwitch = null;
         lock (_outputGate)
         {
             if (_outputClosed || AudioOutputChoice.SameDevice(choice, _outputChoice))
@@ -48,16 +53,21 @@ public sealed partial class MediaPlayerService
 
             _outputChoice = choice;
             _outputMissing = false;
+            _outputDecided = false;
+            _outputSwitch?.Cancel();
             if (choice is null)
             {
                 stopped = _outputs;
+                stoppedSwitch = _outputSwitch;
                 _outputs = null;
+                _outputSwitch = null;
             }
             else if (_outputs is null)
             {
                 var outputs = new AudioOutputWatcher(_logger);
                 outputs.Changed += OnOutputsChanged;
                 _outputs = outputs;
+                _outputSwitch = new OutputSwitchDebouncer(TimeProvider.System, OnOutputsSettled);
                 try
                 {
                     outputs.Start();
@@ -72,6 +82,7 @@ public sealed partial class MediaPlayerService
             RefreshOutputNoLock();
         }
 
+        stoppedSwitch?.Dispose();
         if (stopped is not null)
         {
             stopped.Changed -= OnOutputsChanged;
@@ -83,25 +94,63 @@ public sealed partial class MediaPlayerService
     {
         lock (_outputGate)
         {
-            if (!_outputClosed && sender == _outputs)
+            if (_outputClosed || sender != _outputs)
+            {
+                return;
+            }
+
+            // Listing at startup or after the choice changed: decide at once.
+            if (!_outputDecided || _outputSwitch is not { } debouncer)
+            {
+                RefreshOutputNoLock();
+                return;
+            }
+
+            var wasPending = debouncer.IsPending;
+            switch (debouncer.OnOutputsChanged(EffectiveOutputNoLock(), _outputInUse))
+            {
+                case OutputSwitchStep.Now:
+                    RefreshOutputNoLock();
+                    break;
+                case OutputSwitchStep.Later when !wasPending:
+                    _logger.LogDebug("Audio output {Device} is back; switching to it in {Settle} s if it stays", _outputs?.NameOf(_outputChoice!), OutputSwitchDebouncer.SettleTime.TotalSeconds);
+                    break;
+                case OutputSwitchStep.None when wasPending:
+                    _logger.LogDebug("Audio output {Device} went away again within {Settle} s; staying on the system default", _outputs?.NameOf(_outputChoice!), OutputSwitchDebouncer.SettleTime.TotalSeconds);
+                    break;
+            }
+        }
+    }
+
+    private void OnOutputsSettled()
+    {
+        lock (_outputGate)
+        {
+            if (!_outputClosed)
             {
                 RefreshOutputNoLock();
             }
         }
     }
 
+    // Under _outputGate: the chosen output while it is connected, else null (the system default).
+    private string? EffectiveOutputNoLock() =>
+        _outputs is { } outputs ? AudioOutputChoice.Effective(_outputChoice, outputs.Devices.Select(d => d.Id)) : null;
+
     // Under _outputGate.
     private void RefreshOutputNoLock()
     {
         var choice = _outputChoice;
         var outputs = _outputs;
-        var id = outputs is null ? null : AudioOutputChoice.Effective(choice, outputs.Devices.Select(d => d.Id));
+        var id = EffectiveOutputNoLock();
         var device = id is null ? null : outputs!.Find(id);
         if (choice is not null && device is null && outputs?.IsEnumerated != true)
         {
             return; // still listing the outputs: the chosen one may come next
         }
 
+        _outputDecided = true;
+        _outputSwitch?.Cancel();
         var name = choice is null ? null : outputs?.NameOf(choice) ?? choice;
         if (AudioOutputChoice.SameDevice(device?.Id, _outputInUse))
         {
@@ -217,6 +266,13 @@ public sealed partial class MediaPlayerService
                     EnsureOutputNoLock(_active);
                 }
             }
+            else if (_item is { Track.IsLiveRadio: true } && !_autoplay)
+            {
+                // A live station that the system paused: let go of its connection (it would only buffer stale audio).
+                // Play connects again, on the new output.
+                DetachSourceNoLock();
+                EnsureOutputNoLock(_active);
+            }
             else if (_item is { } item)
             {
                 autoplay = _autoplay;
@@ -307,13 +363,17 @@ public sealed partial class MediaPlayerService
     private void CloseOutputs()
     {
         AudioOutputWatcher? outputs;
+        OutputSwitchDebouncer? debouncer;
         lock (_outputGate)
         {
             _outputClosed = true;
             outputs = _outputs;
+            debouncer = _outputSwitch;
             _outputs = null;
+            _outputSwitch = null;
         }
 
+        debouncer?.Dispose();
         if (outputs is not null)
         {
             outputs.Changed -= OnOutputsChanged;

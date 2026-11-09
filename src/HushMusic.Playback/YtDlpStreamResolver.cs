@@ -2,9 +2,11 @@ using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using HushMusic.Core;
 using HushMusic.Core.Abstractions;
+using HushMusic.Core.Models;
 using HushMusic.Playback.YtDlp;
 
 namespace HushMusic.Playback;
@@ -15,6 +17,13 @@ namespace HushMusic.Playback;
 /// kept in memory for <see cref="ResolveVideoAsync"/>. yt-dlp's JavaScript runtime (normally the
 /// app's own Deno) comes from <see cref="JsRuntimeProvider"/>.
 /// </summary>
+/// <remarks>
+/// Each resolve asks yt-dlp's visionOS client first, without the account: its links work at once. Only when that finds
+/// nothing does yt-dlp run with its default clients (and the account, when "Use my account when resolving streams" is
+/// on). Their links are held back for a few seconds (<see cref="ResolvedStream.AvailableAt"/>); the public resolve
+/// methods wait for that, prefetching doesn't. A track YouTube age-gates is remembered for the session, so it isn't
+/// asked about again on every prefetch, preload and play.
+/// </remarks>
 public sealed class YtDlpStreamResolver(
     ISettingsService settings,
     IAppPaths paths,
@@ -29,14 +38,24 @@ public sealed class YtDlpStreamResolver(
     private static readonly TimeSpan VersionTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ExpiryMargin = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan SaveDelay = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan AvailabilityMargin = TimeSpan.FromSeconds(1);
+
+    // yt-dlp's player client for the first try of each resolve (see ResolveCoreAsync).
+    private const string VisionOsClient = "visionos";
 
     // Bump when the yt-dlp format selection changes, so links resolved with the old one are not reused.
-    private const string PersistedCacheVersion = "webm-1";
+    private const string PersistedCacheVersion = "webm-2";
 
     private readonly ConcurrentDictionary<string, ResolvedStream> _cache = new(StringComparer.Ordinal);
 
     // The playable video formats each run listed (memory only; empty when a track has none).
     private readonly ConcurrentDictionary<string, IReadOnlyList<ResolvedStream>> _videoFormats = new(StringComparer.Ordinal);
+
+    // Tracks YouTube age-gated this session, and whether yt-dlp had the account then (memory only).
+    private readonly ConcurrentDictionary<string, bool> _ageRestricted = new(StringComparer.Ordinal);
+
+    // Age-restricted track -> the counterpart that plays in its place.
+    private readonly ConcurrentDictionary<string, string> _counterparts = new(StringComparer.Ordinal);
     private Task? _cacheLoad;
     private int _savePending;
     private readonly Dictionary<string, Resolution> _inFlight = new(StringComparer.Ordinal);
@@ -61,8 +80,69 @@ public sealed class YtDlpStreamResolver(
 
     private string CacheFile => Path.Combine(paths.Cache, "streams.json");
 
-    public Task<ResolvedStream> ResolveAsync(string videoId, CancellationToken cancellationToken = default) =>
-        ResolveAsync(videoId, interactive: true, cancellationToken);
+    /// <summary>Whether yt-dlp runs with the account cookies now ("Use my account when resolving streams", signed in).</summary>
+    private bool UsesAccount => settings.Current.UseAccountForStreams && auth.Status == AuthStatus.SignedIn;
+
+    public async Task<ResolvedStream> ResolveAsync(string videoId, CancellationToken cancellationToken = default)
+    {
+        var stream = await ResolveAsync(videoId, interactive: true, cancellationToken).ConfigureAwait(false);
+        await WaitUntilAvailableAsync(stream, cancellationToken).ConfigureAwait(false);
+        return stream;
+    }
+
+    /// <summary>
+    /// Resolves the track; when YouTube only plays it to a signed-in, age-confirmed account, its Song / Video counterpart
+    /// is tried before giving up. YouTube Music often keeps an audio-only song next to an age-restricted music video,
+    /// and the two aren't always rated alike. (Queues only name counterparts when signed in.)
+    /// </summary>
+    public async Task<ResolvedStream> ResolveAsync(Track track, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+        StreamResolutionException restricted;
+        try
+        {
+            return await ResolveAsync(track.VideoId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (StreamResolutionException ex) when (ex.Reason == StreamFailureReason.AgeRestricted && Counterpart(track) is not null)
+        {
+            restricted = ex;
+        }
+
+        var counterpart = Counterpart(track)!;
+        try
+        {
+            var stream = await ResolveAsync(counterpart.VideoId, cancellationToken).ConfigureAwait(false);
+            _counterparts[track.VideoId] = counterpart.VideoId;
+            logger.LogInformation(
+                "{VideoId} is age-restricted; playing its {Kind} {Counterpart} instead",
+                track.VideoId,
+                counterpart.IsMusicVideo ? "music video" : "song",
+                counterpart.VideoId);
+            return stream;
+        }
+        catch (StreamResolutionException ex)
+        {
+            logger.LogDebug("The counterpart {Counterpart} of age-restricted {VideoId} doesn't play either: {Error}", counterpart.VideoId, track.VideoId, ex.Message);
+        }
+
+        throw restricted;
+    }
+
+    private static Track? Counterpart(Track track) =>
+        track.Counterpart is { IsLiveRadio: false, VideoId.Length: > 0 } counterpart && counterpart.VideoId != track.VideoId ? counterpart : null;
+
+    // A fresh link only works from AvailableAt on (googlevideo answers 403 before, which Media Foundation reports as
+    // 0xC00D2EE7, "server name not found"). The time is whole seconds and the server counts from when it answered, so a
+    // second more is always enough. Prefetched links are usually past it by the time they play.
+    private async Task WaitUntilAvailableAsync(ResolvedStream stream, CancellationToken cancellationToken)
+    {
+        var wait = stream.AvailableAt is { } at ? at + AvailabilityMargin - DateTimeOffset.UtcNow : TimeSpan.Zero;
+        if (wait > TimeSpan.Zero)
+        {
+            logger.LogDebug("Waiting {Wait} ms until YouTube serves {VideoId}", (int)wait.TotalMilliseconds, stream.VideoId);
+            await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     private async Task<ResolvedStream> ResolveAsync(string videoId, bool interactive, CancellationToken cancellationToken)
     {
@@ -108,12 +188,19 @@ public sealed class YtDlpStreamResolver(
             stream.FrameRate,
             stream.BitrateKbps,
             maxHeight);
+        await WaitUntilAvailableAsync(stream, cancellationToken).ConfigureAwait(false);
         return stream;
     }
 
-    // Runs yt-dlp for the track, or joins the run already going for it.
+    // Runs yt-dlp for the track, or joins the run already going for it. A track YouTube age-gated this session isn't
+    // asked about again until yt-dlp would ask differently (with or without the account).
     private async Task<ResolvedStream> RunAsync(string videoId, CancellationToken cancellationToken)
     {
+        if (IsKnownAgeRestricted(videoId, out var withAccount))
+        {
+            throw AgeRestricted(videoId, withAccount);
+        }
+
         Resolution resolution;
         lock (_inFlightGate)
         {
@@ -150,7 +237,16 @@ public sealed class YtDlpStreamResolver(
     public void Invalidate(string videoId)
     {
         _videoFormats.TryRemove(videoId, out _);
-        if (_cache.TryRemove(videoId, out _))
+        var removed = _cache.TryRemove(videoId, out _);
+
+        // An age-restricted track plays its counterpart's link: that is the one that went stale.
+        if (_counterparts.TryRemove(videoId, out var counterpart))
+        {
+            _videoFormats.TryRemove(counterpart, out _);
+            removed |= _cache.TryRemove(counterpart, out _);
+        }
+
+        if (removed)
         {
             ScheduleSave();
         }
@@ -161,13 +257,29 @@ public sealed class YtDlpStreamResolver(
 
     public void Prefetch(string videoId)
     {
-        if (string.IsNullOrWhiteSpace(videoId) || TryGetCached(videoId, out _))
+        if (string.IsNullOrWhiteSpace(videoId) || TryGetCached(videoId, out _) || IsKnownAgeRestricted(videoId, out _))
         {
             return;
         }
 
         _ = PrefetchAsync(videoId);
     }
+
+    /// <summary>
+    /// What to tell the user when YouTube age-gates a track: how to play it from here (sign in, or let yt-dlp use the
+    /// account), or, when yt-dlp already used the account, that YouTube wants the age confirmed on it.
+    /// </summary>
+    internal static string AgeRestrictedMessage(bool signedIn, bool usedAccount) =>
+        usedAccount ? "This song is age-restricted on YouTube, and YouTube didn't accept your account for it. Confirm your age on YouTube with this Google account, then try again."
+        : signedIn ? "This song is age-restricted on YouTube. To play it, turn on \"Use my account when resolving streams\" in Settings → Playback."
+        : "This song is age-restricted on YouTube. To play it, sign in, then turn on \"Use my account when resolving streams\" in Settings → Playback.";
+
+    private StreamResolutionException AgeRestricted(string videoId, bool usedAccount) =>
+        new(videoId, AgeRestrictedMessage(auth.Status == AuthStatus.SignedIn, usedAccount), reason: StreamFailureReason.AgeRestricted);
+
+    // Known when it was age-gated this session the way yt-dlp would run now: with the account, or without it.
+    private bool IsKnownAgeRestricted(string videoId, out bool withAccount) =>
+        _ageRestricted.TryGetValue(videoId, out withAccount) && withAccount == UsesAccount;
 
     public async Task<string?> GetBackendVersionAsync(CancellationToken cancellationToken = default)
     {
@@ -374,29 +486,81 @@ public sealed class YtDlpStreamResolver(
         }
 
         var runtime = await choosingRuntime.ConfigureAwait(false);
+        logger.LogDebug("Resolving {VideoId} with JavaScript runtime: {Runtime}", videoId, runtime.Description);
+        var stopwatch = Stopwatch.StartNew();
+
+        // The visionOS client first, and without the account. It is one of yt-dlp's default clients and lists the same
+        // WebM/Opus audio and VP9 video, but needs no player JavaScript (about a second faster), and its links work at
+        // once: the TV client's are held back for the length of a pre-roll ad (~5 s, see AvailableAt).
+        var quick = await RunYtDlpAsync(videoId, exe, runtime, VisionOsClient, useAccount: false, cancellationToken).ConfigureAwait(false);
+        if (quick.Info is { } quickInfo && YtDlpOutput.HasPlayableAudio(quickInfo))
+        {
+            return Resolved(videoId, quickInfo, stopwatch, "visionOS", withAccount: false);
+        }
+
+        // Age-gated for every client alike: only the account can change the answer.
+        var useAccount = UsesAccount;
+        if (quick.Reason == StreamFailureReason.AgeRestricted && !useAccount)
+        {
+            _ageRestricted[videoId] = false;
+            throw AgeRestricted(videoId, usedAccount: false);
+        }
+
+        logger.LogInformation(
+            "The visionOS client found nothing to play for {VideoId}; asking yt-dlp's default clients{Account}",
+            videoId,
+            useAccount ? " with the account" : string.Empty);
+        var full = await RunYtDlpAsync(videoId, exe, runtime, clients: null, useAccount, cancellationToken).ConfigureAwait(false);
+        if (full.Info is not { } info)
+        {
+            if (full.Reason == StreamFailureReason.AgeRestricted)
+            {
+                // Prefetch, preload and play would otherwise each spend yt-dlp runs on the same answer.
+                _ageRestricted[videoId] = full.WithAccount;
+                throw AgeRestricted(videoId, full.WithAccount);
+            }
+
+            throw new StreamResolutionException(videoId, full.Error!);
+        }
+
+        return Resolved(videoId, info, stopwatch, "default clients", full.WithAccount);
+    }
+
+    /// <summary>
+    /// One yt-dlp run: with <paramref name="clients"/> (its <c>player_client</c> list; null for yt-dlp's defaults), and the
+    /// account cookies when <paramref name="useAccount"/>. Returns the info JSON, or why there is none.
+    /// </summary>
+    private async Task<YtDlpRun> RunYtDlpAsync(
+        string videoId,
+        string exe,
+        JsRuntimePlan runtime,
+        string? clients,
+        bool useAccount,
+        CancellationToken cancellationToken)
+    {
         List<string> args =
         [
             "--ignore-config",
             // WebM/Opus first: YouTube's M4A audio is fragmented (DASH) MP4, which Media Foundation opens over
-            // HTTP but then jumps straight to MediaEnded without playing (verified 2026-10-07).
+            // HTTP but then jumps straight to MediaEnded without playing (verified 2026-10-07). The selection is checked
+            // again against the full format list (AudioFormats), which also gives the fallbacks.
             "-f", "bestaudio[ext=webm]/bestaudio[acodec=opus]/bestaudio/best",
             // Skipping the HLS manifest saves ~0.3 s per resolve. Video comes from the https (DASH) formats, which stay.
-            "--extractor-args", "youtube:skip=hls",
+            // (YouTube's HLS audio is packed AAC, which Media Foundation's HLS source doesn't play anyway.)
+            "--extractor-args", clients is null ? "youtube:skip=hls" : $"youtube:skip=hls;player_client={clients}",
             "-j",
             "--no-playlist",
             "--no-progress",
             "--cache-dir", Path.Combine(paths.Cache, "yt-dlp"),
         ];
         args.AddRange(runtime.Arguments);
-        logger.LogDebug("Resolving {VideoId} with JavaScript runtime: {Runtime}", videoId, runtime.Description);
 
-        var stopwatch = Stopwatch.StartNew();
         ProcessResult result;
         var withAccount = false;
         try
         {
             // The cookie file is the only unencrypted copy of the session: keep it alive just for the process run.
-            using var cookieFile = current.UseAccountForStreams && auth.Status == AuthStatus.SignedIn
+            using var cookieFile = useAccount
                 ? await cookieFiles.CreateNetscapeCookieFileAsync(cancellationToken).ConfigureAwait(false)
                 : null;
             if (cookieFile is not null)
@@ -428,12 +592,16 @@ public sealed class YtDlpStreamResolver(
 
         if (result.ExitCode != 0)
         {
-            logger.LogWarning("yt-dlp failed for {VideoId} (exit {ExitCode}): {StdErr}", videoId, result.ExitCode, result.StandardError.Trim());
-            throw new StreamResolutionException(
+            logger.LogWarning(
+                "yt-dlp failed for {VideoId} ({Clients}, exit {ExitCode}): {StdErr}",
                 videoId,
-                runtimeProblem is not null && runtime.Source == JsRuntimeSource.None
-                    ? "Playback isn't set up yet: Deno, which YouTube playback needs, couldn't be downloaded. Check your internet connection and try again."
-                    : YtDlpOutput.FindError(result.StandardError) ?? $"yt-dlp failed with exit code {result.ExitCode}.");
+                clients ?? "default clients",
+                result.ExitCode,
+                result.StandardError.Trim());
+            var error = runtimeProblem is not null && runtime.Source == JsRuntimeSource.None
+                ? "Playback isn't set up yet: Deno, which YouTube playback needs, couldn't be downloaded. Check your internet connection and try again."
+                : YtDlpOutput.FindError(result.StandardError) ?? $"yt-dlp failed with exit code {result.ExitCode}.";
+            return new YtDlpRun(null, YtDlpOutput.ClassifyError(result.StandardError), error, withAccount);
         }
 
         if (!string.IsNullOrWhiteSpace(result.StandardError))
@@ -441,21 +609,39 @@ public sealed class YtDlpStreamResolver(
             logger.LogDebug("yt-dlp stderr for {VideoId}: {StdErr}", videoId, result.StandardError.Trim());
         }
 
+        try
+        {
+            return new YtDlpRun(YtDlpOutput.ParseInfo(videoId, result.StandardOutput), StreamFailureReason.Other, null, withAccount);
+        }
+        catch (StreamResolutionException ex)
+        {
+            return new YtDlpRun(null, StreamFailureReason.Other, ex.Message, withAccount);
+        }
+    }
+
+    private ResolvedStream Resolved(string videoId, JsonObject info, Stopwatch stopwatch, string client, bool withAccount)
+    {
         var now = DateTimeOffset.UtcNow;
-        var info = YtDlpOutput.ParseInfo(videoId, result.StandardOutput);
-        var stream = YtDlpOutput.ParseStream(videoId, info, now);
+        var stream = YtDlpOutput.ParseAudio(videoId, info, now);
         RememberVideoFormats(videoId, YtDlpOutput.ParseVideoFormats(videoId, info, now));
+        _ageRestricted.TryRemove(videoId, out _);
         logger.LogInformation(
-            "Resolved {VideoId} in {ElapsedMs} ms: {Container}/{Codec} {Bitrate} kbps, expires {ExpiresAt:u}{Account}",
+            "Resolved {VideoId} in {ElapsedMs} ms ({Client}): {Container}/{Codec} {Bitrate} kbps{Fallback}, expires {ExpiresAt:u}{HeldBack}{Account}",
             videoId,
             stopwatch.ElapsedMilliseconds,
+            client,
             stream.Container,
             stream.Codec,
             stream.BitrateKbps,
+            stream.Fallback is { } fallback ? $" (else {fallback.Container}/{fallback.Codec})" : string.Empty,
             stream.ExpiresAt,
+            stream.AvailableAt is { } at && at > now ? $", served from {(at - now).TotalSeconds:0} s on" : string.Empty,
             withAccount ? " (signed in)" : string.Empty);
         return stream;
     }
+
+    /// <summary>A yt-dlp run's info JSON, or why there is none (<paramref name="Error"/> is the message for the user).</summary>
+    private sealed record YtDlpRun(JsonObject? Info, StreamFailureReason Reason, string? Error, bool WithAccount);
 
     private async Task<string?> GetVersionAsync(string exe, CancellationToken cancellationToken)
     {
@@ -483,6 +669,10 @@ public sealed class YtDlpStreamResolver(
         try
         {
             await ResolveAsync(videoId, interactive: false, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (StreamResolutionException ex) when (ex.Reason == StreamFailureReason.AgeRestricted)
+        {
+            logger.LogInformation("Prefetch: {VideoId} is age-restricted", videoId);
         }
         catch (Exception ex)
         {

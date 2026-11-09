@@ -56,8 +56,9 @@ public sealed class AppSettings
     public string YtDlpJsRuntime { get; set; } = "auto";
 
     /// <summary>
-    /// Pass the signed-in cookies to yt-dlp. Off by default: yt-dlp warns that accounts used with it
-    /// can get rate-limited or blocked, and anonymous resolution works for normal tracks.
+    /// Pass the signed-in cookies to yt-dlp when it finds nothing to play without them (age-restricted or account-only
+    /// tracks). Off by default: yt-dlp warns that accounts used with it can get rate-limited or blocked, and anonymous
+    /// resolution works for normal tracks.
     /// </summary>
     public bool UseAccountForStreams { get; set; }
 

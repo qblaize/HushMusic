@@ -14,7 +14,10 @@ public interface INowPlayingService
     /// <summary>True while the current track is playing (or about to): drives the animated equaliser.</summary>
     bool IsPlaying { get; }
 
-    /// <summary>Raised on the UI thread when <see cref="CurrentVideoId"/> or <see cref="IsPlaying"/> changes.</summary>
+    /// <summary>The live station lost its stream and is connecting again (<see cref="PlaybackStatusChangedEventArgs.IsReconnecting"/>).</summary>
+    bool IsReconnecting { get; }
+
+    /// <summary>Raised on the UI thread when <see cref="CurrentVideoId"/>, <see cref="IsPlaying"/> or <see cref="IsReconnecting"/> changes.</summary>
     event EventHandler? Changed;
 
     bool IsCurrent(string? videoId);
@@ -25,6 +28,7 @@ internal sealed class NowPlayingService : INowPlayingService
     private readonly IUiDispatcher _dispatcher;
     private volatile string? _videoId;
     private volatile PlaybackStatus _status;
+    private volatile bool _reconnecting;
 
     public NowPlayingService(IPlayer player, IUiDispatcher dispatcher)
     {
@@ -42,6 +46,7 @@ internal sealed class NowPlayingService : INowPlayingService
         player.StatusChanged += (_, e) =>
         {
             _status = e.Status;
+            _reconnecting = e.IsReconnecting;
             Publish();
         };
     }
@@ -51,6 +56,8 @@ internal sealed class NowPlayingService : INowPlayingService
     public string? CurrentVideoId { get; private set; }
 
     public bool IsPlaying { get; private set; }
+
+    public bool IsReconnecting { get; private set; }
 
     public bool IsCurrent(string? videoId) =>
         !string.IsNullOrEmpty(videoId) && string.Equals(videoId, CurrentVideoId, StringComparison.Ordinal);
@@ -63,13 +70,15 @@ internal sealed class NowPlayingService : INowPlayingService
     {
         var videoId = _videoId;
         var playing = videoId is not null && IsActive(_status);
-        if (videoId == CurrentVideoId && playing == IsPlaying)
+        var reconnecting = videoId is not null && _reconnecting;
+        if (videoId == CurrentVideoId && playing == IsPlaying && reconnecting == IsReconnecting)
         {
             return;
         }
 
         CurrentVideoId = videoId;
         IsPlaying = playing;
+        IsReconnecting = reconnecting;
         Changed?.Invoke(this, EventArgs.Empty);
     });
 }

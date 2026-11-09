@@ -55,9 +55,17 @@ Rules that follow from this:
 1. A track is resolved lazily, right before it plays. `YtDlpStreamResolver` runs the app-managed yt-dlp
    (`-f "bestaudio[ext=webm]/bestaudio[acodec=opus]/bestaudio/best" -j --no-playlist`, with Deno as the JavaScript
    runtime) and parses its JSON. The next track in the queue and the track under the pointer are resolved ahead of
-   time.
+   time. `AudioFormats` checks the selection against the full format list (WebM audio, then the progressive MP4,
+   never YouTube's fragmented M4A) and chains the best format of each other kind as `ResolvedStream.Fallback`, which
+   the player opens when Windows can't decode the first.
 2. Stream links expire after about 6 hours. They are cached in memory and on disk until shortly before then. On HTTP
-   403 the resolver re-resolves once and retries.
+   403 the resolver re-resolves once and retries. yt-dlp first runs with only its visionOS client
+   (`player_client=visionos`, never with the account): no player JavaScript, and its links work at once. Only when that
+   finds nothing does it run with its default clients (and the account, if allowed). The TV client's links only work a
+   few seconds after the resolve (yt-dlp's `available_at`, the pre-roll ad the web player would show; googlevideo
+   answers 403 until then), so the resolver waits for that before handing them out. A track YouTube age-restricts is
+   remembered for the session: the player skips it with a message, and a signed-in queue's Song / Video counterpart is
+   tried first.
 3. `MediaPlayerService` wraps `Windows.Media.Playback.MediaPlayer` and `SmtcController` drives the system media
    controls.
 4. The queue lives in Core (`QueueService`), not in `MediaPlaybackList`, so features can read and change it. Shuffle

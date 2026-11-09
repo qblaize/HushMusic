@@ -2,7 +2,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using HushMusic.App.Helpers;
+using HushMusic.App.Services;
 using HushMusic.App.Services.Shell;
+using HushMusic.Core;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Models;
 
@@ -28,6 +30,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly INotificationService _notifications;
     private readonly IUiDispatcher _dispatcher;
     private readonly IRadioNowPlaying _radio;
+    private readonly INavigationService _navigation;
     private readonly ILogger<PlayerViewModel> _logger;
 
     // Ratings made in this session win over the (possibly stale) LikeStatus carried by queued tracks.
@@ -50,6 +53,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         INotificationService notifications,
         IUiDispatcher dispatcher,
         IRadioNowPlaying radio,
+        INavigationService navigation,
         ILogger<PlayerViewModel> logger)
     {
         _player = player;
@@ -60,6 +64,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _notifications = notifications;
         _dispatcher = dispatcher;
         _radio = radio;
+        _navigation = navigation;
         _logger = logger;
 
         _radio.Changed += (_, e) => _dispatcher.Run(() => OnRadioNowPlaying(e.StationId, e.NowPlaying));
@@ -546,8 +551,60 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private void OnPlaybackFailed(PlaybackErrorEventArgs e)
     {
+        if (e.Track is { IsLiveRadio: true } station)
+        {
+            // The player has given up reconnecting: offer to try again.
+            _notifications.Show(new AppNotification(NotificationSeverity.Error, $"Couldn't connect to {station.Title}", e.Message, e.Exception)
+            {
+                Action = new NotificationAction("Retry", () => _ = RetryStationAsync(station)),
+            });
+            return;
+        }
+
         var title = e.Track is { } track ? $"Couldn't play \"{track.Title}\"" : "Playback failed";
-        _notifications.Show(new AppNotification(NotificationSeverity.Error, title, e.Message, e.Exception));
+        var notification = new AppNotification(NotificationSeverity.Error, title, e.Message, e.Exception);
+        if (e.Exception is StreamResolutionException { Reason: StreamFailureReason.AgeRestricted } && !_settings.Current.UseAccountForStreams)
+        {
+            // The message says what to do; the button does it, or opens Settings when signing in comes first.
+            notification = notification with
+            {
+                Action = _auth.Status == AuthStatus.SignedIn
+                    ? new NotificationAction("Turn on", () => _ = UseAccountForStreamsAsync())
+                    : new NotificationAction("Open Settings", () => _navigation.NavigateTo(PageKey.Settings)),
+            };
+        }
+
+        _notifications.Show(notification);
+    }
+
+    private async Task UseAccountForStreamsAsync()
+    {
+        try
+        {
+            await _settings.UpdateAsync(s => s.UseAccountForStreams = true);
+        }
+        catch (Exception ex)
+        {
+            _notifications.ShowError("Couldn't change the setting", ex);
+        }
+    }
+
+    // Only while that station is still the current item; anything chosen since stays.
+    private async Task RetryStationAsync(Track station)
+    {
+        if (_player.CurrentTrack?.VideoId != station.VideoId)
+        {
+            return;
+        }
+
+        try
+        {
+            await _player.PlayAsync();
+        }
+        catch (Exception ex)
+        {
+            _notifications.ShowError("Playback failed", ex);
+        }
     }
 
     private async Task SaveVolumeLaterAsync(double volume)

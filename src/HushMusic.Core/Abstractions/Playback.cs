@@ -51,17 +51,36 @@ public sealed record ResolvedStream
 
     /// <summary>A live radio stream: endless, no duration, never expires.</summary>
     public bool IsLive { get; init; }
+
+    /// <summary>
+    /// When the stream host starts serving <see cref="Url"/>; it refuses the link until then. Null when it works at once.
+    /// <see cref="IStreamResolver"/> only hands out links that already work, so this is for logging and caching.
+    /// </summary>
+    public DateTimeOffset? AvailableAt { get; init; }
+
+    /// <summary>
+    /// Another format of the same track to try when Windows can't open or decode this one (a different container or
+    /// codec, from the same resolve), or null when there is none.
+    /// </summary>
+    public ResolvedStream? Fallback { get; init; }
 }
 
 /// <summary>All stream resolution goes through this one interface. Implemented by HushMusic.Playback (yt-dlp).</summary>
 public interface IStreamResolver
 {
-    /// <summary>Returns a cached stream if it is still valid, otherwise resolves a new one.</summary>
+    /// <summary>
+    /// Returns a cached stream if it is still valid, otherwise resolves a new one. The link works when this returns:
+    /// YouTube holds a freshly resolved link back for a few seconds (<see cref="ResolvedStream.AvailableAt"/>), and this
+    /// waits for it. Throws <see cref="StreamResolutionException"/> when there is no stream
+    /// (<see cref="StreamResolutionException.Reason"/> says why, when it is known).
+    /// </summary>
     Task<ResolvedStream> ResolveAsync(string videoId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Resolves the stream of a queue item. Live radio stations (<see cref="Track.Station"/>) carry their own URL; the
-    /// player always calls this overload. (The default implementation, for test fakes, resolves by video id.)
+    /// player always calls this overload. An age-restricted track may play its <see cref="Track.Counterpart"/> instead
+    /// (the stream's <see cref="ResolvedStream.VideoId"/> then names it). (The default implementation, for test fakes,
+    /// resolves by video id.)
     /// </summary>
     Task<ResolvedStream> ResolveAsync(Track track, CancellationToken cancellationToken = default)
     {

@@ -20,4 +20,8 @@
     <ProjectReference Include="..\..\src\HushMusic.Playback\HushMusic.Playback.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

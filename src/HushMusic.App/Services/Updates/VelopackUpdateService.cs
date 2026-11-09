@@ -41,6 +41,7 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
     private string? _offeredVersion;
     private string? _readyNoticeVersion;
     private bool _loggedUpToDate;
+    private int _failedChecksInARow;
     private Task? _loop;
 
     public VelopackUpdateService(
@@ -288,6 +289,7 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
             }
 
             var update = await _manager.CheckForUpdatesAsync().WaitAsync(linked.Token).ConfigureAwait(false);
+            _failedChecksInARow = 0;
             if (update is null)
             {
                 // Every five minutes: only the first answer goes to the log at Information.
@@ -314,7 +316,17 @@ internal sealed class VelopackUpdateService : IUpdateService, IHostedService, ID
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Updates: check failed");
+            // GitHub or the network can be down for hours: the first failure in a row is a warning, the rest go to the
+            // debug log, so a check every five minutes doesn't fill the log with the same stack trace.
+            if (_failedChecksInARow++ == 0)
+            {
+                _logger.LogWarning(ex, "Updates: check failed");
+            }
+            else
+            {
+                _logger.LogDebug("Updates: check failed again ({Count} in a row): {Reason}", _failedChecksInARow, ex.Message);
+            }
+
             if (!quiet)
             {
                 Update(UpdateState.Failed, error: Describe(ex), available: string.Empty);

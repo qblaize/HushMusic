@@ -516,11 +516,12 @@ public sealed class LiveReconnectPolicyTests
     private readonly ManualTimeProvider _time = new();
 
     [Fact]
-    public void Before_the_first_play_retries_once_quickly_and_never_after_a_fatal_error()
+    public void Before_the_first_play_retries_twice_and_never_after_a_fatal_error()
     {
         var policy = new LiveReconnectPolicy(_time);
 
-        Assert.Equal(LiveReconnectPolicy.FirstPlayRetryDelay, policy.OnFailure(fatal: false));
+        Assert.Equal(TimeSpan.FromSeconds(1), policy.OnFailure(fatal: false));
+        Assert.Equal(TimeSpan.FromSeconds(2), policy.OnFailure(fatal: false));
         Assert.Null(policy.OnFailure(fatal: false));
 
         policy.Reset();
@@ -528,14 +529,31 @@ public sealed class LiveReconnectPolicyTests
     }
 
     [Fact]
-    public void After_a_drop_backs_off_and_gives_up_after_four_attempts()
+    public void After_a_drop_backs_off_up_to_ten_seconds_and_gives_up_after_five_attempts()
     {
         var policy = new LiveReconnectPolicy(_time);
         policy.OnPlaying();
 
         Assert.Equal(
-            [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(8), null],
-            Enumerable.Range(0, 5).Select(_ => policy.OnFailure(fatal: false)).ToArray());
+            [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10), null],
+            Enumerable.Range(0, 6).Select(_ => policy.OnFailure(fatal: false)).ToArray());
+    }
+
+    [Fact]
+    public void A_connection_that_plays_only_briefly_keeps_counting_towards_giving_up()
+    {
+        var policy = new LiveReconnectPolicy(_time);
+        var delays = new List<TimeSpan?>();
+        for (var i = 0; i <= LiveReconnectPolicy.MaxAttempts; i++)
+        {
+            // Each reconnect plays 20 s, then the stream freezes and the loss is noticed 12 s later.
+            Play(policy, TimeSpan.FromSeconds(20));
+            _time.Advance(TimeSpan.FromSeconds(12));
+            delays.Add(policy.OnFailure(fatal: false));
+        }
+
+        Assert.Equal([1, 2, 5, 10, 10], delays.Take(LiveReconnectPolicy.MaxAttempts).Select(d => d?.TotalSeconds).ToArray());
+        Assert.Null(delays[^1]);
     }
 
     [Fact]
@@ -557,13 +575,25 @@ public sealed class LiveReconnectPolicyTests
         policy.OnFailure(fatal: false);
 
         // Reconnected, then played long enough to count as healthy again.
-        policy.OnPlaying();
-        _time.Advance(LiveReconnectPolicy.StableAfter);
+        Play(policy, LiveReconnectPolicy.StableAfter);
         Assert.Equal(TimeSpan.FromSeconds(1), policy.OnFailure(fatal: false));
 
         // A connection that drops again quickly keeps counting.
-        policy.OnPlaying();
-        _time.Advance(TimeSpan.FromSeconds(5));
+        Play(policy, TimeSpan.FromSeconds(5));
+        Assert.Equal(TimeSpan.FromSeconds(2), policy.OnFailure(fatal: false));
+    }
+
+    [Fact]
+    public void The_time_it_took_to_notice_a_loss_does_not_count_as_playing()
+    {
+        var policy = new LiveReconnectPolicy(_time);
+        Play(policy, TimeSpan.FromSeconds(10));
+        policy.OnFailure(fatal: false);
+
+        // Plays 25 s, then nothing for a minute before the loss is noticed: still not a stable connection.
+        Play(policy, TimeSpan.FromSeconds(25));
+        _time.Advance(TimeSpan.FromMinutes(1));
+
         Assert.Equal(TimeSpan.FromSeconds(2), policy.OnFailure(fatal: false));
     }
 
@@ -572,7 +602,7 @@ public sealed class LiveReconnectPolicyTests
     {
         var policy = new LiveReconnectPolicy(_time);
         policy.OnPlaying();
-        for (var i = 0; i < LiveReconnectPolicy.MaxAttemptsAfterDrop; i++)
+        for (var i = 0; i <= LiveReconnectPolicy.MaxAttempts; i++)
         {
             policy.OnFailure(fatal: false);
         }
@@ -581,6 +611,17 @@ public sealed class LiveReconnectPolicyTests
 
         Assert.True(policy.HasPlayed);
         Assert.Equal(TimeSpan.FromSeconds(1), policy.OnFailure(fatal: false));
+    }
+
+    // The player reports audio every time the position moves (about four times a second).
+    private void Play(LiveReconnectPolicy policy, TimeSpan length)
+    {
+        policy.OnPlaying();
+        for (var played = TimeSpan.Zero; played < length; played += TimeSpan.FromMilliseconds(250))
+        {
+            _time.Advance(TimeSpan.FromMilliseconds(250));
+            policy.OnPlaying();
+        }
     }
 }
 

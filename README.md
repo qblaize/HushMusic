@@ -316,6 +316,9 @@ parser details in [docs/innertube-requests.md](docs/innertube-requests.md) and
 ## Known limitations
 
 - Real Google sign-in inside the embedded window can be blocked by Google; the cookie-header paste is the fallback.
+- Age-restricted songs don't play anonymously: YouTube asks to sign in for them. Turning on "Use my account when
+  resolving streams" plays them with your account (Hush still tries without it first). Hush tells you when a song is
+  skipped for this reason.
 - Radio song titles come from the station's ICY metadata, read over a short extra connection every 15 seconds (about
   10–30 % of the stream's bandwidth while a station plays). Shoutcast v1 servers show no titles, and HLS-only stations
   are left out.

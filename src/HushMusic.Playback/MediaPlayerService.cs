@@ -27,8 +27,10 @@ namespace HushMusic.Playback;
 /// must not stop the music. Loads are cancelled by newer loads, <see cref="Stop"/> and disposal.
 /// <para>
 /// Live radio items (<see cref="Track.IsLiveRadio"/>) differ: no duration and no seeking; pausing drops the connection
-/// and Play reconnects at the live edge; a stream that drops or ends is reconnected with a backoff
-/// (<see cref="LiveReconnectPolicy"/>) instead of moving on; the ICY title reader runs only while the station plays.
+/// and Play reconnects at the live edge; a stream that drops, ends or stalls (<see cref="LiveStallWatchdog"/>: no audio
+/// while connecting or buffering, or a position that stops moving) is reconnected with a backoff
+/// (<see cref="LiveReconnectPolicy"/>) instead of moving on, and reported once it gives up; the ICY title reader runs
+/// only while the station plays.
 /// </para>
 /// <para>
 /// Transitions use two MediaPlayers. One plays the current item; the other is the spare. Shortly before the current
@@ -190,6 +192,9 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
 
         /// <summary>Re-resolve after a media failure (uses up the one retry).</summary>
         Retry,
+
+        /// <summary>Open the stream's <see cref="ResolvedStream.Fallback"/> format after Windows couldn't play this one.</summary>
+        Fallback,
 
         /// <summary>Re-resolve because the URL is about to expire.</summary>
         Refresh,
@@ -672,6 +677,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         _volumeSaveTimer.Dispose();
         _transitionTimer.Dispose();
         _fadeTimer.Dispose();
+        _liveWatchdogTimer?.Dispose();
         if (saveVolume)
         {
             SaveVolume();
@@ -759,9 +765,16 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
     /// <summary>
     /// Makes <paramref name="item"/> the loaded item and starts resolving + opening it, or, when it is the preloaded
     /// item, starts that at once. The returned task completes when the media source is set (or the load failed or was
-    /// superseded); it never faults.
+    /// superseded); it never faults. <paramref name="stream"/> opens that stream instead of resolving one.
     /// </summary>
-    private Task LoadAsync(QueueItem item, bool autoplay, TimeSpan startAt, LoadKind kind, CancellationToken waitToken, long? onlyIfLoadId = null)
+    private Task LoadAsync(
+        QueueItem item,
+        bool autoplay,
+        TimeSpan startAt,
+        LoadKind kind,
+        CancellationToken waitToken,
+        long? onlyIfLoadId = null,
+        ResolvedStream? stream = null)
     {
         var loadId = 0L;
         CancellationTokenSource? cts = null;
@@ -812,6 +825,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                     case LoadKind.Retry:
                         _retried = true;
                         break;
+                    case LoadKind.Fallback:
                     case LoadKind.Refresh:
                     case LoadKind.Reconnect:
                     case LoadKind.Output:
@@ -844,7 +858,9 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                     });
                 }
 
-                SetStatusNoLock(PlaybackStatus.Loading);
+                // Reconnecting a live station stays "reconnecting" until it plays; anything new starts afresh.
+                SetStatusNoLock(PlaybackStatus.Loading, reconnecting: !newItem && _reconnecting);
+                WatchNewLiveConnectionNoLock();
             }
         }
 
@@ -855,18 +871,18 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         }
 
         // Start (or join) the new resolve before cancelling the old one, so a shared yt-dlp run is not killed in between.
-        var work = ResolveAndOpenAsync(item, loadId, cts!.Token);
+        var work = ResolveAndOpenAsync(item, loadId, stream, cts!.Token);
         previous?.Cancel();
         dropped?.Cancel();
         return waitToken.CanBeCanceled ? work.WaitAsync(waitToken) : work;
     }
 
-    private async Task ResolveAndOpenAsync(QueueItem item, long loadId, CancellationToken cancellationToken)
+    private async Task ResolveAndOpenAsync(QueueItem item, long loadId, ResolvedStream? resolved, CancellationToken cancellationToken)
     {
         ResolvedStream stream;
         try
         {
-            stream = await _resolver.ResolveAsync(item.Track, cancellationToken).ConfigureAwait(false);
+            stream = resolved ?? await _resolver.ResolveAsync(item.Track, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -947,7 +963,10 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
 
             DetachSourceNoLock();
             _consecutiveFailures++;
-            skip = _loadKind == LoadKind.AutoAdvance && _consecutiveFailures < MaxConsecutiveFailures;
+
+            // An age-restricted track can't play however it was started: go on to the next one instead of stopping there.
+            var ageRestricted = exception is StreamResolutionException { Reason: StreamFailureReason.AgeRestricted };
+            skip = (_loadKind == LoadKind.AutoAdvance || ageRestricted) && _consecutiveFailures < MaxConsecutiveFailures;
             SetStatusNoLock(PlaybackStatus.Failed);
             Post(() => PlaybackFailed?.Invoke(this, new PlaybackErrorEventArgs(item.Track, message, exception)));
         }
@@ -1051,6 +1070,11 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                 return;
             }
 
+            if (_item?.Track.IsLiveRadio == true)
+            {
+                _logger.LogDebug("Live station {Station}: {State}", _item.Track.Title, state);
+            }
+
             if (state == MediaPlaybackState.Paused && _autoplay && !_starting && _item?.Track.IsLiveRadio == true)
             {
                 // We never pause a live stream ourselves (pausing disconnects): this is a drop (MediaEnded follows and
@@ -1080,7 +1104,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                 _autoplay = true;
                 if (_item?.Track.Station is { } station)
                 {
-                    _livePolicy.OnPlaying();
+                    // The reconnect policy counts it as playing once the position moves (SampleLiveNoLock).
                     Post(() => _radio.Follow(station));
                 }
             }
@@ -1283,6 +1307,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         LoadKind? next;
         bool autoplay;
         TimeSpan resumeAt;
+        ResolvedStream? fallback;
         lock (_gate)
         {
             if (_disposed)
@@ -1312,9 +1337,13 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                 return;
             }
 
-            // Reopening costs ~0.3 s, re-resolving ~2.5 s (a yt-dlp run). Network hiccups such as a failed lookup of a
-            // fresh googlevideo host (0xC00D2EE7) recover with the same URL; only a rejected URL needs a new one.
-            next = !_reopened && !IsRejectedUrl(hresult) ? LoadKind.Reopen
+            // A format Windows can't play fails the same way from any link to it: try another format of the same resolve.
+            // Otherwise, reopening costs ~0.3 s, re-resolving ~2.5 s (a yt-dlp run). Network hiccups recover with the
+            // same URL; only a rejected URL needs a new one. (Media Foundation reports some refusals as 0xC00D2EE7,
+            // "server name not found", rather than as an HTTP error.)
+            fallback = IsFormatFailure(args, hresult) ? _stream?.Fallback : null;
+            next = fallback is not null ? LoadKind.Fallback
+                : !_reopened && !IsRejectedUrl(hresult) ? LoadKind.Reopen
                 : !_retried ? LoadKind.Retry
                 : null;
             autoplay = _autoplay;
@@ -1329,6 +1358,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
             hresult,
             next switch
             {
+                LoadKind.Fallback => $"trying {fallback!.Container}/{fallback.Codec} instead",
                 LoadKind.Reopen => "reopening the same URL",
                 LoadKind.Retry => "re-resolving once",
                 _ => "giving up",
@@ -1345,10 +1375,12 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
             _resolver.Invalidate(item.Track.VideoId);
         }
 
-        _ = Task.Run(() => LoadAsync(item, autoplay, resumeAt, kind, CancellationToken.None, onlyIfLoadId: loadId));
+        _ = Task.Run(() => LoadAsync(item, autoplay, resumeAt, kind, CancellationToken.None, onlyIfLoadId: loadId, stream: fallback));
     }
 
-    // Live radio: reconnect the same stream with a backoff (LiveReconnectPolicy), or give up and report it.
+    // Live radio: reconnect the same stream with a backoff (LiveReconnectPolicy), or give up and report it. Called for a
+    // failure, an end, or a stall (LiveStallWatchdog). The station's own URL is opened again, so a host that redirects to
+    // a tokenised address (zeno.fm) hands out a fresh one.
     private void RecoverLive(QueueItem item, long loadId, bool fatal, string reason, string message, Exception? exception)
     {
         TimeSpan? delay;
@@ -1356,11 +1388,13 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         int attempt;
         lock (_gate)
         {
-            if (loadId != _loadId || _disposed)
+            // Also skipped when this connection's loss is already handled (a stall and a failure can both report it).
+            if (loadId != _loadId || _disposed || loadId == _liveRecoveryFor)
             {
                 return;
             }
 
+            _liveRecoveryFor = loadId;
             autoplay = _autoplay;
             delay = autoplay ? _livePolicy.OnFailure(fatal) : null;
             attempt = _livePolicy.Attempts;
@@ -1375,9 +1409,10 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
 
             if (delay is not null)
             {
-                // Drop the dead connection now (its late events are ignored) and show buffering while waiting.
+                // Drop the dead connection now (its late events are ignored) and show "reconnecting" while waiting.
                 DetachSourceNoLock();
-                SetStatusNoLock(PlaybackStatus.Buffering);
+                SetStatusNoLock(PlaybackStatus.Buffering, reconnecting: true);
+                StopLiveWatchNoLock();
             }
         }
 
@@ -1419,8 +1454,10 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                 return;
             }
 
+            // Let go of the connection like a pause from the user (it would only buffer stale audio); Play connects again.
             _logger.LogInformation("Live station {Station} was paused by the system", _item?.Track.Title);
             _autoplay = false;
+            DetachSourceNoLock();
             SetStatusNoLock(PlaybackStatus.Paused);
             Post(() => _radio.Unfollow(forget: false));
         }
@@ -1449,14 +1486,19 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
             // MF_E_UNSUPPORTED_BYTESTREAM_TYPE, MF_E_UNSUPPORTED_FORMAT
             0xC00D36C4 or 0xC00D36C3 => "This station's audio format isn't supported.",
             _ when args.Error == MediaPlayerError.DecodingError => "This station's audio format isn't supported.",
-            _ when hasPlayed => "The station's stream keeps dropping. Try again later.",
-            _ => "Couldn't connect to this station.",
+            _ when hasPlayed => "The station's stream keeps dropping. Try again in a moment.",
+            _ => "The station's server couldn't be reached.",
         };
     }
 
     // HTTP_E_STATUS_* (0x8019xxxx, low word = HTTP status): the URL itself was refused (expired, wrong IP, gone).
     private static bool IsRejectedUrl(int hresult) =>
         ((uint)hresult & 0xFFFF0000u) == 0x80190000u && (hresult & 0xFFFF) is 401 or 403 or 404 or 410;
+
+    // Windows can't read the container or has no decoder for the codec, as opposed to the network or server failing:
+    // MF_E_UNSUPPORTED_BYTESTREAM_TYPE, MF_E_INVALID_FILE_FORMAT, MF_E_INVALIDMEDIATYPE, MF_E_TOPO_CODEC_NOT_FOUND.
+    private static bool IsFormatFailure(MediaPlayerFailedEventArgs args, int hresult) =>
+        args.Error == MediaPlayerError.DecodingError || (uint)hresult is 0xC00D36C4 or 0xC00D36BE or 0xC00D36B4 or 0xC00D5212;
 
     private void OnQueueCurrentChanged(object? sender, QueueCurrentChangedEventArgs e)
     {
@@ -1734,6 +1776,11 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
 
             position = PositionNoLock();
             duration = DurationNoLock();
+            if (_item?.Track.IsLiveRadio == true)
+            {
+                SampleLiveNoLock(position);
+            }
+
             if (_fadeOut is { } fading && tick % 4 == 0)
             {
                 var outgoing = _mixer.Levels(fading.Deck.Index);
@@ -1819,19 +1866,25 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         handler?.Invoke(this, new TrackChangedEventArgs(item?.Track, item));
     }
 
-    private void SetStatusNoLock(PlaybackStatus status)
+    private void SetStatusNoLock(PlaybackStatus status) => SetStatusNoLock(status, _reconnecting);
+
+    // "Reconnecting" (a live station connecting again after losing its stream) only goes with Loading or Buffering:
+    // playing, pausing, failing or stopping ends it.
+    private void SetStatusNoLock(PlaybackStatus status, bool reconnecting)
     {
-        if (_status == status)
+        reconnecting &= status is PlaybackStatus.Loading or PlaybackStatus.Buffering;
+        if (_status == status && _reconnecting == reconnecting)
         {
             return;
         }
 
         _status = status;
+        _reconnecting = reconnecting;
         var hasTrack = _item is not null;
         Post(() =>
         {
             _smtc.SetStatus(status, hasTrack);
-            StatusChanged?.Invoke(this, new PlaybackStatusChangedEventArgs(status));
+            StatusChanged?.Invoke(this, new PlaybackStatusChangedEventArgs(status, reconnecting));
         });
 
         if (!_disposed)
@@ -1842,6 +1895,8 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                 _transitionTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
         }
+
+        UpdateLiveWatchNoLock();
     }
 
     /// <summary>Invalidates the current load and closes its source. Returns the old token source; cancel it after leaving the lock.</summary>

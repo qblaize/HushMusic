@@ -318,8 +318,14 @@ public sealed class TaskbarPlayerService : IDisposable
                 Push();
                 break;
             case nameof(PlayerViewModel.PositionSeconds):
-                // The line moves at most once a second; a jump (seek) shows at once.
+                // The line moves at most once a second; a jump (seek) shows at once. Without a line (live radio, length
+                // unknown) there is nothing to redraw.
                 var progress = Progress();
+                if (progress is null && _sentProgress is null)
+                {
+                    break;
+                }
+
                 var now = DateTime.UtcNow.Ticks;
                 if (now - _lastProgressTicks >= ProgressIntervalTicks || (progress is null) != (_sentProgress is null)
                     || Math.Abs((progress ?? 0) - (_sentProgress ?? 0)) > 0.02)

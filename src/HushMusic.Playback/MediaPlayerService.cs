@@ -55,6 +55,9 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
     private const string LoadIdKey = "HushMusic.LoadId";
     private const int MaxConsecutiveFailures = 3;
     private static readonly TimeSpan PositionInterval = TimeSpan.FromMilliseconds(250);
+
+    // Live radio has no seek bar: once a second is enough for the stall watchdog.
+    private static readonly TimeSpan LivePositionInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan RestartThreshold = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan VolumeSaveDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan RefreshBeforeExpiry = TimeSpan.FromMinutes(2);
@@ -96,6 +99,7 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
     private FadeOut? _fadeOut;
     private PlaybackStatus _status = PlaybackStatus.Idle;
     private QueueItem? _item;
+    private TimeSpan _positionPeriod = Timeout.InfiniteTimeSpan; // how often _positionTimer ticks now
     private MediaSource? _source;
     private ResolvedStream? _stream;
     private CancellationTokenSource? _loadCts;
@@ -1774,6 +1778,13 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
                 return;
             }
 
+            // A station can follow a song (or the reverse) without the status changing.
+            if (PositionPeriodNoLock() is var period && period != _positionPeriod)
+            {
+                _positionPeriod = period;
+                _positionTimer.Change(period, period);
+            }
+
             position = PositionNoLock();
             duration = DurationNoLock();
             if (_item?.Track.IsLiveRadio == true)
@@ -1811,6 +1822,8 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
         });
         EvaluateTransition();
     }
+
+    private TimeSpan PositionPeriodNoLock() => _item?.Track.IsLiveRadio == true ? LivePositionInterval : PositionInterval;
 
     private void SaveVolume()
     {
@@ -1889,7 +1902,8 @@ public sealed partial class MediaPlayerService : IPlayer, IDisposable
 
         if (!_disposed)
         {
-            _positionTimer.Change(status == PlaybackStatus.Playing ? PositionInterval : Timeout.InfiniteTimeSpan, PositionInterval);
+            _positionPeriod = status == PlaybackStatus.Playing ? PositionPeriodNoLock() : Timeout.InfiniteTimeSpan;
+            _positionTimer.Change(_positionPeriod, _positionPeriod);
             if (status != PlaybackStatus.Playing)
             {
                 _transitionTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);

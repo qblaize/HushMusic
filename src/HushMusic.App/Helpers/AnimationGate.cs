@@ -5,13 +5,15 @@ namespace HushMusic.App.Helpers;
 /// <summary>
 /// Lets an endless animation (equaliser bars, the LIVE pulse, skeleton breathing, the Now Playing drift) run only while
 /// it can be seen: its element is loaded, it and every ancestor are visible, and the main window is on screen (not
-/// minimized or in the notification area). A running animation keeps the compositor drawing frames, also inside a
-/// collapsed view or a hidden window, so one left running there costs CPU for nothing.
+/// minimized, in the notification area, or completely covered by other windows). A running animation keeps the
+/// compositor redrawing the whole window every frame, also inside a collapsed view or a hidden or covered window, so one
+/// left running there costs CPU for nothing.
 /// </summary>
 /// <remarks>
 /// The owner says when it wants to animate (<see cref="IsWanted"/>), and the callback it passed in is called when the
 /// animation may start (true) or must stop (false). While it is wanted, the gate re-checks after every layout pass (showing or
-/// collapsing any ancestor causes one) and whenever the window is shown or hidden.
+/// collapsing any ancestor causes one), whenever the window is shown or hidden, and when it becomes covered or uncovered
+/// (<see cref="WindowPresence.CoverageChanged"/>).
 /// </remarks>
 internal sealed class AnimationGate
 {
@@ -64,7 +66,7 @@ internal sealed class AnimationGate
     {
         var listen = _wanted && _element.IsLoaded;
         Listen(listen);
-        var open = listen && !WindowPresence.Hides(_element) && IsInVisibleTree(_element);
+        var open = listen && !WindowPresence.HidesAnimation(_element) && IsInVisibleTree(_element);
         if (open != IsOpen)
         {
             IsOpen = open;
@@ -84,11 +86,13 @@ internal sealed class AnimationGate
         {
             _element.LayoutUpdated += OnLayoutUpdated;
             WindowPresence.Changed += OnWindowVisibilityChanged;
+            WindowPresence.CoverageChanged += OnWindowVisibilityChanged;
         }
         else
         {
             _element.LayoutUpdated -= OnLayoutUpdated;
             WindowPresence.Changed -= OnWindowVisibilityChanged;
+            WindowPresence.CoverageChanged -= OnWindowVisibilityChanged;
         }
     }
 

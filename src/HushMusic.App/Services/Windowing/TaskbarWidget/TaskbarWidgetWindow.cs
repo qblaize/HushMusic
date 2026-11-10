@@ -19,6 +19,10 @@ namespace HushMusic.App.Services.Windowing.TaskbarWidget;
 /// As a child of the taskbar it moves and hides with it (auto-hide, full-screen apps) and dies with it. A hidden
 /// top-level window on the same thread hears "TaskbarCreated" (Explorer restarted), display and theme changes.
 /// </para>
+/// <para>
+/// Its text colour follows what actually shows behind it (<see cref="TaskbarBackdropSampler"/>): on a see-through taskbar
+/// that is the wallpaper, whatever Windows' light / dark mode says. Until the first sample it follows that mode.
+/// </para>
 /// </summary>
 internal sealed class TaskbarWidgetWindow : IDisposable
 {
@@ -27,14 +31,22 @@ internal sealed class TaskbarWidgetWindow : IDisposable
     private const uint StateMessage = Win32.WmApp + 20;
     private const uint ProbeMessage = Win32.WmApp + 21;
     private const uint StopMessage = Win32.WmApp + 22;
+    private const uint SampleMessage = Win32.WmApp + 23;
     private const int OpenAppCommand = 1;
     private const int HidePlayerCommand = 2;
     private const uint LayoutIntervalMs = 2500;
     private const uint VolumeOverlayMs = 1500;
+
+    // A moved or newly shown player is sampled once its new frame is on screen; otherwise every fourth layout check
+    // (10 s), which also catches wallpaper slideshows and taskbar tools that change with maximized windows.
+    private const uint SampleDelayMs = 400;
+    private const int SampleEveryLayoutChecks = 4;
+    private const int SpiSetDeskWallpaper = 0x0014;
     private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
     private static readonly UIntPtr LayoutTimer = new(1);
     private static readonly UIntPtr OverlayTimer = new(2);
+    private static readonly UIntPtr SampleTimer = new(3);
 
     // One window class per process for all instances, so the procedure never points at a collected delegate.
     private static readonly Win32.WndProc StaticProc = StaticWindowProc;
@@ -56,12 +68,16 @@ internal sealed class TaskbarWidgetWindow : IDisposable
     // Widget thread only from here on.
     private TaskbarWidgetRenderer? _renderer;
     private TaskbarProbe? _probe;
+    private TaskbarBackdropSampler? _sampler;
     private IntPtr _taskbar;
     private IntPtr _widget;
     private PixelRect? _placed;
     private TaskbarWidgetGeometry? _geometry;
     private int _reportedCoverSize;
     private bool _light;
+    private bool? _lightBackdrop;
+    private bool _shadow;
+    private int _layoutChecks;
     private TaskbarWidgetPart _hover;
     private TaskbarWidgetPart _pressed;
     private bool _trackingLeave;
@@ -189,6 +205,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
 
             _renderer = new TaskbarWidgetRenderer();
             _probe = new TaskbarProbe(host, ProbeMessage, _logger);
+            _sampler = new TaskbarBackdropSampler(host, SampleMessage, _logger);
             _light = ReadLightTaskbar();
             WidgetNative.SetTimer(host, LayoutTimer, LayoutIntervalMs, IntPtr.Zero);
             Embed();
@@ -268,6 +285,9 @@ internal sealed class TaskbarWidgetWindow : IDisposable
             case ProbeMessage:
                 Relayout();
                 return IntPtr.Zero;
+            case SampleMessage:
+                OnBackdropSampled();
+                return IntPtr.Zero;
             case StopMessage:
                 DestroyWidget();
                 Win32.DestroyWindow(_host);
@@ -277,6 +297,10 @@ internal sealed class TaskbarWidgetWindow : IDisposable
                 return IntPtr.Zero;
             case WidgetNative.WmTimer when (nuint)wParam == LayoutTimer:
                 OnLayoutTimer();
+                return IntPtr.Zero;
+            case WidgetNative.WmTimer when (nuint)wParam == SampleTimer:
+                WidgetNative.KillTimer(_host, SampleTimer);
+                SampleBackdrop();
                 return IntPtr.Zero;
             case WidgetNative.WmTimer when (nuint)wParam == OverlayTimer:
                 WidgetNative.KillTimer(_host, OverlayTimer);
@@ -288,6 +312,11 @@ internal sealed class TaskbarWidgetWindow : IDisposable
                 {
                     _light = ReadLightTaskbar();
                     Render();
+                    ScheduleSample();
+                }
+                else if ((int)wParam == SpiSetDeskWallpaper)
+                {
+                    ScheduleSample();
                 }
 
                 // Taskbar alignment and similar settings arrive here too.
@@ -408,6 +437,10 @@ internal sealed class TaskbarWidgetWindow : IDisposable
         }
 
         Relayout();
+        if (++_layoutChecks % SampleEveryLayoutChecks == 0)
+        {
+            SampleBackdrop();
+        }
     }
 
     private void RequestProbe()
@@ -521,6 +554,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
             if (_placed != rect)
             {
                 _logger.LogDebug("Taskbar player on the {Name} at {X},{Y} {Width}x{Height} (scale {Scale})", TaskbarName, rect.X, rect.Y, rect.Width, rect.Height, scale);
+                ScheduleSample();
             }
 
             _placed = rect;
@@ -636,7 +670,7 @@ internal sealed class TaskbarWidgetWindow : IDisposable
             return;
         }
 
-        var visuals = new WidgetVisuals(_hover, _pressed, _overlayVolume, _overlayMuted, _light);
+        var visuals = new WidgetVisuals(_hover, _pressed, _overlayVolume, _overlayMuted, _lightBackdrop ?? _light, _shadow);
         _renderer.Render(_bits, width * 4, geometry, _state, visuals);
 
         var size = new WidgetNative.Size(width, height);
@@ -646,6 +680,59 @@ internal sealed class TaskbarWidgetWindow : IDisposable
         {
             Problem($"UpdateLayeredWindow failed (error {Marshal.GetLastPInvokeError()})");
         }
+    }
+
+    private void ScheduleSample()
+    {
+        if (_host != IntPtr.Zero)
+        {
+            WidgetNative.SetTimer(_host, SampleTimer, SampleDelayMs, IntPtr.Zero);
+        }
+    }
+
+    // Hands the sampler the player's screen rectangle and its current pixels (to leave out). Skipped while the player
+    // shows more than its idle look, or before its frame matches its size.
+    private void SampleBackdrop()
+    {
+        if (_sampler is null || _widget == IntPtr.Zero || _placed is not { } placed || _bits == IntPtr.Zero
+            || _hover != TaskbarWidgetPart.None || _pressed != TaskbarWidgetPart.None || _overlayVolume is not null
+            || _dibWidth != placed.Width || _dibHeight != placed.Height || !WidgetNative.IsWindowVisible(_widget)
+            || !Win32.GetWindowRect(_widget, out var screen) || screen.Right - screen.Left != placed.Width || screen.Bottom - screen.Top != placed.Height)
+        {
+            return;
+        }
+
+        var overlay = new byte[placed.Width * placed.Height * 4];
+        Marshal.Copy(_bits, overlay, 0, overlay.Length);
+        _sampler.Request(screen, overlay);
+    }
+
+    private void OnBackdropSampled()
+    {
+        if (_sampler?.Latest is not { Reading: { } reading } result)
+        {
+            return;
+        }
+
+        var current = _lightBackdrop ?? _light;
+        var lightText = TaskbarBackdrop.UseLightText(reading, lightText: !current);
+        var shadow = TaskbarBackdrop.NeedsShadow(reading, lightText);
+        if (_lightBackdrop == !lightText && _shadow == shadow)
+        {
+            return;
+        }
+
+        _logger.LogDebug(
+            "Taskbar player on the {Name}: {Text} text{Shadow} ({Dark:P0} of the backdrop dark, {Light:P0} light; sampled in {Elapsed:0.0} ms)",
+            TaskbarName,
+            lightText ? "light" : "dark",
+            shadow ? " with a shadow" : string.Empty,
+            reading.DarkShare,
+            reading.LightShare,
+            result.Milliseconds);
+        _lightBackdrop = !lightText;
+        _shadow = shadow;
+        Render();
     }
 
     private bool EnsureDib(int width, int height)

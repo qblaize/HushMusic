@@ -7,8 +7,9 @@ namespace HushMusic.App.Services.Windowing.TaskbarWidget;
 
 /// <summary>Hover, press and volume feedback of the taskbar player (widget thread state).</summary>
 /// <param name="OverlayVolume">Non-null while the wheel changes the volume: shown instead of the text.</param>
-/// <param name="LightTaskbar">The taskbar (Windows "system mode") is light.</param>
-internal readonly record struct WidgetVisuals(TaskbarWidgetPart Hover, TaskbarWidgetPart Pressed, double? OverlayVolume, bool OverlayMuted, bool LightTaskbar);
+/// <param name="LightTaskbar">What shows behind the player is light (dark text): the sampled backdrop, else Windows' system mode.</param>
+/// <param name="Shadow">The backdrop is busy (a photo through a see-through taskbar): text and icons get a soft halo.</param>
+internal readonly record struct WidgetVisuals(TaskbarWidgetPart Hover, TaskbarWidgetPart Pressed, double? OverlayVolume, bool OverlayMuted, bool LightTaskbar, bool Shadow = false);
 
 /// <summary>
 /// Draws the taskbar player with GDI+ into a premultiplied BGRA buffer (a DIB section for UpdateLayeredWindow, or a
@@ -31,6 +32,9 @@ internal sealed class TaskbarWidgetRenderer : IDisposable
     private static readonly string[] RegularFamilies = ["Segoe UI Variable Text", "Segoe UI"];
     private static readonly string[] IconFamilies = ["Segoe Fluent Icons", "Segoe MDL2 Assets"];
 
+    // Halo offsets, in device pixels times the scale: around the glyph, a little heavier below (like desktop icon labels).
+    private static readonly (float X, float Y)[] HaloOffsets = [(-1, 0), (1, 0), (0, -1), (0, 1), (0, 1.5f)];
+
     private readonly Dictionary<string, IntPtr> _families = new(StringComparer.Ordinal);
     private Fonts? _fonts;
     private IntPtr _brush;
@@ -38,6 +42,8 @@ internal sealed class TaskbarWidgetRenderer : IDisposable
     private IntPtr _textFormat;
     private IntPtr _centerFormat;
     private bool _disposed;
+    private uint _halo;      // 0xAARRGGBB of this frame's text halo, 0 for none
+    private float _haloStep;
 
     /// <summary>Draws one frame into <paramref name="scan0"/> (top-down, <paramref name="stride"/> bytes per row).</summary>
     public void Render(IntPtr scan0, int stride, TaskbarWidgetGeometry g, TaskbarWidgetState state, WidgetVisuals visuals)
@@ -104,6 +110,8 @@ internal sealed class TaskbarWidgetRenderer : IDisposable
     private void Draw(IntPtr graphics, TaskbarWidgetGeometry g, TaskbarWidgetState state, WidgetVisuals visuals)
     {
         var palette = Palette.For(visuals.LightTaskbar);
+        _halo = visuals.Shadow ? palette.Halo : 0;
+        _haloStep = Math.Max(1f, (float)g.Scale);
         GdiPlus.GdipGraphicsClear(graphics, HitTestFill);
         GdiPlus.GdipSetSmoothingMode(graphics, GdiPlus.SmoothingModeAntiAlias);
         GdiPlus.GdipSetPixelOffsetMode(graphics, GdiPlus.PixelOffsetModeHalf);
@@ -252,19 +260,39 @@ internal sealed class TaskbarWidgetRenderer : IDisposable
     private void DrawGlyph(IntPtr graphics, char glyph, FontInfo font, PixelRect rect, uint color)
     {
         GdiPlus.GdipSetTextRenderingHint(graphics, GdiPlus.TextRenderingHintAntiAlias);
-        SetBrush(color);
+        var text = glyph.ToString();
         var layout = new GdiPlus.RectF(rect.X, rect.Y, rect.Width, rect.Height);
-        GdiPlus.GdipDrawString(graphics, glyph.ToString(), 1, font.Handle, ref layout, _centerFormat, _brush);
+        DrawHalo(graphics, text, font, layout, _centerFormat);
+        SetBrush(color);
+        GdiPlus.GdipDrawString(graphics, text, 1, font.Handle, ref layout, _centerFormat, _brush);
     }
 
     // One line of text with an ellipsis, placed by its baseline.
     private void DrawLine(IntPtr graphics, string text, FontInfo font, float x, float width, float baseline, uint color)
     {
         GdiPlus.GdipSetTextRenderingHint(graphics, GdiPlus.TextRenderingHintAntiAlias);
-        SetBrush(color);
         // A single line (no wrap), so the box can be taller than the line: GDI+ drops a trimmed line that doesn't fit.
         var layout = new GdiPlus.RectF(x, baseline - font.Ascent, width, font.LineHeight * 2);
+        DrawHalo(graphics, text, font, layout, _textFormat);
+        SetBrush(color);
         GdiPlus.GdipDrawString(graphics, text, text.Length, font.Handle, ref layout, _textFormat, _brush);
+    }
+
+    // On a busy backdrop: the text drawn a pixel around itself in the opposite colour first, so it reads on any part of
+    // a photo. Nothing on a plain taskbar.
+    private void DrawHalo(IntPtr graphics, string text, FontInfo font, GdiPlus.RectF layout, IntPtr format)
+    {
+        if (_halo == 0)
+        {
+            return;
+        }
+
+        SetBrush(_halo);
+        foreach (var (dx, dy) in HaloOffsets)
+        {
+            var shifted = new GdiPlus.RectF(layout.X + (dx * _haloStep), layout.Y + (dy * _haloStep), layout.Width, layout.Height);
+            GdiPlus.GdipDrawString(graphics, text, text.Length, font.Handle, ref shifted, format, _brush);
+        }
     }
 
     private float Measure(IntPtr graphics, string text, FontInfo font)
@@ -391,10 +419,11 @@ internal sealed class TaskbarWidgetRenderer : IDisposable
         uint PressedFill,
         uint Track,
         uint Placeholder,
-        uint CoverStroke)
+        uint CoverStroke,
+        uint Halo)
     {
-        private static readonly Palette Dark = new(false, 0xFFFFFFFF, 0xC5FFFFFF, 0x0FFFFFFF, 0x12FFFFFF, 0x0AFFFFFF, 0x29FFFFFF, 0x1AFFFFFF, 0x14FFFFFF);
-        private static readonly Palette LightPalette = new(true, 0xE4000000, 0x9E000000, 0x0D000000, 0x0F000000, 0x08000000, 0x24000000, 0x14000000, 0x14000000);
+        private static readonly Palette Dark = new(false, 0xFFFFFFFF, 0xC5FFFFFF, 0x0FFFFFFF, 0x12FFFFFF, 0x0AFFFFFF, 0x29FFFFFF, 0x1AFFFFFF, 0x14FFFFFF, 0x66000000);
+        private static readonly Palette LightPalette = new(true, 0xE4000000, 0x9E000000, 0x0D000000, 0x0F000000, 0x08000000, 0x24000000, 0x14000000, 0x14000000, 0x80FFFFFF);
 
         public static Palette For(bool light) => light ? LightPalette : Dark;
 

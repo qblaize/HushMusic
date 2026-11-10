@@ -112,7 +112,8 @@ Windows taskbar.
 - Keep playing from the notification area when the window is closed, and start with Windows.
 - Taskbar player (optional): cover, title and controls in the empty left part of the Windows 11 taskbar. Scroll over
   it to change the volume; click it for a flyout with seek, shuffle, repeat, like, volume and the next three songs.
-  Show it on the main display, on all displays, or on one you choose.
+  Show it on the main display, on all displays, or on one you choose. Its text turns light or dark to match what
+  shows behind it, so it stays readable on a see-through taskbar over a wallpaper.
 - **Global shortcuts** (optional, rebindable): control playback, volume and likes from anywhere, even while Hush is
   in the background.
 - **Song notifications** (optional): a silent notification with the cover and a Next button when a new song starts

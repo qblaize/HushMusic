@@ -11,16 +11,22 @@ namespace HushMusic.App.ViewModels.Pages;
 public sealed partial class AlbumViewModel : PageViewModelBase, ITrackListHost, ITrackSelectionHost
 {
     private readonly IBrowseApi _browse;
+    private readonly IPlaylistExportService _export;
     private string? _browseId;
 
-    public AlbumViewModel(IBrowseApi browse, PageServices services)
+    public AlbumViewModel(IBrowseApi browse, IPlaylistExportService export, PinToggle pin, PageServices services)
         : base(services)
     {
         _browse = browse;
+        _export = export;
+        Pin = pin;
         Selection = new TrackSelection(Tracks, services.Actions, CurrentSource);
     }
 
     public ObservableCollection<TrackItem> Tracks { get; } = [];
+
+    /// <summary>The menu's "Pin to sidebar" / "Unpin from sidebar".</summary>
+    public PinToggle Pin { get; }
 
     public TrackSelection Selection { get; }
 
@@ -83,7 +89,11 @@ public sealed partial class AlbumViewModel : PageViewModelBase, ITrackListHost, 
         return LoadAsync();
     }
 
-    protected override void OnNavigatedFromCore() => Selection.Exit();
+    protected override void OnNavigatedFromCore()
+    {
+        Selection.Exit();
+        Pin.Detach();
+    }
 
     protected override Task LoadAsync()
     {
@@ -108,6 +118,7 @@ public sealed partial class AlbumViewModel : PageViewModelBase, ITrackListHost, 
                 Description = page.Description;
                 Stats = ItemFormat.Join(ItemFormat.TrackCount(page.TrackCount ?? page.Tracks.Count), page.DurationText);
                 OtherVersions = page.OtherVersions;
+                Pin.Attach(SidebarPinItems.For(album with { BrowseId = browseId }));
 
                 Selection.Exit();
                 Tracks.Clear();
@@ -151,6 +162,14 @@ public sealed partial class AlbumViewModel : PageViewModelBase, ITrackListHost, 
 
     [RelayCommand]
     private Task AddToPlaylistAsync() => Actions.AddToPlaylistAsync(AvailableTracks());
+
+    /// <summary>"Export…": the album's songs (all on the page already) as CSV or M3U.</summary>
+    [RelayCommand]
+    private Task ExportAsync()
+    {
+        IReadOnlyList<Track> tracks = [.. Tracks.Select(t => t.Track)];
+        return Album is null ? Task.CompletedTask : _export.ExportAsync(Title, "album", _ => Task.FromResult(tracks));
+    }
 
     private List<Track> AvailableTracks() => [.. Tracks.Select(t => t.Track).Where(t => t.IsAvailable)];
 

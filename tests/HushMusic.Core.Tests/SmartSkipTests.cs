@@ -211,10 +211,10 @@ public sealed class SmartSkipTests
     [Fact]
     public void Without_smart_skip_nothing_is_left_out()
     {
-        ISmartSkip? none = null;
+        IAutoQueueFilter? none = null;
         Assert.Equal(["a", "b"], none.WithoutLeftOut(Tracks("a", "b")).Select(t => t.VideoId));
 
-        var skip = new StubSmartSkip("b");
+        var skip = new AutoQueueFilter(new StubSmartSkip("b"));
         Assert.Equal(["a", "c"], skip.WithoutLeftOut(Tracks("a", "b", "c")).Select(t => t.VideoId));
     }
 
@@ -247,7 +247,7 @@ public sealed class SmartSkipTests
     {
         var queue = new QueueService();
         var watch = new FakeWatchApi { OnContinuation = (_, _) => Task.FromResult(new Paged<Track>(Tracks("p", "skipped", "q"), null)) };
-        var extender = new QueueAutoExtender(queue, watch, NullLogger<QueueAutoExtender>.Instance, new StubSmartSkip("skipped"));
+        var extender = new QueueAutoExtender(queue, watch, NullLogger<QueueAutoExtender>.Instance, new AutoQueueFilter(new StubSmartSkip("skipped")));
         await extender.StartAsync(TestContext.Current.CancellationToken);
         try
         {
@@ -272,7 +272,7 @@ public sealed class SmartSkipTests
         var queue = new QueueService();
         var player = new FakePlayer();
         var watch = new FakeWatchApi { OnGet = call => Task.FromResult(new WatchPlaylist { Tracks = Tracks(call.VideoId!, "s1", "skipped", "s2") }) };
-        var autoplay = new QueueAutoplay(queue, player, watch, new FakeSettings(), NullLogger<QueueAutoplay>.Instance, new StubSmartSkip("skipped"));
+        var autoplay = new QueueAutoplay(queue, player, watch, new FakeSettings(), NullLogger<QueueAutoplay>.Instance, new AutoQueueFilter(new StubSmartSkip("skipped")));
         await autoplay.StartAsync(TestContext.Current.CancellationToken);
         try
         {
@@ -360,7 +360,7 @@ public sealed class SmartSkipTests
     }
 
     private static PlaybackActions CreateActions(QueueService queue, FakeWatchApi watch, ISmartSkip smartSkip) =>
-        new(queue, new FakePlayer(), watch, new FakeBrowseApi(), new FakeNotifications(), NullLogger<PlaybackActions>.Instance, smartSkip: smartSkip);
+        new(queue, new FakePlayer(), watch, new FakeBrowseApi(), new FakeNotifications(), NullLogger<PlaybackActions>.Instance, filter: new AutoQueueFilter(smartSkip));
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {

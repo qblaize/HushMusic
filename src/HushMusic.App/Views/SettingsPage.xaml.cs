@@ -21,8 +21,21 @@ public sealed partial class SettingsPage : Page
             case "lyrics":
                 ((FrameworkElement)Scroller.Content).SizeChanged += (_, _) => ScrollToLyrics();
                 break;
+            case { Length: > 1 } section:
+                // =window, =discord…: the section whose header is named WindowSectionHeader, DiscordSectionHeader…
+                ((FrameworkElement)Scroller.Content).SizeChanged += (_, _) => ScrollToHeader(char.ToUpperInvariant(section[0]) + section[1..] + "SectionHeader");
+                break;
         }
     }
+
+    private void ScrollToHeader(string name) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (FindName(name) is UIElement header)
+        {
+            var top = header.TransformToVisual((UIElement)Scroller.Content).TransformPoint(default).Y;
+            Scroller.ChangeView(null, Math.Max(0, top - 16), null, disableAnimation: true);
+        }
+    });
 
     public SettingsViewModel ViewModel { get; } = App.GetService<SettingsViewModel>();
 

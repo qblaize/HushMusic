@@ -297,6 +297,14 @@
                                 <Button.Flyout>
                                     <MenuFlyout MenuFlyoutPresenterStyle="{StaticResource AppMenuFlyoutPresenterStyle}" Placement="BottomEdgeAlignedLeft">
                                         <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.TodayStation.TogglePinCommand, Mode=OneWay}"
+                                            Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                            Text="{x:Bind ViewModel.TodayStation.PinLabel, Mode=OneWay}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="{x:Bind ViewModel.TodayStation.PinGlyph, Mode=OneWay}" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem
                                             Command="{x:Bind ViewModel.TodayStation.ToggleAutoSaveCommand, Mode=OneWay}"
                                             Style="{StaticResource AppMenuFlyoutItemStyle}"
                                             Text="{x:Bind ViewModel.TodayStation.AutoSaveLabel, Mode=OneWay}">

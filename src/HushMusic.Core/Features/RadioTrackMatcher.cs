@@ -61,6 +61,16 @@ public sealed class RadioTrackMatcher(ISearchApi search, ILogger<RadioTrackMatch
         return cached.Count <= count ? cached : [.. cached.Take(count)];
     }
 
+    public IReadOnlyList<Track>? Remembered(RadioNowPlaying song, string? stationName = null)
+    {
+        ArgumentNullException.ThrowIfNull(song);
+        var query = GetQuery(song, stationName);
+        lock (_gate)
+        {
+            return query.Length > 0 && _cache.TryGetValue(query, out var cached) ? cached : null;
+        }
+    }
+
     /// <summary>
     /// True when <paramref name="track"/> is very likely the song the station announced, strict enough to act on without
     /// asking (saving it to a playlist): an artist credit matches the announced artist, and one title starts with the other

@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Windows.UI.ViewManagement;
 using HushMusic.App.ViewModels.Shell;
 using HushMusic.Core.Abstractions;
 using VirtualKey = Windows.System.VirtualKey;
@@ -12,17 +13,33 @@ using VirtualKey = Windows.System.VirtualKey;
 namespace HushMusic.App.Controls.TaskbarFlyout;
 
 /// <summary>
-/// The taskbar player's flyout: cover, title, seek bar, transport, like, volume and the next songs in the queue. Logic
-/// lives in <see cref="PlayerViewModel"/> and <see cref="TaskbarFlyoutUpNextViewModel"/>; this is UI glue (seek drags,
-/// Esc, focus, the open animation).
+/// The taskbar player's flyout: cover, title, seek bar, transport, like, volume and the next songs in the queue, or the
+/// song's lyrics in their place. Logic lives in <see cref="PlayerViewModel"/>, <see cref="TaskbarFlyoutUpNextViewModel"/>
+/// and <see cref="CompactLyricsViewModel"/>; this is UI glue (seek drags, Esc, focus, the open animation, the lyric lines).
 /// </summary>
 public sealed partial class TaskbarFlyoutView : UserControl, IDisposable
 {
+    private readonly FlyoutLyricsList _lyricLines;
+    private readonly UISettings _uiSettings = new();
     private Storyboard? _open;
 
     public TaskbarFlyoutView()
     {
         InitializeComponent();
+        _lyricLines = new FlyoutLyricsList(SyncedLyricsViewport, LyricLinesHost, (Style)Resources["FlyoutLyricLineStyle"]);
+        Lyrics.LinesReplaced += (_, _) => ShowLyricLines();
+        Lyrics.PropertyChanged += (_, e) =>
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(CompactLyricsViewModel.CurrentIndex):
+                    _lyricLines.SetCurrent(Lyrics.CurrentIndex, animate: _uiSettings.AnimationsEnabled);
+                    break;
+                case nameof(CompactLyricsViewModel.IsAvailable) or nameof(CompactLyricsViewModel.IsShowing):
+                    PreferredHeightChanged?.Invoke(this, EventArgs.Empty);
+                    break;
+            }
+        };
 
         // Slider marks pointer events handled, so listen with handledEventsToo to know when a drag starts and ends.
         SeekSlider.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) => ViewModel.BeginSeek()), handledEventsToo: true);
@@ -52,7 +69,30 @@ public sealed partial class TaskbarFlyoutView : UserControl, IDisposable
         App.GetService<INotificationService>(),
         App.GetService<IUiDispatcher>());
 
-    public void Dispose() => UpNext.Dispose();
+    public CompactLyricsViewModel Lyrics { get; } = new(
+        App.GetService<LyricsViewModel>(),
+        App.GetService<IPlayer>(),
+        App.GetService<ISettingsService>(),
+        App.GetService<IUiDispatcher>(),
+        LyricsViewer.TaskbarFlyout,
+        showsPlainText: true);
+
+    public void Dispose()
+    {
+        UpNext.Dispose();
+        Lyrics.Dispose();
+    }
+
+    /// <summary>The flyout opened (true) or closed (false): the lyrics follow the song only while it is open.</summary>
+    public void SetOpen(bool open)
+    {
+        if (!open)
+        {
+            _lyricLines.Reset();
+        }
+
+        Lyrics.SetViewShown(open);
+    }
 
     /// <summary>Fades and slides the content in (the window itself appears at once).</summary>
     public void PlayOpenAnimation()
@@ -104,6 +144,12 @@ public sealed partial class TaskbarFlyoutView : UserControl, IDisposable
     /// <summary>Test hook: shows "Up next" tile <paramref name="position"/> (1-based) as hovered (screenshots can't hover).</summary>
     internal bool HoverUpNextTileForTest(int position) =>
         UpNextTile(position - 1) is { } tile && VisualStateManager.GoToState(tile, "PointerOver", useTransitions: false);
+
+    private void ShowLyricLines()
+    {
+        _lyricLines.MotionEnabled = _uiSettings.AnimationsEnabled;
+        _lyricLines.SetLines(Lyrics.Lines, Lyrics.CurrentIndex);
+    }
 
     private UpNextTileButton? UpNextTile(int index) =>
         UpNextList.ContainerFromIndex(index) is DependencyObject container && VisualTreeHelper.GetChildrenCount(container) > 0

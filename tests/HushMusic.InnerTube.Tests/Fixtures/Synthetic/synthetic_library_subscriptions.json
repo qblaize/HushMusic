@@ -1,0 +1,145 @@
+{
+ "_synthetic": "FEmusic_library_corpus_artists (get_library_subscriptions) built from ytmusicapi get_library_contents + parse_artists: the shelf sits in an itemSectionRenderer; rows are musicResponsiveListItemRenderer with the name in flex column 0, the subscriber count in column 1 and the channel in navigationEndpoint.browseEndpoint. Not a captured response (it needs a signed-in session).",
+ "contents": {
+  "singleColumnBrowseResultsRenderer": {
+   "tabs": [
+    {
+     "tabRenderer": {
+      "content": {
+       "sectionListRenderer": {
+        "contents": [
+         {
+          "itemSectionRenderer": {
+           "contents": [
+            {
+             "musicShelfRenderer": {
+              "contents": [
+               {
+                "musicResponsiveListItemRenderer": {
+                 "thumbnail": {
+                  "musicThumbnailRenderer": {
+                   "thumbnail": {
+                    "thumbnails": [
+                     {
+                      "url": "https://lh3.googleusercontent.com/synthetic-daft-punk=w60-h60-p-l90-rj",
+                      "width": 60,
+                      "height": 60
+                     },
+                     {
+                      "url": "https://lh3.googleusercontent.com/synthetic-daft-punk=w120-h120-p-l90-rj",
+                      "width": 120,
+                      "height": 120
+                     }
+                    ]
+                   }
+                  }
+                 },
+                 "flexColumns": [
+                  {
+                   "musicResponsiveListItemFlexColumnRenderer": {
+                    "text": {
+                     "runs": [
+                      {
+                       "text": "Daft Punk"
+                      }
+                     ]
+                    }
+                   }
+                  },
+                  {
+                   "musicResponsiveListItemFlexColumnRenderer": {
+                    "text": {
+                     "runs": [
+                      {
+                       "text": "7.19M subscribers"
+                      }
+                     ]
+                    }
+                   }
+                  }
+                 ],
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UCRr1xG_2WIDs18a6cIiCxeA",
+                   "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                     "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                    }
+                   }
+                  }
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemRenderer": {
+                 "thumbnail": {
+                  "musicThumbnailRenderer": {
+                   "thumbnail": {
+                    "thumbnails": [
+                     {
+                      "url": "https://lh3.googleusercontent.com/synthetic-oasis=w120-h120-p-l90-rj",
+                      "width": 120,
+                      "height": 120
+                     }
+                    ]
+                   }
+                  }
+                 },
+                 "flexColumns": [
+                  {
+                   "musicResponsiveListItemFlexColumnRenderer": {
+                    "text": {
+                     "runs": [
+                      {
+                       "text": "Oasis"
+                      }
+                     ]
+                    }
+                   }
+                  },
+                  {
+                   "musicResponsiveListItemFlexColumnRenderer": {
+                    "text": {
+                     "runs": [
+                      {
+                       "text": "4.5M subscribers"
+                      }
+                     ]
+                    }
+                   }
+                  }
+                 ],
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UCmMUZbaYdNH0bEd1PAlAqsA",
+                   "browseEndpointContextSupportedConfigs": {
+                    "browseEndpointContextMusicConfig": {
+                     "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              ],
+              "continuations": [
+               {
+                "nextContinuationData": {
+                 "continuation": "SYNTHETIC_SUBSCRIPTIONS_TOKEN"
+                }
+               }
+              ]
+             }
+            }
+           ]
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}

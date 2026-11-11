@@ -3,7 +3,9 @@ using Windows.Graphics.Imaging;
 using HushMusic.App.Services.Shell;
 using HushMusic.App.Services.Windowing;
 using HushMusic.App.Services.Windowing.TaskbarWidget;
+using HushMusic.App.ViewModels.Pages;
 using HushMusic.Core.Abstractions;
+using HushMusic.Core.Features.NewReleases;
 using HushMusic.Core.Models;
 using HushMusic.Core.Services;
 
@@ -14,7 +16,8 @@ namespace HushMusic.App.Services.Notifications;
 /// and a Next button when a new song starts, or the song on a live station changes, while Hush isn't the window in
 /// front. Each one replaces the last (same tag and group) and expires soon, so Notification Center never fills up.
 /// Also shows the app update notifications (<see cref="ShowUpdateAvailable"/>, <see cref="ShowUpdateReady"/>), whatever
-/// the song setting.
+/// the song setting, and the new-release notifications of <see cref="INewReleaseAlerts"/> (a click opens the album, or the
+/// list of several).
 /// <para>
 /// Shown with <see cref="WindowsToasts"/>, which registers the app ID the first time a notification is due (the
 /// uninstaller removes it: <see cref="RemoveRegistration"/>). Test instances never register: they log what they would
@@ -27,10 +30,15 @@ public sealed class TrackNotificationService : IDisposable
     private const string Group = "playback";
     private const string UpdateTag = "update-ready";
     private const string UpdateGroup = "updates";
+    private const string ReleaseTag = "new-releases";
+    private const string ReleaseGroup = "releases";
     private const int CoverPixels = 192;
     private const int TrackThumbnailWidth = 226;
     private const int KeptCovers = 3;
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(5);
+
+    // New releases stay in Notification Center for a while: they are news, not a song that is already over.
+    private static readonly TimeSpan ReleaseLifetime = TimeSpan.FromDays(3);
 
     // A station's first notification waits a moment for its song title, so starting a station shows one, not two.
     private static readonly TimeSpan StationSongWait = TimeSpan.FromSeconds(4);
@@ -42,6 +50,8 @@ public sealed class TrackNotificationService : IDisposable
     private readonly IAppPaths _paths;
     private readonly IUiDispatcher _dispatcher;
     private readonly INotificationService _notifications;
+    private readonly INewReleaseAlerts _newReleases;
+    private readonly INavigationService _navigation;
     private readonly ILogger<TrackNotificationService> _logger;
     private readonly bool _testInstance = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_BACKGROUND") == "1";
     private readonly WindowsToasts _toasts = new();
@@ -54,6 +64,7 @@ public sealed class TrackNotificationService : IDisposable
     private Action? _downloadUpdate;
     private Action? _skipUpdate;
     private CancellationTokenSource? _pending;
+    private IReadOnlyList<NewRelease> _releases = [];
     private string? _lastKey;
     private bool _registrationFailed;
     private bool _showFailureLogged;
@@ -68,8 +79,12 @@ public sealed class TrackNotificationService : IDisposable
         IAppPaths paths,
         IUiDispatcher dispatcher,
         INotificationService notifications,
+        INewReleaseAlerts newReleases,
+        INavigationService navigation,
         ILogger<TrackNotificationService> logger)
     {
+        _newReleases = newReleases;
+        _navigation = navigation;
         _player = player;
         _radio = radio;
         _settings = settings;
@@ -102,7 +117,9 @@ public sealed class TrackNotificationService : IDisposable
         _settings.Changed += OnSettingsChanged;
         _player.TrackStarted += OnTrackStarted;
         _radio.Changed += OnRadioChanged;
+        _newReleases.Found += OnNewReleasesFound;
         ApplySetting();
+        NewReleaseTestHook.Start(this);
     }
 
     /// <summary>
@@ -184,6 +201,7 @@ public sealed class TrackNotificationService : IDisposable
             _settings.Changed -= OnSettingsChanged;
             _player.TrackStarted -= OnTrackStarted;
             _radio.Changed -= OnRadioChanged;
+            _newReleases.Found -= OnNewReleasesFound;
         }
 
         lock (_gate)
@@ -427,8 +445,81 @@ public sealed class TrackNotificationService : IDisposable
         }
     }
 
+    // ===== New releases (Found arrives on a background thread) =====
+
+    private void OnNewReleasesFound(object? sender, NewReleasesFoundEventArgs e) => _ = ShowNewReleasesAsync(e.Releases);
+
+    /// <summary>One notification for <paramref name="releases"/>, with the first one's cover. Any thread; never throws.</summary>
+    internal async Task ShowNewReleasesAsync(IReadOnlyList<NewRelease> releases)
+    {
+        if (_disposed || releases.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            lock (_gate)
+            {
+                _releases = releases;
+            }
+
+            var cover = await CreateCoverAsync(releases[0].Album.ThumbnailFor(TrackThumbnailWidth)?.Url, CancellationToken.None).ConfigureAwait(false);
+            var payload = NewReleaseNotificationContent.Build(releases, cover);
+            if (_testInstance)
+            {
+                // Automated test instances never put notifications on the user's screen.
+                _logger.LogInformation("New-release notification (test instance, not shown): {Payload}", payload);
+                return;
+            }
+
+            if (_disposed || !EnsureRegistered())
+            {
+                return;
+            }
+
+            var shown = _toasts.Show(payload, ReleaseTag, ReleaseGroup, DateTimeOffset.Now + ReleaseLifetime, OnToastActivated);
+            _logger.LogInformation("New-release notification for {Count} release(s) (shown: {Shown})", releases.Count, shown);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not show the new-release notification");
+        }
+    }
+
+    /// <summary>Shows the window and opens the album, or (null) the list of the releases last announced. Any thread.</summary>
+    internal void OpenRelease(string? albumId) => _dispatcher.Run(() =>
+    {
+        _showMainWindow?.Invoke();
+        if (albumId is not null)
+        {
+            _navigation.NavigateTo(PageKey.Album, albumId);
+            return;
+        }
+
+        IReadOnlyList<NewRelease> releases;
+        lock (_gate)
+        {
+            releases = _releases;
+        }
+
+        if (releases.Count > 0)
+        {
+            _navigation.NavigateTo(PageKey.ExploreCategory, new FollowedReleasesRequest([.. releases.Select(r => r.Album)]));
+        }
+    });
+
     // Raised on a background thread when a notification or its button is clicked while the app runs.
-    private void OnToastActivated(string? arguments) => Run(TrackNotificationContent.Parse(arguments));
+    private void OnToastActivated(string? arguments)
+    {
+        if (NewReleaseNotificationContent.TryParse(arguments, out var albumId))
+        {
+            OpenRelease(albumId);
+            return;
+        }
+
+        Run(TrackNotificationContent.Parse(arguments));
+    }
 
     private void Run(TrackNotificationCommand command) => _dispatcher.Run(() =>
     {

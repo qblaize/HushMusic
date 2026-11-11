@@ -131,13 +131,20 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.ContextFlyout>
-                                    <MenuFlyout>
-                                        <MenuFlyoutItem Command="{x:Bind PlayCommand}" Text="Play">
+                                    <!--  "Dislike" and "Don't play this artist" are added when it opens (OnRowMenuOpening).  -->
+                                    <MenuFlyout MenuFlyoutPresenterStyle="{StaticResource AppMenuFlyoutPresenterStyle}" Opening="OnRowMenuOpening">
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind PlayCommand}"
+                                            Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                            Text="Play">
                                             <MenuFlyoutItem.Icon>
                                                 <FontIcon Glyph="&#xE768;" />
                                             </MenuFlyoutItem.Icon>
                                         </MenuFlyoutItem>
-                                        <MenuFlyoutItem Command="{x:Bind RemoveCommand}" Text="Remove from queue">
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind RemoveCommand}"
+                                            Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                            Text="Remove from queue">
                                             <MenuFlyoutItem.Icon>
                                                 <FontIcon Glyph="&#xE711;" />
                                             </MenuFlyoutItem.Icon>

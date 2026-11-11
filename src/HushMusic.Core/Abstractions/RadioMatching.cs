@@ -19,4 +19,10 @@ public interface IRadioTrackMatcher
     /// nothing matches. Results are remembered for the session. Network errors propagate.
     /// </summary>
     Task<IReadOnlyList<Track>> FindAsync(RadioNowPlaying song, string? stationName = null, int count = 3, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// What <see cref="FindAsync"/> already found for <paramref name="song"/> this session, without searching; null when it
+    /// hasn't looked yet. (The default implementation, for test fakes, never remembers anything.)
+    /// </summary>
+    IReadOnlyList<Track>? Remembered(RadioNowPlaying song, string? stationName = null) => null;
 }

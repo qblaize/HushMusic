@@ -46,6 +46,16 @@ internal sealed class LibraryApi(IInnerTubeClient client, ILogger<LibraryApi> lo
             response => LibraryParser.ParseArtistsContinuation(response, logger),
             cancellationToken);
 
+    /// <summary>ytmusicapi <c>get_library_subscriptions</c>: same rows and paging as <c>get_library_artists</c>.</summary>
+    public Task<Paged<Artist>> GetSubscriptionsAsync(string? continuation = null, CancellationToken cancellationToken = default) =>
+        GetLibraryPageAsync(
+            "FEmusic_library_corpus_artists",
+            ContinuationScope.LibrarySubscriptions,
+            continuation,
+            response => LibraryParser.ParseArtists(response, logger),
+            response => LibraryParser.ParseArtistsContinuation(response, logger),
+            cancellationToken);
+
     /// <summary>ytmusicapi <c>get_liked_songs</c> = <c>get_playlist("LM")</c>, with the same continuation path.</summary>
     public async Task<Paged<Track>> GetLikedSongsAsync(string? continuation = null, CancellationToken cancellationToken = default)
     {

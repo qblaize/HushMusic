@@ -37,7 +37,17 @@ public interface IMediaItemActions
 
     LikeStatus GetLikeStatus(Track track);
 
+    /// <summary>
+    /// Rates the song on the account. A dislike replaces a like, skips the song when it is playing and keeps it out of what
+    /// Hush adds by itself (<see cref="IBlocklist"/>); its toast offers Undo.
+    /// </summary>
     Task RateAsync(Track track, LikeStatus status);
+
+    /// <summary>The artist's songs are kept out of radio, autoplay and the weekly mix (<see cref="IBlocklist"/>).</summary>
+    bool IsArtistBlocked(ArtistRef artist);
+
+    /// <summary>Blocks the artist (the toast offers Undo) or unblocks it. Kept on this PC only.</summary>
+    Task SetArtistBlockedAsync(ArtistRef artist, bool blocked);
 
     /// <summary>Asks for a playlist (or a new one) and adds the tracks to it, asking again when some are already in it.</summary>
     Task AddToPlaylistAsync(IReadOnlyList<Track> tracks);
@@ -60,7 +70,8 @@ internal sealed class MediaItemActions(
     IPlaylistAdder playlistAdder,
     INavigationService navigation,
     INavigationPreviews previews,
-    INotificationService notifications) : IMediaItemActions
+    INotificationService notifications,
+    IBlocklist blocklist) : IMediaItemActions
 {
     public bool IsSignedIn => auth.Status == AuthStatus.SignedIn;
 
@@ -146,15 +157,59 @@ internal sealed class MediaItemActions(
 
     public LikeStatus GetLikeStatus(Track track) => likes.GetStatus(track);
 
-    public Task RateAsync(Track track, LikeStatus status) =>
-        TryAsync(
+    public Task RateAsync(Track track, LikeStatus status)
+    {
+        var previous = likes.GetStatus(track);
+        var undislike = status == LikeStatus.Indifferent && previous == LikeStatus.Dislike;
+        return TryAsync(
             async () =>
             {
                 await account.RateTrackAsync(track.VideoId, status);
-                var title = status == LikeStatus.Like ? "Added to your liked songs" : "Removed from your liked songs";
-                notifications.Show(new AppNotification(NotificationSeverity.Success, title, track.Title));
+                notifications.Show(status switch
+                {
+                    LikeStatus.Like => new AppNotification(NotificationSeverity.Success, "Added to your liked songs", track.Title),
+                    LikeStatus.Dislike => new AppNotification(NotificationSeverity.Success, "Disliked", track.Title)
+                    {
+                        Action = new NotificationAction("Undo", () => _ = UndoDislikeAsync(track, previous)),
+                    },
+                    _ when undislike => new AppNotification(NotificationSeverity.Success, "Dislike removed", track.Title),
+                    _ => new AppNotification(NotificationSeverity.Success, "Removed from your liked songs", track.Title),
+                });
             },
-            "Couldn't update the like");
+            status == LikeStatus.Dislike ? "Couldn't dislike the song" : undislike ? "Couldn't remove the dislike" : "Couldn't update the like");
+    }
+
+    public bool IsArtistBlocked(ArtistRef artist) => blocklist.IsBlocked(artist);
+
+    public Task SetArtistBlockedAsync(ArtistRef artist, bool blocked) =>
+        TryAsync(
+            async () =>
+            {
+                if (!blocked)
+                {
+                    if (await blocklist.UnblockAsync(artist))
+                    {
+                        notifications.Show(new AppNotification(NotificationSeverity.Success, "Artist unblocked", artist.Name));
+                    }
+
+                    return;
+                }
+
+                if (await blocklist.BlockAsync(artist))
+                {
+                    notifications.Show(new AppNotification(NotificationSeverity.Success, "Artist blocked", $"{artist.Name} won't play in radio, autoplay or your weekly mix.")
+                    {
+                        Action = new NotificationAction("Undo", () => _ = TryAsync(() => blocklist.UnblockAsync(artist), "Couldn't unblock this artist")),
+                    });
+                }
+            },
+            blocked ? "Couldn't block this artist" : "Couldn't unblock this artist");
+
+    // Back to how it was: liked again, or no rating.
+    private Task UndoDislikeAsync(Track track, LikeStatus previous) =>
+        TryAsync(
+            () => account.RateTrackAsync(track.VideoId, previous == LikeStatus.Like ? LikeStatus.Like : LikeStatus.Indifferent),
+            "Couldn't undo the dislike");
 
     public Task AddToPlaylistAsync(IReadOnlyList<Track> tracks)
     {

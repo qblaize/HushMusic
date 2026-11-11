@@ -74,6 +74,35 @@
             <!--  Three tiles and two Space12 gaps fit the 326 px between the flyout's padding (it is 360 wide).  -->
             <x:Double x:Key="UpNextTileSize">100</x:Double>
 
+            <!--  The lyrics (and "Nothing up next") take the height of a row of tiles, so switching tabs keeps the size.  -->
+            <x:Double x:Key="FlyoutLowerAreaHeight">154</x:Double>
+
+            <!--  Up next | Lyrics: Now Playing's segmented tabs, sized to their labels (equal unless a label is longer).  -->
+            <Style
+                x:Key="FlyoutTabStyle"
+                BasedOn="{StaticResource SegmentButtonStyle}"
+                TargetType="ToggleButton">
+                <Setter Property="MinWidth" Value="88" />
+            </Style>
+
+            <!--  Lyric lines: all bold, the one being sung bright and the rest dimmed (opacity, set in code).  -->
+            <Style
+                x:Key="FlyoutLyricLineStyle"
+                BasedOn="{StaticResource HeadlineStyle}"
+                TargetType="TextBlock">
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="TextTrimming" Value="None" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style
+                x:Key="FlyoutPlainLyricsStyle"
+                BasedOn="{StaticResource BodyStyle}"
+                TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+                <Setter Property="TextTrimming" Value="None" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
             <!--
                 An "Up next" tile: cover on top, two lines of text below. On hover the cover brightens and a play glyph
                 appears on it; pressing shrinks the tile a little. Storyboards only (implicit transitions crash here).
@@ -427,21 +456,110 @@
                 TextAlignment="Right" />
         </Grid>
 
-        <!--  Up next: the next three in the queue (stations for live radio); hidden when nothing comes next.  -->
+        <!--
+            Up next: the next three in the queue (stations for live radio). Songs can switch it to their lyrics instead.
+            Hidden when there is neither.
+        -->
         <StackPanel
             Grid.Row="4"
             Margin="0,12,0,4"
-            Visibility="{x:Bind helpers:Format.VisibleIf(UpNext.HasItems), Mode=OneWay}">
+            Visibility="{x:Bind flyout:TaskbarFlyoutBindings.LowerAreaVisibility(UpNext.HasItems, Lyrics.IsAvailable), Mode=OneWay}">
             <Border Height="1" Background="{ThemeResource SeparatorBrush}" />
             <TextBlock
                 Margin="0,14,0,10"
                 Style="{StaticResource EyebrowStyle}"
-                Text="UP NEXT" />
+                Text="UP NEXT"
+                Visibility="{x:Bind helpers:Format.CollapsedIf(Lyrics.IsAvailable), Mode=OneWay}" />
+            <Border
+                Margin="0,12,0,10"
+                Padding="2"
+                HorizontalAlignment="Left"
+                Background="{ThemeResource HoverFillBrush}"
+                CornerRadius="16"
+                Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsAvailable), Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <ToggleButton
+                        AutomationProperties.AutomationId="FlyoutUpNextTab"
+                        AutomationProperties.Name="Up next tab"
+                        Command="{x:Bind Lyrics.HideLyricsCommand}"
+                        Content="Up next"
+                        IsChecked="{x:Bind helpers:Format.Not(Lyrics.IsOn), Mode=OneWay}"
+                        Style="{StaticResource FlyoutTabStyle}" />
+                    <ToggleButton
+                        AutomationProperties.AutomationId="FlyoutLyricsTab"
+                        AutomationProperties.Name="Lyrics tab"
+                        Command="{x:Bind Lyrics.ShowLyricsCommand}"
+                        Content="Lyrics"
+                        IsChecked="{x:Bind Lyrics.IsOn, Mode=OneWay}"
+                        Style="{StaticResource FlyoutTabStyle}" />
+                </StackPanel>
+            </Border>
+
+            <!--  Nothing queued while the Up next tab shows: a quiet line, as tall as the tiles so the tabs don't jump.  -->
+            <Grid Height="{StaticResource FlyoutLowerAreaHeight}" Visibility="{x:Bind flyout:TaskbarFlyoutBindings.NothingNextVisibility(UpNext.HasItems, Lyrics.IsAvailable, Lyrics.IsOn), Mode=OneWay}">
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource SubheadStyle}"
+                    Text="Nothing up next." />
+            </Grid>
+
+            <!--
+                Lyrics: a few lines, the one being sung bright and kept near the top as the song plays (built in code).
+                Unsynced lyrics scroll as plain text.
+            -->
+            <Grid
+                x:Name="LyricsArea"
+                Height="{StaticResource FlyoutLowerAreaHeight}"
+                Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsShowing), Mode=OneWay}">
+                <!--  Clipped in code; the lines glide on the compositor (FlyoutLyricsList), the wheel scrolls them.  -->
+                <Grid
+                    x:Name="SyncedLyricsViewport"
+                    AutomationProperties.AutomationId="FlyoutSyncedLyrics"
+                    AutomationProperties.Name="Lyrics"
+                    Background="Transparent"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsSynced), Mode=OneWay}">
+                    <Canvas>
+                        <StackPanel x:Name="LyricLinesHost" Spacing="{StaticResource Space8}" />
+                    </Canvas>
+                </Grid>
+                <ScrollViewer
+                    AutomationProperties.AutomationId="FlyoutPlainLyrics"
+                    AutomationProperties.Name="Lyrics"
+                    HorizontalScrollMode="Disabled"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsPlain), Mode=OneWay}">
+                    <!--  One block per line, so a wrapped line reads as one; an empty line opens a new verse.  -->
+                    <ItemsControl
+                        Margin="0,0,12,0"
+                        IsTabStop="False"
+                        ItemsSource="{x:Bind Lyrics.PlainLines, Mode=OneWay}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="{StaticResource Space4}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Style="{StaticResource FlyoutPlainLyricsStyle}" Text="{x:Bind}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="FlyoutLyricsNote"
+                    Style="{StaticResource SubheadStyle}"
+                    Text="{x:Bind Lyrics.Note, Mode=OneWay}"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.HasNote), Mode=OneWay}" />
+            </Grid>
+
             <ItemsControl
                 x:Name="UpNextList"
                 AutomationProperties.Name="Up next"
                 IsTabStop="False"
                 ItemsSource="{x:Bind UpNext.Items}"
+                Visibility="{x:Bind helpers:Format.CollapsedIf(Lyrics.IsShowing), Mode=OneWay}"
                 XYFocusKeyboardNavigation="Enabled">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

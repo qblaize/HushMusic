@@ -10,10 +10,21 @@ using HushMusic.Core.Models;
 
 namespace HushMusic.App.ViewModels.Shell;
 
+/// <summary>The views that show lyrics; the lyrics load and follow the song while at least one of them is on screen.</summary>
+[Flags]
+public enum LyricsViewer
+{
+    None = 0,
+    NowPlaying = 1,
+    MiniPlayer = 2,
+    TaskbarFlyout = 4,
+}
+
 /// <summary>
 /// Lyrics for the current track from <see cref="ILyricsService"/> (the user's source order), shown line by line and,
-/// where the timing allows, word by word. Loads only while the lyrics tab is visible; a track change cancels the
-/// request in flight.
+/// where the timing allows, word by word. One instance serves every lyrics view (Now Playing, the mini player, the
+/// taskbar player's flyout), so they share one load and one source choice. Loads only while one of them is visible
+/// (<see cref="SetActive"/>); a track change cancels the request in flight.
 /// </summary>
 /// <remarks>
 /// The view animates the words itself (on the compositor) from <see cref="GetPosition"/>; this keeps the clock and says
@@ -53,7 +64,7 @@ public sealed partial class LyricsViewModel : ObservableObject
     private string? _shownVideoId;
     private LyricsDocument? _document;
     private bool _estimateWords;
-    private bool _isActive;
+    private LyricsViewer _viewers;
 
     public LyricsViewModel(
         IPlayer player,
@@ -191,12 +202,21 @@ public sealed partial class LyricsViewModel : ObservableObject
         }
     }
 
-    /// <summary>The lyrics tab became visible (true) or hidden (false).</summary>
-    public void SetActive(bool active)
+    // Some lyrics view is on screen.
+    private bool IsActive => _viewers != LyricsViewer.None;
+
+    /// <summary>A lyrics view became visible (true) or hidden (false).</summary>
+    public void SetActive(LyricsViewer viewer, bool active)
     {
-        _isActive = active;
-        if (active)
+        _viewers = active ? _viewers | viewer : _viewers & ~viewer;
+        if (IsActive)
         {
+            if (!_isPlaying)
+            {
+                // Paused, the player's position is the truth (nothing reports it until playback resumes).
+                Report(_player.Position);
+            }
+
             EnsureLoaded();
             Tick();
         }
@@ -291,7 +311,7 @@ public sealed partial class LyricsViewModel : ObservableObject
         Report(position);
 
         // Playing, the timer follows the clock; paused, only a seek moves it.
-        if ((jumped || !_isPlaying) && _isActive)
+        if ((jumped || !_isPlaying) && IsActive)
         {
             _dispatcher.Run(() =>
             {
@@ -354,8 +374,10 @@ public sealed partial class LyricsViewModel : ObservableObject
         _track = track;
         _cts?.Cancel();
         _shownVideoId = null;
-        Report(TimeSpan.Zero);
-        if (_isActive)
+
+        // A restored session starts mid-song, paused (no position reports follow until it plays).
+        Report(track is not null && _player.CurrentTrack?.VideoId == track.VideoId ? _player.Position : TimeSpan.Zero);
+        if (IsActive)
         {
             EnsureLoaded();
         }
@@ -372,7 +394,7 @@ public sealed partial class LyricsViewModel : ObservableObject
         if (_track is { } track && !_chosenSource.ContainsKey(track.VideoId))
         {
             _shownVideoId = null;
-            if (_isActive)
+            if (IsActive)
             {
                 EnsureLoaded();
             }
@@ -601,7 +623,7 @@ public sealed partial class LyricsViewModel : ObservableObject
     // A one-shot timer for the next line change, only while synced lines are on screen and the song plays.
     private void UpdateTimer()
     {
-        if (!_isActive || !IsSynced || !_isPlaying)
+        if (!IsActive || !IsSynced || !_isPlaying)
         {
             _timer?.Stop();
             return;
@@ -619,17 +641,12 @@ public sealed partial class LyricsViewModel : ObservableObject
             _timer.Tick += (_, _) => Tick();
         }
 
-        var lines = Lines;
-        var position = GetPosition() + LineLead;
-        var next = CurrentIndex + 1;
-        if (next >= lines.Count)
+        _timer.Stop();
+        if (LyricsCursor.UntilNext(Lines, CurrentIndex, GetPosition() + LineLead) is not { } due)
         {
-            _timer.Stop();
             return;
         }
 
-        var due = lines[next].Start - position;
-        _timer.Stop();
         _timer.Interval = due > MinTimerInterval ? due : MinTimerInterval;
         _timer.Start();
     }
@@ -642,31 +659,13 @@ public sealed partial class LyricsViewModel : ObservableObject
             return;
         }
 
-        var position = GetPosition() + LineLead;
-
-        // Last line that has started (lines are in time order).
-        int low = 0, high = lines.Count - 1, index = -1;
-        while (low <= high)
-        {
-            var mid = (low + high) / 2;
-            if (lines[mid].Start <= position)
-            {
-                index = mid;
-                low = mid + 1;
-            }
-            else
-            {
-                high = mid - 1;
-            }
-        }
-
-        CurrentIndex = index;
+        CurrentIndex = LyricsCursor.IndexAt(lines, GetPosition() + LineLead);
         UpdateTimer();
     }
 }
 
 /// <summary>One item of the synced lyrics: a sung line, or an instrumental break (shown as three dots).</summary>
-public sealed class LyricLineViewModel
+public sealed class LyricLineViewModel : ITimedLyric
 {
     internal LyricLineViewModel(
         int index,

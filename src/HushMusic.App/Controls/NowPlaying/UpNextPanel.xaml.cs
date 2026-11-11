@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
+using HushMusic.App.Controls.Items;
 using HushMusic.App.Helpers;
 using HushMusic.App.ViewModels.Shell;
 
@@ -116,6 +117,16 @@ public sealed partial class UpNextPanel : UserControl
 
     // The header is inside the first suggestion's row: a press there must not start that row's click or drag.
     private void OnSuggestionsHeaderPointerPressed(object sender, PointerRoutedEventArgs e) => e.Handled = true;
+
+    // The row's song as it is now (rated, artist blocked): its "Dislike" and "Don't play this artist" items.
+    private void OnRowMenuOpening(object? sender, object e)
+    {
+        if (sender is MenuFlyout menu)
+        {
+            var track = (menu.Target as FrameworkElement)?.DataContext is QueueItemViewModel item ? item.Track : null;
+            TrackMenu.InsertTasteItems(menu, menu.Items.Count, track, separatorBefore: true);
+        }
+    }
 
     private async void OnSaveAsPlaylistClick(object sender, RoutedEventArgs e)
     {

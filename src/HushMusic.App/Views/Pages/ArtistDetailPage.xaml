@@ -65,6 +65,38 @@
                                     <TextBlock Text="Radio" />
                                 </StackPanel>
                             </Button>
+                            <Button
+                                AutomationProperties.AutomationId="ArtistMore"
+                                AutomationProperties.Name="More options"
+                                CornerRadius="18"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTipService.ToolTip="More options"
+                                Visibility="{x:Bind ViewModel.Pin.CanPin, Mode=OneWay}">
+                                <FontIcon Glyph="&#xE712;" />
+                                <Button.Flyout>
+                                    <MenuFlyout MenuFlyoutPresenterStyle="{StaticResource AppMenuFlyoutPresenterStyle}" Placement="BottomEdgeAlignedLeft">
+                                        <MenuFlyoutItem
+                                            AutomationProperties.AutomationId="PinToSidebar"
+                                            Command="{x:Bind ViewModel.Pin.ToggleCommand}"
+                                            Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                            Text="{x:Bind ViewModel.Pin.Label, Mode=OneWay}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="{x:Bind ViewModel.Pin.Glyph, Mode=OneWay}" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem
+                                            AutomationProperties.AutomationId="ArtistBlock"
+                                            Command="{x:Bind ViewModel.ToggleBlockCommand}"
+                                            Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                            Text="{x:Bind ViewModel.BlockLabel, Mode=OneWay}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="&#xE8F8;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
                         </StackPanel>
                     </StackPanel>
                 </Grid>

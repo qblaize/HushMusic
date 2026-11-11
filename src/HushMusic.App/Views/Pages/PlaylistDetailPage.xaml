@@ -119,6 +119,27 @@
                                                     <FontIcon Glyph="&#xE710;" />
                                                 </MenuFlyoutItem.Icon>
                                             </MenuFlyoutItem>
+                                            <MenuFlyoutSeparator Visibility="{x:Bind ViewModel.HasContent, Mode=OneWay}" />
+                                            <MenuFlyoutItem
+                                                AutomationProperties.AutomationId="PinToSidebar"
+                                                Command="{x:Bind ViewModel.Pin.ToggleCommand}"
+                                                Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                                Text="{x:Bind ViewModel.Pin.Label, Mode=OneWay}"
+                                                Visibility="{x:Bind ViewModel.Pin.CanPin, Mode=OneWay}">
+                                                <MenuFlyoutItem.Icon>
+                                                    <FontIcon Glyph="{x:Bind ViewModel.Pin.Glyph, Mode=OneWay}" />
+                                                </MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
+                                            <MenuFlyoutItem
+                                                AutomationProperties.AutomationId="ExportPlaylist"
+                                                Command="{x:Bind ViewModel.ExportCommand}"
+                                                Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                                Text="Export…"
+                                                Visibility="{x:Bind ViewModel.HasContent, Mode=OneWay}">
+                                                <MenuFlyoutItem.Icon>
+                                                    <FontIcon Glyph="&#xEDE1;" />
+                                                </MenuFlyoutItem.Icon>
+                                            </MenuFlyoutItem>
                                             <MenuFlyoutSeparator Visibility="{x:Bind ViewModel.IsOwned, Mode=OneWay}" />
                                             <MenuFlyoutItem
                                                 AutomationProperties.Name="Delete playlist"

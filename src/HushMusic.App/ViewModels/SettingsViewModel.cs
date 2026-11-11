@@ -64,6 +64,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         IMusicPulse pulse,
         ILyricsService lyrics,
         SmartSkipSettingsViewModel smartSkip,
+        BlockedArtistsSettingsViewModel blockedArtists,
         INotificationService notifications,
         ILogger<SettingsViewModel> logger)
         : base(notifications)
@@ -82,6 +83,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         _logger = logger;
         Account = account;
         SmartSkip = smartSkip;
+        BlockedArtists = blockedArtists;
         AccentSwatches = BuildAccentSwatches();
         Hotkeys = [.. GlobalHotkeyMap.Actions.Select(a => new HotkeySettingViewModel(a, OnHotkeyEdited, hotkeys.Pause))];
     }
@@ -90,6 +92,9 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     /// <summary>Playback: smart skip and the songs it leaves out.</summary>
     public SmartSkipSettingsViewModel SmartSkip { get; }
+
+    /// <summary>Playback: the artists whose songs radio, autoplay and the weekly mix leave out.</summary>
+    public BlockedArtistsSettingsViewModel BlockedArtists { get; }
 
     public IReadOnlyList<string> LogLevels { get; } = ["Verbose", "Debug", "Information", "Warning", "Error"];
 
@@ -206,6 +211,12 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
 
     [ObservableProperty]
     public partial bool ShowTrackNotifications { get; set; }
+
+    [ObservableProperty]
+    public partial bool NewReleaseAlerts { get; set; }
+
+    [ObservableProperty]
+    public partial bool ShowOnDiscord { get; set; }
 
     [ObservableProperty]
     public partial bool ResumeLastSession { get; set; }
@@ -402,6 +413,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
         ShowAudioOutputs(null);
         AutoplayWhenQueueEnds = current.AutoplayWhenQueueEnds;
         ShowTrackNotifications = current.ShowTrackNotifications;
+        NewReleaseAlerts = current.NewReleaseAlerts;
+        ShowOnDiscord = current.ShowOnDiscord;
         ResumeLastSession = current.ResumeLastSession;
         CloseToTray = current.CloseToTray;
         StartWithWindows = current.StartWithWindows;
@@ -740,6 +753,10 @@ public sealed partial class SettingsViewModel : ViewModelBase, INavigationAware
     partial void OnAutoplayWhenQueueEndsChanged(bool value) => Save(s => s.AutoplayWhenQueueEnds = value);
 
     partial void OnShowTrackNotificationsChanged(bool value) => Save(s => s.ShowTrackNotifications = value);
+
+    partial void OnNewReleaseAlertsChanged(bool value) => Save(s => s.NewReleaseAlerts = value);
+
+    partial void OnShowOnDiscordChanged(bool value) => Save(s => s.ShowOnDiscord = value);
 
     partial void OnResumeLastSessionChanged(bool value) => Save(s => s.ResumeLastSession = value);
 

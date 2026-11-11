@@ -19,8 +19,9 @@ namespace HushMusic.Core.Features;
 /// <item>A build makes at most <see cref="MaxRequests"/> requests, one after another: a radio for each seed song and the
 /// page of each seed artist (for their top songs), then the radios' next pages while the mix is short.</item>
 /// <item>A failed build is tried again an hour later; without enough history, six hours later.</item>
-/// <item>A song that becomes often skipped (<see cref="ISmartSkip"/>) drops out of the mix on show right away; the saved
-/// mix keeps it, so forgiving the song brings it back.</item>
+/// <item>A song that <see cref="IAutoQueueFilter"/> starts rejecting (often skipped, disliked, by a blocked artist) drops
+/// out of the mix on show right away; the saved mix keeps it, so forgiving the song or unblocking the artist brings it
+/// back.</item>
 /// </list>
 /// </remarks>
 public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisposable
@@ -54,7 +55,7 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
     private readonly IAppPaths _paths;
     private readonly TimeProvider _time;
     private readonly ILogger<WeeklyMixService> _logger;
-    private readonly ISmartSkip? _smartSkip;
+    private readonly IAutoQueueFilter? _filter;
     private readonly CancellationTokenSource _stopping = new();
     private readonly Lock _gate = new();
 
@@ -65,7 +66,7 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
     private bool _building;
     private long _retryAfter;
 
-    // The mix as built (or read back), and as shown: without the songs smart skip leaves out.
+    // The mix as built (or read back), and as shown: without the songs the filter leaves out.
     private volatile WeeklyMix? _current;
     private volatile WeeklyMix? _visible;
 
@@ -77,7 +78,7 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
         IAppPaths paths,
         TimeProvider time,
         ILogger<WeeklyMixService> logger,
-        ISmartSkip? smartSkip = null)
+        IAutoQueueFilter? filter = null)
     {
         _playLog = playLog;
         _watchApi = watchApi;
@@ -86,7 +87,7 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
         _paths = paths;
         _time = time;
         _logger = logger;
-        _smartSkip = smartSkip;
+        _filter = filter;
     }
 
     public event EventHandler? Changed;
@@ -101,9 +102,9 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _player.TrackStarted += OnTrackStarted;
-        if (_smartSkip is not null)
+        if (_filter is not null)
         {
-            _smartSkip.Changed += OnSmartSkipChanged;
+            _filter.Changed += OnFilterChanged;
         }
 
         _ = FirstCheckAsync();
@@ -113,9 +114,9 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _player.TrackStarted -= OnTrackStarted;
-        if (_smartSkip is not null)
+        if (_filter is not null)
         {
-            _smartSkip.Changed -= OnSmartSkipChanged;
+            _filter.Changed -= OnFilterChanged;
         }
 
         _stopping.Cancel();
@@ -301,7 +302,7 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
         return [.. tracks.Select(ForStorage)];
 
         List<Track> Merge() =>
-            WeeklyMixPlanner.Merge(sources, heard, videoId => _smartSkip?.IsLeftOut(videoId) == true, Random.Shared);
+            WeeklyMixPlanner.Merge(sources, heard, track => _filter?.IsLeftOut(track) == true, Random.Shared);
 
         // One request at a time, a little apart.
         async Task<T?> RequestAsync<T>(Func<CancellationToken, Task<T>> request)
@@ -380,7 +381,7 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnSmartSkipChanged(object? sender, EventArgs e)
+    private void OnFilterChanged(object? sender, EventArgs e)
     {
         lock (_gate)
         {
@@ -398,12 +399,12 @@ public sealed partial class WeeklyMixService : IWeeklyMix, IHostedService, IDisp
 
     private WeeklyMix? WithoutLeftOut(WeeklyMix? mix)
     {
-        if (mix is null || _smartSkip is null)
+        if (mix is null || _filter is null)
         {
             return mix;
         }
 
-        var tracks = _smartSkip.WithoutLeftOut(mix.Tracks);
+        var tracks = _filter.WithoutLeftOut(mix.Tracks);
         return tracks.Count == mix.Tracks.Count ? mix : mix with { Tracks = tracks };
     }
 

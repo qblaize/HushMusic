@@ -5,8 +5,8 @@ namespace HushMusic.App.Controls.Radio;
 
 /// <summary>
 /// A radio station card: logo (or generated art), name, genres, country and quality. Clicking plays it; hovering
-/// reveals play, favourite and "More options" buttons; the menu (also on right-click) has Play, favourite, "Save songs to
-/// a playlist" and Open website. Logic lives in <see cref="StationItem"/>.
+/// reveals play, favourite and "More options" buttons; the menu (also on right-click) has Play, favourite, Pin to sidebar,
+/// "Save songs to a playlist" and Open website. Logic lives in <see cref="StationItem"/>.
 /// </summary>
 public sealed partial class StationCard : UserControl
 {

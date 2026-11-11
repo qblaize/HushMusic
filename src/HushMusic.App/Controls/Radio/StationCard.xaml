@@ -115,6 +115,15 @@
                 </MenuFlyoutItem.Icon>
             </MenuFlyoutItem>
             <MenuFlyoutItem
+                AutomationProperties.AutomationId="PinToSidebar"
+                Command="{x:Bind Item.TogglePinCommand, Mode=OneWay}"
+                Style="{StaticResource AppMenuFlyoutItemStyle}"
+                Text="{x:Bind Item.PinLabel, Mode=OneWay}">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="{x:Bind Item.PinGlyph, Mode=OneWay}" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
                 AutomationProperties.AutomationId="StationAutoSave"
                 Command="{x:Bind Item.ToggleAutoSaveCommand, Mode=OneWay}"
                 Style="{StaticResource AppMenuFlyoutItemStyle}"

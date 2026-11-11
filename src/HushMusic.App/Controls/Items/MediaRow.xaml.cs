@@ -30,6 +30,7 @@ public sealed partial class MediaRow : UserControl
         var item = e.NewValue as MediaItem;
         row.ArtHost.CornerRadius = item is Artist ? new CornerRadius(row.ArtHost.Width / 2) : row._defaultCorner;
         row.SetHover(false);
+        CollectionMenu.SetItem(row, item is Track ? null : item);
         AutomationProperties.SetName(row, item is null ? string.Empty : $"{ItemFormat.Kind(item)}: {item.Title}");
     }
 

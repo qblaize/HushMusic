@@ -19,4 +19,12 @@ public static class TaskbarFlyoutBindings
     public static Visibility LiveVisibility(Track? track) => IsLive(track) ? Visibility.Visible : Visibility.Collapsed;
 
     public static string VolumeText(double volume, bool muted) => muted ? "Muted" : $"{Math.Round(Math.Clamp(volume, 0, 100)):0}%";
+
+    /// <summary>The lower area shows when something comes next, or the song can have lyrics (its tabs then show).</summary>
+    public static Visibility LowerAreaVisibility(bool hasUpNext, bool lyricsAvailable) =>
+        hasUpNext || lyricsAvailable ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>The Up next tab is chosen but nothing is queued after this song.</summary>
+    public static Visibility NothingNextVisibility(bool hasUpNext, bool lyricsAvailable, bool lyricsOn) =>
+        !hasUpNext && lyricsAvailable && !lyricsOn ? Visibility.Visible : Visibility.Collapsed;
 }

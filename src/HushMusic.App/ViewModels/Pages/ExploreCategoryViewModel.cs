@@ -67,6 +67,7 @@ public sealed partial class ExploreCategoryViewModel(IExploreApi explore, PageSe
         ChartsRequest => "YouTube Music has no charts for this country right now.",
         NewVideosRequest => "YouTube Music didn't return any new videos.",
         NewReleasesRequest => "YouTube Music didn't return any new releases.",
+        FollowedReleasesRequest => "Nothing new from the artists you follow.",
         _ => "YouTube Music didn't return anything for this category.",
     };
 
@@ -78,6 +79,7 @@ public sealed partial class ExploreCategoryViewModel(IExploreApi explore, PageSe
         {
             MoodRequest => "Moods & genres",
             ChartsRequest => null,
+            FollowedReleasesRequest => "New releases",
             _ => "Explore",
         };
         OnPropertyChanged(nameof(EmptyMessage));
@@ -112,6 +114,9 @@ public sealed partial class ExploreCategoryViewModel(IExploreApi explore, PageSe
                         break;
                     case NewVideosRequest:
                         ShowGridOf(await explore.GetNewVideosAsync(ct), videos: true);
+                        break;
+                    case FollowedReleasesRequest followed:
+                        ShowGridOf(followed.Albums, videos: false);
                         break;
                     case ChartsRequest charts:
                         ShowCharts = true;

@@ -12,6 +12,9 @@
     <!-- ===== Layout tokens ===== -->
     <!-- A compact NavigationView pane. -->
     <x:Double x:Key="SidebarWidth">48</x:Double>
+    <!-- Pinned items: icon-sized covers. -->
+    <x:Double x:Key="RailPinArtSize">24</x:Double>
+    <CornerRadius x:Key="RailPinArtCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="ArtCornerRadius">4</CornerRadius>
 
     <!-- ===== Buttons ===== -->

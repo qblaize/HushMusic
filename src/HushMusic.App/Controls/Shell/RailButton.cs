@@ -111,8 +111,17 @@ public sealed partial class RailButton : Button
     private static void OnShortcutChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
         AutomationProperties.SetAcceleratorKey(d, e.NewValue as string ?? string.Empty);
 
-    private static void OnIsSelectedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
-        ((RailButton)d).UpdateSelectionState(useTransitions: true);
+    private static void OnIsSelectedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var button = (RailButton)d;
+        button.UpdateSelectionState(useTransitions: true);
+
+        // A pin scrolled out of sight comes into view when its page opens.
+        if (e.NewValue is true && button.IsLoaded)
+        {
+            button.StartBringIntoView();
+        }
+    }
 
     private void UpdateSelectionState(bool useTransitions)
     {

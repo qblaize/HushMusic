@@ -29,11 +29,34 @@
             TargetType="Button">
             <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
         </Style>
+        <Style
+            x:Key="MiniIconToggleStyle"
+            BasedOn="{StaticResource IconToggleButtonStyle}"
+            TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        </Style>
+        <!--  Lyrics: the line being sung, large; the next one smaller and dimmed below it.  -->
+        <Style
+            x:Key="MiniLyricCurrentStyle"
+            BasedOn="{StaticResource Title3Style}"
+            TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MaxLines" Value="3" />
+        </Style>
+        <Style
+            x:Key="MiniLyricNextStyle"
+            BasedOn="{StaticResource HeadlineStyle}"
+            TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MaxLines" Value="2" />
+        </Style>
     </UserControl.Resources>
 
     <!--  Artwork fills the window. Hover (or keyboard focus) fades in the controls, Apple-style.  -->
     <Grid x:Name="Root" Background="{ThemeResource Surface1Brush}">
         <VisualStateManager.VisualStateGroups>
+            <!--  The lyrics make way for the controls while they show (they would sit under the play button).  -->
             <VisualStateGroup x:Name="ControlStates">
                 <VisualState x:Name="ControlsHidden">
                     <Storyboard>
@@ -41,6 +64,11 @@
                             Storyboard.TargetName="HoverLayer"
                             Storyboard.TargetProperty="Opacity"
                             To="0"
+                            Duration="0:0:0.3" />
+                        <DoubleAnimation
+                            Storyboard.TargetName="LyricsBlock"
+                            Storyboard.TargetProperty="Opacity"
+                            To="1"
                             Duration="0:0:0.3" />
                     </Storyboard>
                 </VisualState>
@@ -51,7 +79,31 @@
                             Storyboard.TargetProperty="Opacity"
                             To="1"
                             Duration="0:0:0.15" />
+                        <DoubleAnimation
+                            Storyboard.TargetName="LyricsBlock"
+                            Storyboard.TargetProperty="Opacity"
+                            To="0"
+                            Duration="0:0:0.15" />
                     </Storyboard>
+                </VisualState>
+            </VisualStateGroup>
+
+            <!--  A short window keeps the lyrics to fewer lines, so the title still fits under them.  -->
+            <VisualStateGroup x:Name="SizeStates">
+                <VisualState x:Name="Roomy">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowHeight="280" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <VisualState x:Name="Short">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowHeight="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="CurrentLyric.MaxLines" Value="2" />
+                        <Setter Target="GhostLyric.MaxLines" Value="2" />
+                        <Setter Target="NextLyric.MaxLines" Value="1" />
+                    </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
@@ -78,6 +130,12 @@
             StationName="{x:Bind ViewModel.StationName, Mode=OneWay}"
             Visibility="{x:Bind ViewModel.IsLive, Mode=OneWay}" />
 
+        <!--  Lyrics on: the artwork steps back so the lines read on any cover.  -->
+        <Border
+            Background="{StaticResource MiniDimBrush}"
+            IsHitTestVisible="False"
+            Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsShowing), Mode=OneWay}" />
+
         <!--  The whole surface drags the window (Window.SetTitleBar); the buttons are pass-through holes.  -->
         <Border x:Name="DragRegion" Background="Transparent" />
 
@@ -96,17 +154,33 @@
                 FontSize="14"
                 Style="{StaticResource MiniIconButtonStyle}"
                 ToolTipService.ToolTip="Back to full window" />
-            <Button
-                x:Name="CloseButton"
+            <StackPanel
                 Margin="8"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Top"
-                AutomationProperties.Name="Close"
-                Click="OnCloseClick"
-                Content="&#xE8BB;"
-                FontSize="12"
-                Style="{StaticResource MiniIconButtonStyle}"
-                ToolTipService.ToolTip="Close" />
+                Orientation="Horizontal"
+                Spacing="2">
+                <!--  Not for live radio (no lyrics there).  -->
+                <ToggleButton
+                    x:Name="LyricsButton"
+                    AutomationProperties.AutomationId="MiniPlayerLyrics"
+                    AutomationProperties.Name="Lyrics"
+                    Command="{x:Bind Lyrics.ToggleCommand}"
+                    Content="&#xE8BD;"
+                    FontSize="14"
+                    IsChecked="{x:Bind Lyrics.IsOn, Mode=OneWay}"
+                    Style="{StaticResource MiniIconToggleStyle}"
+                    ToolTipService.ToolTip="{x:Bind mini:MiniPlayerBindings.LyricsLabel(Lyrics.IsOn), Mode=OneWay}"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsAvailable), Mode=OneWay}" />
+                <Button
+                    x:Name="CloseButton"
+                    AutomationProperties.Name="Close"
+                    Click="OnCloseClick"
+                    Content="&#xE8BB;"
+                    FontSize="12"
+                    Style="{StaticResource MiniIconButtonStyle}"
+                    ToolTipService.ToolTip="Close" />
+            </StackPanel>
 
             <StackPanel
                 Margin="0,0,0,24"
@@ -169,13 +243,49 @@
             </StackPanel>
         </Grid>
 
-        <!--  Title, artists and a thin progress line: always visible.  -->
+        <!--  Title, artists and a thin progress line: always visible. Lyrics, when on, sit above the title.  -->
         <StackPanel
             Padding="16,56,16,14"
             VerticalAlignment="Bottom"
             Background="{StaticResource MiniTitleScrimBrush}"
             IsHitTestVisible="False"
             Spacing="1">
+            <!--
+                The line being sung and the next one, following the song. A new line rises into place as the old one
+                leaves upwards (GhostLyric, on a canvas so it never moves the layout).
+            -->
+            <StackPanel
+                x:Name="LyricsBlock"
+                Margin="0,0,0,14"
+                AutomationProperties.AutomationId="MiniPlayerLyricsArea"
+                Spacing="6"
+                Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsShowing), Mode=OneWay}">
+                <Grid Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.IsSynced), Mode=OneWay}">
+                    <Canvas>
+                        <TextBlock
+                            x:Name="GhostLyric"
+                            AutomationProperties.AccessibilityView="Raw"
+                            Style="{StaticResource MiniLyricCurrentStyle}" />
+                    </Canvas>
+                    <TextBlock
+                        x:Name="CurrentLyric"
+                        AutomationProperties.AutomationId="MiniPlayerCurrentLyric"
+                        Style="{StaticResource MiniLyricCurrentStyle}"
+                        Text="{x:Bind Lyrics.CurrentLine, Mode=OneWay}" />
+                </Grid>
+                <TextBlock
+                    x:Name="NextLyric"
+                    AutomationProperties.AutomationId="MiniPlayerNextLyric"
+                    Style="{StaticResource MiniLyricNextStyle}"
+                    Text="{x:Bind Lyrics.NextLine, Mode=OneWay}"
+                    Visibility="{x:Bind mini:MiniPlayerBindings.NextLyricVisibility(Lyrics.IsSynced, Lyrics.NextLine), Mode=OneWay}" />
+                <TextBlock
+                    AutomationProperties.AutomationId="MiniPlayerLyricsNote"
+                    Style="{StaticResource SubheadStyle}"
+                    Text="{x:Bind Lyrics.Note, Mode=OneWay}"
+                    TextWrapping="Wrap"
+                    Visibility="{x:Bind helpers:Format.VisibleIf(Lyrics.HasNote), Mode=OneWay}" />
+            </StackPanel>
             <radio:LiveBadge
                 Margin="0,0,0,5"
                 Accent="{StaticResource AccentOnDarkBrush}"

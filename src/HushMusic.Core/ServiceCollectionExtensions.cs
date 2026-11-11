@@ -2,7 +2,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Features;
+using HushMusic.Core.Features.Discord;
 using HushMusic.Core.Features.LastFm;
+using HushMusic.Core.Features.NewReleases;
 using HushMusic.Core.Features.Stats;
 using HushMusic.Core.Lyrics;
 using HushMusic.Core.Queue;
@@ -42,6 +44,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SmartSkipService>();
         services.AddSingleton<ISmartSkip>(sp => sp.GetRequiredService<SmartSkipService>());
         services.AddHostedService(sp => sp.GetRequiredService<SmartSkipService>());
+
+        // Disliked songs and blocked artists stay out of radio, autoplay and the weekly mix too (one filter with smart skip).
+        services.AddSingleton<BlocklistService>();
+        services.AddSingleton<IBlocklist>(sp => sp.GetRequiredService<BlocklistService>());
+        services.AddHostedService(sp => sp.GetRequiredService<BlocklistService>());
+        services.AddSingleton<IAutoQueueFilter, AutoQueueFilter>();
+        services.AddHostedService<DislikedSongSkipper>();
         services.AddSingleton<WeeklyMixService>();
         services.AddSingleton<IWeeklyMix>(sp => sp.GetRequiredService<WeeklyMixService>());
         services.AddHostedService(sp => sp.GetRequiredService<WeeklyMixService>());
@@ -50,6 +59,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<LastFmService>();
         services.AddSingleton<ILastFmService>(sp => sp.GetRequiredService<LastFmService>());
         services.AddHostedService(sp => sp.GetRequiredService<LastFmService>());
+
+        // Discord "Listening to" status and new-release alerts: both off by default, and idle while off.
+        services.AddDiscordPresence();
+        services.AddNewReleaseAlerts();
 
         // Live internet radio: the Radio Browser directory, favourites, ICY "now playing" titles, play counting.
         services.AddHttpClient(RadioBrowserClient.HttpClientName, client =>

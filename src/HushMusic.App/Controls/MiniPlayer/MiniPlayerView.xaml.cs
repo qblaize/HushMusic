@@ -2,24 +2,31 @@ using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
+using Windows.UI.ViewManagement;
+using HushMusic.App.Helpers;
 using HushMusic.App.Services.Shell;
 using HushMusic.App.Services.Windowing;
 using HushMusic.App.ViewModels.Shell;
+using HushMusic.Core.Abstractions;
 
 namespace HushMusic.App.Controls.MiniPlayer;
 
 /// <summary>
-/// The mini player shown in the always-on-top compact window. Logic lives in <see cref="PlayerViewModel"/>; this is
-/// UI glue: hover reveal, keyboard shortcuts and the pieces the window needs (drag region, pass-through buttons).
+/// The mini player shown in the always-on-top compact window. Logic lives in <see cref="PlayerViewModel"/> and, for the
+/// lyrics, <see cref="CompactLyricsViewModel"/>; this is UI glue: hover reveal, keyboard shortcuts, the change of lyric
+/// line, and the pieces the window needs (drag region, pass-through buttons).
 /// </summary>
 public sealed partial class MiniPlayerView : UserControl
 {
     private static readonly TimeSpan HoverCheckInterval = TimeSpan.FromMilliseconds(400);
 
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _hoverTimer;
+    private readonly LyricLineTransition _lyricTransition;
+    private readonly UISettings _uiSettings = new();
     private InputNonClientPointerSource? _nonClient;
     private IntPtr _hwnd;
     private bool _controlsShown;
+    private bool _isShown;
     private bool _spaceHandled;
     private DateTime _revealUntil;
 
@@ -50,6 +57,9 @@ public sealed partial class MiniPlayerView : UserControl
         Root.SizeChanged += (_, _) => InteractiveLayoutChanged?.Invoke(this, EventArgs.Empty);
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+
+        _lyricTransition = new LyricLineTransition(GhostLyric, CurrentLyric, NextLyric);
+        Lyrics.LineChanged += OnLyricLineChanged;
     }
 
     /// <summary>The buttons moved or resized (the window updates its pass-through regions).</summary>
@@ -61,16 +71,26 @@ public sealed partial class MiniPlayerView : UserControl
 
     public PlayerViewModel ViewModel { get; } = App.GetService<PlayerViewModel>();
 
+    public CompactLyricsViewModel Lyrics { get; } = new(
+        App.GetService<LyricsViewModel>(),
+        App.GetService<IPlayer>(),
+        App.GetService<ISettingsService>(),
+        App.GetService<IUiDispatcher>(),
+        LyricsViewer.MiniPlayer,
+        showsPlainText: false);
+
     /// <summary>The draggable surface, for <see cref="Window.SetTitleBar"/>.</summary>
     public UIElement DragRegionElement => DragRegion;
 
     /// <summary>Controls inside the drag surface that must stay clickable.</summary>
-    public IReadOnlyList<FrameworkElement> InteractiveElements => [ExpandButton, CloseButton, PreviousButton, PlayPauseButton, NextButton];
+    public IReadOnlyList<FrameworkElement> InteractiveElements => [ExpandButton, LyricsButton, CloseButton, PreviousButton, PlayPauseButton, NextButton];
 
     /// <summary>Called when the mini player appears: shows the controls for a moment and takes keyboard focus.</summary>
     public void Activate(TimeSpan reveal)
     {
         _revealUntil = DateTime.UtcNow + reveal;
+        _isShown = true;
+        UpdateLyricsShown();
         ShowControls();
 
         // The view itself (no focus visual), so Space works at once and Tab moves on to the buttons.
@@ -83,11 +103,15 @@ public sealed partial class MiniPlayerView : UserControl
         _hoverTimer.Stop();
         _revealUntil = default;
         _controlsShown = false;
+        _isShown = false;
+        UpdateLyricsShown();
         VisualStateManager.GoToState(this, "ControlsHidden", false);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        WindowPresence.Changed -= OnWindowPresenceChanged;
+        WindowPresence.Changed += OnWindowPresenceChanged;
         if (_nonClient is not null || XamlRoot?.ContentIslandEnvironment is not { } environment)
         {
             return;
@@ -108,11 +132,29 @@ public sealed partial class MiniPlayerView : UserControl
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         _hoverTimer.Stop();
+        WindowPresence.Changed -= OnWindowPresenceChanged;
         if (_nonClient is not null)
         {
             _nonClient.PointerEntered -= OnNonClientPointer;
             _nonClient.PointerMoved -= OnNonClientPointer;
             _nonClient = null;
+        }
+    }
+
+    // The lyrics follow the song only while they can be seen: the mini player shown, the window not minimized or hidden.
+    private void UpdateLyricsShown() => Lyrics.SetViewShown(_isShown && WindowPresence.IsShown);
+
+    private void OnWindowPresenceChanged(object? sender, EventArgs e) => UpdateLyricsShown();
+
+    private void OnLyricLineChanged(object? sender, CompactLyricsLineChangedEventArgs e)
+    {
+        if (e.Follows && _uiSettings.AnimationsEnabled)
+        {
+            _lyricTransition.Play(e.PreviousLine);
+        }
+        else
+        {
+            _lyricTransition.Snap();
         }
     }
 

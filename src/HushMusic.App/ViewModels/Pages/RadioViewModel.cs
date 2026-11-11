@@ -30,6 +30,8 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
     private readonly IRadioAutoSave _autoSave;
     private readonly IStationOfTheDay _stationOfTheDay;
     private readonly IPlayer _player;
+    private readonly ISidebarPins _pins;
+    private readonly ISidebarPinActions _pinActions;
     private readonly ILogger<RadioViewModel> _logger;
     private CancellationTokenSource? _directoryCts;
     private CancellationTokenSource? _searchCts;
@@ -43,6 +45,8 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         IRadioAutoSave autoSave,
         IStationOfTheDay stationOfTheDay,
         IPlayer player,
+        ISidebarPins pins,
+        ISidebarPinActions pinActions,
         PageServices services,
         ILogger<RadioViewModel> logger)
         : base(services)
@@ -52,6 +56,8 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         _autoSave = autoSave;
         _stationOfTheDay = stationOfTheDay;
         _player = player;
+        _pins = pins;
+        _pinActions = pinActions;
         _logger = logger;
         Genres = CuratedRadio.Genres;
         SelectedGenre = Genres.FirstOrDefault(g => g.Id == s_genreId) ?? Genres[0];
@@ -205,6 +211,12 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         }
     }
 
+    public Task TogglePinAsync(StationItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return SidebarPin.For(item.Station) is { } pin ? _pinActions.ToggleAsync(pin) : Task.CompletedTask;
+    }
+
     public async Task OpenWebsiteAsync(StationItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
@@ -230,11 +242,13 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
     {
         _favorites.Changed += OnFavoritesChanged;
         _autoSave.Changed += OnAutoSaveChanged;
+        _pins.Changed += OnPinsChanged;
         Services.Auth.StatusChanged += OnAuthStatusChanged;
         _player.TrackChanged += OnPlayerTrackChanged;
         _player.StatusChanged += OnPlayerStatusChanged;
         SyncPlaying();
         SyncAutoSave();
+        SyncPins();
         if (Query.Length == 0 && s_query.Length > 0)
         {
             Query = s_query;
@@ -280,6 +294,7 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
     {
         _favorites.Changed -= OnFavoritesChanged;
         _autoSave.Changed -= OnAutoSaveChanged;
+        _pins.Changed -= OnPinsChanged;
         Services.Auth.StatusChanged -= OnAuthStatusChanged;
         _player.TrackChanged -= OnPlayerTrackChanged;
         _player.StatusChanged -= OnPlayerStatusChanged;
@@ -322,6 +337,8 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
     private void OnFavoritesChanged(object? sender, EventArgs e) => Services.Dispatcher.Run(SyncFavorites);
 
     private void OnAutoSaveChanged(object? sender, EventArgs e) => Services.Dispatcher.Run(SyncAutoSave);
+
+    private void OnPinsChanged(object? sender, EventArgs e) => Services.Dispatcher.Run(SyncPins);
 
     private void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e) => Services.Dispatcher.Run(SyncAutoSave);
 
@@ -473,6 +490,7 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         var item = new StationItem(station, section, this)
         {
             IsFavorite = _favorites.Contains(station.Id),
+            IsPinned = _pins.Contains(PinKind.Station, station.Id),
             IsAutoSaveOn = _autoSave.IsEnabled(station.Id),
             CanAutoSave = Services.Auth.Status == AuthStatus.SignedIn,
         };
@@ -497,6 +515,14 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         {
             item.CanAutoSave = signedIn;
             item.IsAutoSaveOn = _autoSave.IsEnabled(item.Id);
+        }
+    }
+
+    private void SyncPins()
+    {
+        foreach (var item in AllItems())
+        {
+            item.IsPinned = _pins.Contains(PinKind.Station, item.Id);
         }
     }
 

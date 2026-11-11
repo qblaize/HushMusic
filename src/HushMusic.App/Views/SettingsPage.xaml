@@ -244,6 +244,15 @@
                                 Style="{StaticResource TextActionButtonStyle}" />
                         </Grid>
                         <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Blocked artists" Description="Radio, autoplay and your weekly mix leave out their songs. Songs you pick yourself still play.">
+                            <Button
+                                AutomationProperties.AutomationId="BlockedArtistsButton"
+                                AutomationProperties.Name="Blocked artists"
+                                Command="{x:Bind ViewModel.BlockedArtists.ShowCommand}"
+                                Content="{x:Bind ViewModel.BlockedArtists.ButtonText, Mode=OneWay}"
+                                Style="{StaticResource PillSecondaryButtonStyle}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Resume where I left off" Description="Opens with your last queue and song, paused at the same spot.">
                             <ToggleSwitch IsOn="{x:Bind ViewModel.ResumeLastSession, Mode=TwoWay}" />
                         </settings:SettingsRow>
@@ -371,6 +380,7 @@
 
                 <!--  ===== Window =====  -->
                 <TextBlock
+                    x:Name="WindowSectionHeader"
                     AutomationProperties.HeadingLevel="Level2"
                     Style="{StaticResource SettingsSectionHeaderStyle}"
                     Text="{x:Bind helpers:Format.SectionHeader('Window')}" />
@@ -386,6 +396,10 @@
                         <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Song notifications" Description="Show a notification with the cover when a new song starts while Hush is in the background.">
                             <ToggleSwitch AutomationProperties.AutomationId="TrackNotificationsToggle" IsOn="{x:Bind ViewModel.ShowTrackNotifications, Mode=TwoWay}" />
+                        </settings:SettingsRow>
+                        <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
+                        <settings:SettingsRow Title="Tell me about new releases from artists I follow" Description="Once a day, a notification when an artist you subscribe to puts out an album or single. Works while you're signed in.">
+                            <ToggleSwitch AutomationProperties.AutomationId="NewReleaseAlertsToggle" IsOn="{x:Bind ViewModel.NewReleaseAlerts, Mode=TwoWay}" />
                         </settings:SettingsRow>
                         <Rectangle Style="{StaticResource SettingsSeparatorStyle}" />
                         <settings:SettingsRow Title="Show player on the taskbar" Description="A small player in the empty space of the taskbar. Scroll over it to change the volume; click it for the full controls.">
@@ -591,6 +605,18 @@
                     Style="{StaticResource SettingsFooterStyle}"
                     Text="Last.fm needs a free API account of your own: select Get an API key, sign in, enter any application name and leave the callback URL empty. Connect then opens last.fm in your browser to approve the app. The key, secret and session are stored encrypted on this PC."
                     Visibility="{x:Bind helpers:Format.VisibleIf(ViewModel.IsLastFmDisconnected), Mode=OneWay}" />
+
+                <!--  ===== Discord =====  -->
+                <TextBlock
+                    x:Name="DiscordSectionHeader"
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SettingsSectionHeaderStyle}"
+                    Text="{x:Bind helpers:Format.SectionHeader('Discord')}" />
+                <Border Style="{StaticResource SettingsGroupStyle}">
+                    <settings:SettingsRow Title="Show what you're playing on Discord" Description="Needs the Discord desktop app. Your status shows the song, the artist and the cover.">
+                        <ToggleSwitch AutomationProperties.AutomationId="ShowOnDiscordToggle" IsOn="{x:Bind ViewModel.ShowOnDiscord, Mode=TwoWay}" />
+                    </settings:SettingsRow>
+                </Border>
 
                 <!--  ===== Content =====  -->
                 <TextBlock

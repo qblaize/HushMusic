@@ -354,7 +354,7 @@ public sealed partial class NowPlayingViewModel : ObservableObject
         // A hidden panel (or window: minimized, in the notification area) stops lyrics following the song and related
         // loading.
         var panel = IsOpen && ShowsPanel && _windowMode.IsWindowVisible;
-        Lyrics.SetActive(panel && Tab == NowPlayingTab.Lyrics);
+        Lyrics.SetActive(LyricsViewer.NowPlaying, panel && Tab == NowPlayingTab.Lyrics);
         Related.SetActive(panel && Tab == NowPlayingTab.Related);
     }
 

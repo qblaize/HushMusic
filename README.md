@@ -44,16 +44,28 @@ Windows taskbar.
 - **Fresh for you** on Home: a new mix every Monday with artists you love and songs you haven't heard yet, built from
   your listening on this PC. Play it, shuffle it, or save it as a playlist.
 - Artist pages with **See all** for the full list of albums, singles and videos.
+- **New release alerts** (optional, signed in): once a day Hush looks at the artists you subscribe to and sends one
+  notification when they put out an album or single. Click it to open the release, or the list when there are several.
 - Your library, playlists, liked songs and history once you sign in. Like and unlike songs, add them to playlists,
   create, rename and delete playlists. Changes go straight to your account.
 - Start a radio from any song; radio and up-next queues keep topping themselves up.
 - When an album or playlist ends, it keeps going with similar songs (you can turn this off).
 - **Smart skip**: a song you skip in its first seconds three times stops showing up in radio, autoplay and your
   weekly mix. Songs you pick yourself still play. Settings → Playback lists them, so you can forgive one.
+- **Dislike** a song from its menu (signed in): the dislike goes to your account, the song skips if it's playing, and
+  radio, autoplay and your weekly mix leave it out from then on.
+- **Don't play this artist**, from an artist's page or a song's menu: their songs stay out of radio, autoplay and your
+  weekly mix, but still play when you pick them. Kept on this PC; Settings → Playback → Blocked artists lists them.
 - Save the current queue as a playlist.
 - Edit your playlists: drag songs to reorder them, or select several (**Select**, or Ctrl/Shift-click) to play, queue,
   add to another playlist or remove them, with Undo.
 - Filter any playlist or Liked songs as you type, or sort it by title, artist, album or length.
+- **Export** a playlist, an album or Liked songs (the page's ⋯ menu → Export…) as a CSV file for Excel or an M3U
+  playlist with a YouTube Music link per song. Long playlists are loaded in full first.
+- **Pin to sidebar**: playlists, albums, artists and radio stations get a small cover under the sidebar's main items,
+  one click away (a pinned station starts playing). Pin from a page's ⋯ menu or by right-clicking a card; right-click a
+  pin to unpin it or move it up or down. Up to 20 pins, kept on this PC; pinned playlists go when you sign out or
+  switch accounts.
 - Adding a song that's already in the playlist asks first: add it anyway, or (for several songs) skip the ones already
   there.
 - **Your stats** (Library → Your stats): top artists, songs and albums, listening time and when you listen, by week,
@@ -90,6 +102,8 @@ Windows taskbar.
 - Resume where you left off: the queue, song and position come back, paused.
 - Sleep timer (15 to 60 minutes, or the end of the song) with a fade-out.
 - [Last.fm](https://www.last.fm) scrobbling with your own API key ([setup](#lastfm)).
+- **Discord status** (optional): your Discord profile shows "Listening to" with the song, the artist, the cover and a
+  progress bar. Needs the Discord desktop app ([details](#discord)).
 
 **Live radio**
 
@@ -108,12 +122,13 @@ Windows taskbar.
 - Light, Dark or Auto theme. The accent colour follows the album art, or pick one of five presets or your Windows accent colour.
 - Standard or Minimal player layout. Minimal docks a simple player bar (cover, title, previous / play / next, volume) and keeps Now Playing to the cover and controls.
 - Media keys and the Windows media flyout, taskbar thumbnail buttons and progress.
-- Mini player: a small always-on-top window.
+- Mini player: a small always-on-top window. Its lyrics button shows the line being sung over the cover, with the next
+  one below it.
 - Keep playing from the notification area when the window is closed, and start with Windows.
 - Taskbar player (optional): cover, title and controls in the empty left part of the Windows 11 taskbar. Scroll over
-  it to change the volume; click it for a flyout with seek, shuffle, repeat, like, volume and the next three songs.
-  Show it on the main display, on all displays, or on one you choose. Its text turns light or dark to match what
-  shows behind it, so it stays readable on a see-through taskbar over a wallpaper.
+  it to change the volume; click it for a flyout with seek, shuffle, repeat, like, volume and the next three songs, or
+  the song's lyrics in their place. Show it on the main display, on all displays, or on one you choose. Its text
+  turns light or dark to match what shows behind it, so it stays readable on a see-through taskbar over a wallpaper.
 - **Global shortcuts** (optional, rebindable): control playback, volume and likes from anywhere, even while Hush is
   in the background.
 - **Song notifications** (optional): a silent notification with the cover and a Next button when a new song starts
@@ -184,6 +199,7 @@ work:
 | Radio Browser (`*.api.radio-browser.info`) and the stations you play | When you open Radio | The station directory, station logos and streams. Playing a station counts one "click" with Radio Browser, as its API asks. |
 | `lrclib.net` | When you open the lyrics of a song, if LRCLIB is on in Settings → Lyrics → Sources | The song's title, artist, album and length, to find its lyrics. |
 | `ws.audioscrobbler.com`, `last.fm` | Only if you connect Last.fm | Scrobbles and "now playing". |
+| The Discord desktop app on this PC | Only if you turn on Settings → Discord | The song, artist, album and cover link, which Discord shows on your profile. Hush talks to the app on your PC, never to Discord's servers. |
 
 ## Where your data lives
 
@@ -206,7 +222,9 @@ Everything is in `%LOCALAPPDATA%\HushMusic`. The app itself is installed in `%LO
 | `radio-autosave.json` | Stations whose songs are saved to a playlist, and those playlists' ids. |
 | `radio-station-of-the-day.json` | Today's station and its candidates. |
 | `skipped-songs.json` | Smart skip counts. |
+| `blocklist.json` | Songs you disliked (forgotten when you sign out or switch accounts) and artists you blocked, which radio, autoplay and your weekly mix leave out. |
 | `weekly-mix.json` | This week's Fresh for you mix. |
+| `new-releases.json` | For new release alerts: the artists you follow and the releases already seen on their pages. Deleted when you sign out. |
 | `history\plays-YYYY.jsonl` | Your listening log for **Your stats** (one line per play). Clear it from the stats page. |
 | `history\achievements.json` | Achievements already announced. |
 | `tools\yt-dlp\<version>\`, `tools\deno\<version>\` | The app-managed yt-dlp and Deno. |
@@ -223,6 +241,17 @@ empty), paste its **API key** and **shared secret**, select **Connect**, approve
   than 30 seconds. Radio stations are not scrobbled.
 - Plays made offline are queued and sent later.
 - **Disconnect** forgets the key, the secret, the session and any queued plays.
+
+## Discord
+
+Settings → Discord → **Show what you're playing on Discord**. Hush talks to the Discord desktop app running on your
+PC (not the browser version) and sets your status to "Listening to Hush": the song, the artist, the album cover and a
+progress bar. In the member list it reads "Listening to" the artist.
+
+- Live stations show the song on air (or the station's name) with the station, and the time since you tuned in.
+- After 10 seconds of pause, or when playback stops, the status goes away; it comes back when you press play.
+- If Discord isn't running, Hush tries again every 30 to 60 seconds while music plays, so starting Discord later works.
+- Discord shows the status only while its own Activity Privacy settings let it share your activity.
 
 ## FAQ
 

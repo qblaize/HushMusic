@@ -142,7 +142,7 @@ public static partial class WeeklyMixPlanner
     public static List<Track> Merge(
         IReadOnlyList<IReadOnlyList<Track>> sources,
         HeardSongs heard,
-        Func<string, bool> leaveOut,
+        Func<Track, bool> leaveOut,
         Random random,
         int size = TargetSize)
     {
@@ -181,7 +181,7 @@ public static partial class WeeklyMixPlanner
         bool Accept(Track track)
         {
             if (!track.IsAvailable || track.IsLiveRadio || track.Type == TrackType.Episode || string.IsNullOrWhiteSpace(track.VideoId)
-                || ids.Contains(track.VideoId) || leaveOut(track.VideoId) || heard.Contains(track))
+                || ids.Contains(track.VideoId) || leaveOut(track) || heard.Contains(track))
             {
                 return false;
             }

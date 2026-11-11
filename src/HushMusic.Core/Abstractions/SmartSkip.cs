@@ -1,5 +1,3 @@
-using HushMusic.Core.Models;
-
 namespace HushMusic.Core.Abstractions;
 
 /// <summary>A song the user keeps skipping, as Settings lists it.</summary>
@@ -11,7 +9,8 @@ public sealed record SkippedSong(string VideoId, string Title, string Artists, s
 /// listening to it in between, is left out of the songs Hush adds to the queue by itself: radio and Up next top-ups,
 /// "keep playing when the queue ends", a radio started from a song (except that song) and the weekly mix. Songs the user
 /// picks, and the albums and playlists they play, are never filtered. Kept on this PC only; it isn't a dislike and nothing
-/// is sent to YouTube Music. Thread-safe; <see cref="Changed"/> is raised on a background thread. Implemented in Core.
+/// is sent to YouTube Music. The queue fillers ask <see cref="IAutoQueueFilter"/>, which includes it.
+/// Thread-safe; <see cref="Changed"/> is raised on a background thread. Implemented in Core.
 /// </summary>
 public interface ISmartSkip
 {
@@ -32,14 +31,4 @@ public interface ISmartSkip
 
     /// <summary>Completes once the saved skips are loaded (they load in the background at startup).</summary>
     Task LoadAsync(CancellationToken cancellationToken = default);
-}
-
-public static class SmartSkipExtensions
-{
-    /// <summary>The tracks that may be added automatically, in their order (all of them without smart skip).</summary>
-    public static List<Track> WithoutLeftOut(this ISmartSkip? smartSkip, IEnumerable<Track> tracks)
-    {
-        ArgumentNullException.ThrowIfNull(tracks);
-        return smartSkip is null ? [.. tracks] : [.. tracks.Where(t => !smartSkip.IsLeftOut(t.VideoId))];
-    }
 }

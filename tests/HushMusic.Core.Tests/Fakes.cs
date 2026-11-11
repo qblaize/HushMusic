@@ -146,7 +146,13 @@ internal sealed class FakePlayer : IPlayer
         Position = position;
     }
 
-    public Task NextAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public int NextCount { get; private set; }
+
+    public Task NextAsync(CancellationToken cancellationToken = default)
+    {
+        NextCount++;
+        return Task.CompletedTask;
+    }
 
     public Task PreviousAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
@@ -300,7 +306,17 @@ internal sealed class FakeAccountApi : IAccountApi
 
     public Task<AccountInfo?> GetAccountInfoAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task RateSongAsync(string videoId, LikeStatus status, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public List<(string VideoId, LikeStatus Status)> Ratings { get; } = [];
+
+    public Task RateSongAsync(string videoId, LikeStatus status, CancellationToken cancellationToken = default)
+    {
+        lock (Ratings)
+        {
+            Ratings.Add((videoId, status));
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task<string> CreatePlaylistAsync(string title, string? description, PrivacyStatus privacy, IReadOnlyList<string>? videoIds = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 

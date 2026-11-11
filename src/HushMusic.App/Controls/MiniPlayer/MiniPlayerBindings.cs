@@ -15,4 +15,10 @@ public static class MiniPlayerBindings
     /// <summary>0 – 1 for the progress line's ScaleX.</summary>
     public static double Fraction(double position, double duration) =>
         duration > 0 ? Math.Clamp(position / duration, 0, 1) : 0;
+
+    public static string LyricsLabel(bool on) => on ? "Hide lyrics" : "Show lyrics";
+
+    /// <summary>The dimmed next line shows with synced lyrics, until the last line.</summary>
+    public static Visibility NextLyricVisibility(bool synced, string next) =>
+        synced && !string.IsNullOrEmpty(next) ? Visibility.Visible : Visibility.Collapsed;
 }

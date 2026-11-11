@@ -2,9 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using HushMusic.App.Services.Pages;
 using HushMusic.App.Services.Radio;
 using HushMusic.App.ViewModels.Pages;
+using HushMusic.App.ViewModels.Shell;
 using HushMusic.App.Views.Pages;
 using HushMusic.Core.Features;
 using HushMusic.Core.Radio;
+using HushMusic.Core.Services;
 
 namespace HushMusic.App.Hosting;
 
@@ -25,6 +27,13 @@ internal static class PageServiceRegistration
         services.AddSingleton<IStationLogos, StationLogos>();
         services.AddRadioAutoSave();
         services.AddStationOfTheDay();
+
+        // Pin to sidebar (the rail's pins) and Export… (CSV / M3U) on playlist, album and Liked songs pages.
+        services.AddSidebarPins();
+        services.AddSingleton<ISidebarPinActions, SidebarPinActions>();
+        services.AddSingleton<SidebarPinsViewModel>();
+        services.AddTransient<PinToggle>();
+        services.AddSingleton<IPlaylistExportService, PlaylistExportService>();
         services.AddSingleton<IConfirmDialogService, ConfirmDialogService>();
         services.AddSingleton<PageServices>();
 

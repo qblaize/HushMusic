@@ -57,6 +57,28 @@
                                 <TextBlock Text="{x:Bind ViewModel.Selection.ModeButtonText, Mode=OneWay}" />
                             </StackPanel>
                         </Button>
+                        <Button
+                            AutomationProperties.AutomationId="LikedSongsMore"
+                            AutomationProperties.Name="More options"
+                            CornerRadius="18"
+                            Style="{StaticResource IconButtonStyle}"
+                            ToolTipService.ToolTip="More options"
+                            Visibility="{x:Bind ViewModel.HasContent, Mode=OneWay}">
+                            <FontIcon Glyph="&#xE712;" />
+                            <Button.Flyout>
+                                <MenuFlyout MenuFlyoutPresenterStyle="{StaticResource AppMenuFlyoutPresenterStyle}" Placement="BottomEdgeAlignedLeft">
+                                    <MenuFlyoutItem
+                                        AutomationProperties.AutomationId="ExportLikedSongs"
+                                        Command="{x:Bind ViewModel.ExportCommand}"
+                                        Style="{StaticResource AppMenuFlyoutItemStyle}"
+                                        Text="Export…">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xEDE1;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
                     </StackPanel>
                     <items:TrackListToolbar
                         Margin="0,6,0,0"

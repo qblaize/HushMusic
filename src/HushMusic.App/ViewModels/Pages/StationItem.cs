@@ -1,6 +1,7 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using HushMusic.App.Services.Pages;
 using HushMusic.Core.Models;
 
 namespace HushMusic.App.ViewModels.Pages;
@@ -26,6 +27,9 @@ public interface IStationHost
 
     /// <summary>Turns "Save songs to a playlist" on or off for the station.</summary>
     Task ToggleAutoSaveAsync(StationItem item);
+
+    /// <summary>Pins the station to the sidebar, or unpins it.</summary>
+    Task TogglePinAsync(StationItem item);
 }
 
 /// <summary>One station card on the Radio page.</summary>
@@ -41,6 +45,7 @@ public sealed partial class StationItem : ObservableObject
         ToggleFavoriteCommand = new AsyncRelayCommand(() => host.ToggleFavoriteAsync(this));
         OpenWebsiteCommand = new AsyncRelayCommand(() => host.OpenWebsiteAsync(this), () => HasWebsite);
         ToggleAutoSaveCommand = new AsyncRelayCommand(() => host.ToggleAutoSaveAsync(this), () => CanAutoSave);
+        TogglePinCommand = new AsyncRelayCommand(() => host.TogglePinAsync(this));
     }
 
     public RadioStation Station { get; }
@@ -93,6 +98,15 @@ public sealed partial class StationItem : ObservableObject
 
     public string AutoSaveGlyph => IsAutoSaveOn ? "" : "";
 
+    /// <summary>Pinned to the sidebar.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PinLabel), nameof(PinGlyph))]
+    public partial bool IsPinned { get; set; }
+
+    public string PinLabel => SidebarPinItems.Label(IsPinned);
+
+    public string PinGlyph => SidebarPinItems.Glyph(IsPinned);
+
     public string PlayLabel => "Play " + Station.Name;
 
     public string FavoriteGlyph => IsFavorite ? "" : "";
@@ -106,6 +120,8 @@ public sealed partial class StationItem : ObservableObject
     public IAsyncRelayCommand OpenWebsiteCommand { get; }
 
     public IAsyncRelayCommand ToggleAutoSaveCommand { get; }
+
+    public IAsyncRelayCommand TogglePinCommand { get; }
 
     private static string DetailsOf(RadioStation station)
     {

@@ -126,6 +126,20 @@
         <Setter Property="CharacterSpacing" Value="-4" />
     </Style>
 
+    <!-- Pinned items: a short hairline under the main items, then one small cover per pin (artists round). -->
+    <Style x:Key="RailDividerStyle" TargetType="Rectangle">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="1" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Fill" Value="{ThemeResource SeparatorBrush}" />
+    </Style>
+    <Style x:Key="RailPinArtStyle" TargetType="shell:RailPinArt">
+        <Setter Property="Width" Value="{StaticResource RailPinArtSize}" />
+        <Setter Property="Height" Value="{StaticResource RailPinArtSize}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RailPinArtCornerRadius}" />
+        <Setter Property="Background" Value="{ThemeResource Surface2Brush}" />
+    </Style>
+
     <!-- ===== Player bar ===== -->
 
     <!-- Round play/pause: light fill, dark glyph. -->

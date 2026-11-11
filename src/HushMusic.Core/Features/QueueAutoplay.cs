@@ -20,7 +20,8 @@ namespace HushMusic.Core.Features;
 /// <item>Removing everything after the current song means "stop after this one": autoplay stays quiet for that queue
 /// until songs are added to it again.</item>
 /// <item>Turning the setting off removes the suggestions that haven't played yet.</item>
-/// <item>Songs the user keeps skipping (<see cref="ISmartSkip"/>) are left out.</item>
+/// <item>Songs <see cref="IAutoQueueFilter"/> rejects (often skipped, disliked, by a blocked artist) are left out, and
+/// suggestions still to come that it rejects later are removed.</item>
 /// </list>
 /// </remarks>
 public sealed class QueueAutoplay(
@@ -29,7 +30,7 @@ public sealed class QueueAutoplay(
     IWatchApi watchApi,
     ISettingsService settings,
     ILogger<QueueAutoplay> logger,
-    ISmartSkip? smartSkip = null) : IQueueAutoplay, IHostedService, IDisposable
+    IAutoQueueFilter? filter = null) : IQueueAutoplay, IHostedService, IDisposable
 {
     private const long RetryDelayMs = 30_000;
 
@@ -95,6 +96,11 @@ public sealed class QueueAutoplay(
         queue.CurrentChanged += OnCurrentChanged;
         player.TrackStarted += OnTrackStarted;
         settings.Changed += OnSettingsChanged;
+        if (filter is not null)
+        {
+            filter.Changed += OnFilterChanged;
+        }
+
         return Task.CompletedTask;
     }
 
@@ -104,6 +110,11 @@ public sealed class QueueAutoplay(
         queue.CurrentChanged -= OnCurrentChanged;
         player.TrackStarted -= OnTrackStarted;
         settings.Changed -= OnSettingsChanged;
+        if (filter is not null)
+        {
+            filter.Changed -= OnFilterChanged;
+        }
+
         _stopping.Cancel();
         return Task.CompletedTask;
     }
@@ -211,6 +222,20 @@ public sealed class QueueAutoplay(
         else if (enabled)
         {
             TrySeed();
+        }
+    }
+
+    // A dislike or a blocked artist: the suggestions still to come that are left out now go, and the rest tops up.
+    private void OnFilterChanged(object? sender, EventArgs e)
+    {
+        if (_stopping.IsCancellationRequested || filter is null)
+        {
+            return;
+        }
+
+        if (RemoveUpcomingSuggestions(filter.IsLeftOut) > 0)
+        {
+            TryExtend();
         }
     }
 
@@ -432,7 +457,7 @@ public sealed class QueueAutoplay(
     private int Append(IReadOnlyList<Track> tracks, QueueSnapshot before, int generation)
     {
         var queued = new HashSet<string>(before.Items.Select(i => i.Track.VideoId), StringComparer.Ordinal);
-        var fresh = smartSkip.WithoutLeftOut(tracks.Where(t => t.IsAvailable && !t.IsLiveRadio && queued.Add(t.VideoId)));
+        var fresh = filter.WithoutLeftOut(tracks.Where(t => t.IsAvailable && !t.IsLiveRadio && queued.Add(t.VideoId)));
         if (fresh.Count == 0)
         {
             return 0;
@@ -506,26 +531,38 @@ public sealed class QueueAutoplay(
         }
     }
 
-    private void RemoveUpcomingSuggestions()
+    /// <summary>Removes the suggestions still to come (only those <paramref name="which"/> picks). Returns how many went.</summary>
+    private int RemoveUpcomingSuggestions(Func<Track, bool>? which = null)
     {
         var snapshot = queue.GetSnapshot();
         IReadOnlySet<Guid> suggested;
         lock (_gate)
         {
             suggested = _suggested;
+            if (suggested.Count == 0)
+            {
+                return 0;
+            }
+
             _ownChanges++;
         }
 
+        var removed = 0;
         try
         {
             // Last first; each index is looked up again because the queue may change under us.
-            var upcoming = snapshot.Items.Skip(snapshot.CurrentIndex + 1).Where(i => suggested.Contains(i.Id)).Select(i => i.Id).Reverse().ToList();
+            var upcoming = snapshot.Items.Skip(snapshot.CurrentIndex + 1)
+                .Where(i => suggested.Contains(i.Id) && (which is null || which(i.Track)))
+                .Select(i => i.Id)
+                .Reverse()
+                .ToList();
             foreach (var id in upcoming)
             {
                 var index = IndexOf(queue.Items, id);
                 if (index > queue.CurrentIndex)
                 {
                     queue.RemoveAt(index);
+                    removed++;
                 }
             }
         }
@@ -536,6 +573,8 @@ public sealed class QueueAutoplay(
                 _ownChanges--;
             }
         }
+
+        return removed;
     }
 
     // Forgets suggestions that are no longer in the queue. Returns true when there were any.

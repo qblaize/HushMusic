@@ -95,6 +95,7 @@ public sealed partial class MediaCard : UserControl, IHoverReset
         var card = (MediaCard)d;
         var item = e.NewValue as MediaItem;
         TrackMenu.SetTrack(card, item as Track);
+        CollectionMenu.SetItem(card, item is Track ? null : item);
         AutomationProperties.SetName(card, item is null ? string.Empty : $"{ItemFormat.Kind(item)}: {item.Title}");
         card.PlayButton.Visibility = card.CanPlay ? Visibility.Visible : Visibility.Collapsed;
 

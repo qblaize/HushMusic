@@ -67,6 +67,13 @@ public interface ILibraryApi
 
     Task<Paged<Artist>> GetArtistsAsync(string? continuation = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The artists the account subscribes to (ytmusicapi <c>get_library_subscriptions</c>). (The default implementation,
+    /// for test fakes, returns none.)
+    /// </summary>
+    Task<Paged<Artist>> GetSubscriptionsAsync(string? continuation = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Paged<Artist>.Empty);
+
     Task<Paged<Track>> GetLikedSongsAsync(string? continuation = null, CancellationToken cancellationToken = default);
 
     /// <summary>Play history grouped by day ("Today", "Yesterday", ...).</summary>

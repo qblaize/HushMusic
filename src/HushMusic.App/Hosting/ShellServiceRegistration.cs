@@ -60,6 +60,7 @@ internal static class ShellServiceRegistration
 
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<SmartSkipSettingsViewModel>();
+        services.AddTransient<BlockedArtistsSettingsViewModel>();
         pages.Register<SettingsPage>(PageKey.Settings);
         return services;
     }

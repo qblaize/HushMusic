@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="HushMusic.App.Dialogs.Settings.BlockedArtistsDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:items="using:HushMusic.App.Controls.Items"
+    xmlns:viewmodels="using:HushMusic.App.ViewModels"
+    Title="Blocked artists"
+    CloseButtonText="Done">
+
+    <Grid
+        Width="420"
+        MaxHeight="440"
+        Margin="-8,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Margin="8,0,8,12"
+            Style="{StaticResource SubheadStyle}"
+            Text="Radio, autoplay and your weekly mix leave out their songs. Songs you pick yourself still play."
+            TextTrimming="None"
+            TextWrapping="Wrap" />
+
+        <ListView
+            Grid.Row="1"
+            AutomationProperties.Name="Blocked artists"
+            ItemContainerStyle="{StaticResource TrackRowContainerStyle}"
+            ItemsSource="{x:Bind ViewModel.Artists}"
+            SelectionMode="None"
+            items:ItemMotion.Mode="None">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="viewmodels:BlockedArtistItem">
+                    <Grid
+                        Height="{StaticResource RowHeight}"
+                        Padding="8,0"
+                        ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid
+                            Width="{StaticResource RowArtSize}"
+                            Height="{StaticResource RowArtSize}"
+                            VerticalAlignment="Center"
+                            Background="{ThemeResource Surface2Brush}"
+                            CornerRadius="{StaticResource RadiusPill}">
+                            <FontIcon
+                                FontSize="14"
+                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                Glyph="&#xE77B;" />
+                        </Grid>
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="1">
+                            <TextBlock Style="{StaticResource HeadlineStyle}" Text="{x:Bind Name}" />
+                            <TextBlock Style="{StaticResource SubheadStyle}" Text="{x:Bind Subtitle}" />
+                        </StackPanel>
+                        <Button
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="{x:Bind UnblockName}"
+                            Command="{x:Bind UnblockCommand}"
+                            Content="Unblock"
+                            Style="{StaticResource TextActionButtonStyle}"
+                            ToolTipService.ToolTip="Let radio, autoplay and your mix play this artist again" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <TextBlock
+            Grid.Row="1"
+            Margin="24,32"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            Style="{StaticResource SubheadStyle}"
+            Text="Nothing here. Choose &quot;Don't play this artist&quot; on an artist's page or in a song's menu."
+            TextAlignment="Center"
+            TextTrimming="None"
+            TextWrapping="Wrap"
+            Visibility="{x:Bind ViewModel.IsListEmpty, Mode=OneWay}" />
+    </Grid>
+</ContentDialog>

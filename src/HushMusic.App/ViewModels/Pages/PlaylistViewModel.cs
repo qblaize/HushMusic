@@ -5,6 +5,7 @@ using HushMusic.App.Controls.Items;
 using HushMusic.App.Services.Pages;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Models;
+using HushMusic.Core.Services;
 
 namespace HushMusic.App.ViewModels.Pages;
 
@@ -18,6 +19,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
     private readonly IAccountActionsService _account;
     private readonly IPlaylistDialogService _dialogs;
     private readonly IQueueService _queue;
+    private readonly IPlaylistExportService _export;
 
     // Moves go to YouTube Music one at a time, in the order they were made.
     private readonly SemaphoreSlim _moveGate = new(1, 1);
@@ -36,6 +38,8 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         IAccountActionsService account,
         IPlaylistDialogService dialogs,
         IQueueService queue,
+        IPlaylistExportService export,
+        PinToggle pin,
         PageServices services)
         : base(services)
     {
@@ -43,6 +47,8 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         _account = account;
         _dialogs = dialogs;
         _queue = queue;
+        _export = export;
+        Pin = pin;
         Tracks = TrackItem.CreateList(
             (continuation, ct) => _browse.GetPlaylistTracksAsync(continuation, ct),
             ex => ReportError("Couldn't load more songs", ex),
@@ -61,8 +67,16 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
 
     public TrackSelection Selection { get; }
 
-    /// <summary>The thin progress bar: a reload, or the rest of a long playlist loading for the filter or sort.</summary>
-    public bool ShowProgress => ShowBusyBar || Filter.IsLoadingRest;
+    /// <summary>The menu's "Pin to sidebar" / "Unpin from sidebar".</summary>
+    public PinToggle Pin { get; }
+
+    /// <summary>The thin progress bar: a reload, the rest of a long playlist loading for the filter or sort, or an export.</summary>
+    public bool ShowProgress => ShowBusyBar || Filter.IsLoadingRest || IsExporting;
+
+    /// <summary>"Export…" is loading the whole playlist and writing the file.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowProgress))]
+    public partial bool IsExporting { get; private set; }
 
     [ObservableProperty]
     public partial Playlist? Playlist { get; set; }
@@ -187,6 +201,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
     {
         _account.PlaylistChanged -= OnPlaylistChanged;
         Selection.Exit();
+        Pin.Detach();
     }
 
     protected override Task LoadAsync()
@@ -216,6 +231,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
                 _durationText = page.DurationText;
                 UpdateKicker();
                 UpdateStats();
+                Pin.Attach(SidebarPinItems.ForPlaylist(playlistId, playlist.Title, ItemFormat.CardArt(playlist)));
 
                 _listVersion++;
                 Tracks.Reset(TrackItem.From(page.Tracks.Items), page.Tracks.Continuation);
@@ -299,6 +315,27 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
     [RelayCommand]
     private Task AddToPlaylistAsync() => Actions.AddToPlaylistAsync(AvailableTracks());
 
+    /// <summary>"Export…": the whole playlist, every page in its own order (not just the songs a filter shows), as CSV or M3U.</summary>
+    [RelayCommand]
+    private Task ExportAsync()
+    {
+        if (Playlist is not { } playlist)
+        {
+            return Task.CompletedTask;
+        }
+
+        var playlistId = playlist.PlaylistId;
+        return _export.ExportAsync(
+            Title,
+            "playlist",
+            async ct =>
+            {
+                var page = await _browse.GetPlaylistAsync(playlistId, ct);
+                return await PlaylistExport.LoadAllAsync(page.Tracks, _browse.GetPlaylistTracksAsync, cancellationToken: ct);
+            },
+            busy => IsExporting = busy);
+    }
+
     [RelayCommand(CanExecute = nameof(IsOwned))]
     private async Task EditAsync()
     {
@@ -326,6 +363,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
             Description = edited.Description;
             Privacy = edited.Privacy;
             Playlist = playlist with { Title = edited.Title, Description = edited.Description };
+            Pin.Attach(SidebarPinItems.ForPlaylist(_playlistId, edited.Title, ItemFormat.CardArt(playlist)));
             UpdateKicker();
             Notifications.Show(new AppNotification(NotificationSeverity.Success, "Playlist updated", edited.Title));
         }
@@ -346,6 +384,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
         try
         {
             await _account.DeletePlaylistAsync(playlist.PlaylistId);
+            await Pin.UnpinAsync();
             Notifications.Show(new AppNotification(NotificationSeverity.Success, "Playlist deleted", Title));
             if (Services.Navigation.CanGoBack)
             {

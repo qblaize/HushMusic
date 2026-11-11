@@ -157,11 +157,26 @@ public sealed class AppSettings
     /// <summary>A small player in the empty space of the primary taskbar (Windows 11), with a flyout for the full controls.</summary>
     public bool ShowTaskbarWidget { get; set; }
 
+    /// <summary>The mini player shows the lyrics of the song playing over its artwork (its lyrics button).</summary>
+    public bool MiniPlayerLyrics { get; set; }
+
+    /// <summary>The taskbar player's flyout shows lyrics in place of the next songs.</summary>
+    public bool TaskbarFlyoutLyrics { get; set; }
+
     /// <summary>Most recent first, at most 8. Local only.</summary>
     public List<string> RecentSearches { get; set; } = [];
 
     /// <summary>Scrobble to Last.fm while a Last.fm account is connected.</summary>
     public bool LastFmScrobbling { get; set; } = true;
+
+    /// <summary>Show the song as a "Listening to" status on the Discord desktop app (<see cref="IDiscordPresence"/>). Off by default.</summary>
+    public bool ShowOnDiscord { get; set; }
+
+    /// <summary>
+    /// A notification when an artist the signed-in account subscribes to puts out an album or single
+    /// (<see cref="INewReleaseAlerts"/>). Off by default.
+    /// </summary>
+    public bool NewReleaseAlerts { get; set; }
 }
 
 /// <summary>Small named secrets (API keys, session keys), encrypted for the current Windows user. Implemented in HushMusic.Auth.</summary>

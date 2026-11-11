@@ -34,7 +34,8 @@ internal static class TestWindowPlacement
 
     /// <summary>
     /// HUSHMUSIC_TEST_MINI=1 enters the mini player shortly after startup; =controls also keeps its hover controls
-    /// visible (screenshots can't hover).
+    /// visible (screenshots can't hover); =play also starts playback without touching its buttons (invoking a button
+    /// focuses it, which keeps the hover controls up).
     /// </summary>
     public static void RunTestHooks(MainWindow window)
     {
@@ -42,7 +43,7 @@ internal static class TestWindowPlacement
         RunWindowScript(window);
         RunToastScript(window);
         var mini = Environment.GetEnvironmentVariable("HUSHMUSIC_TEST_MINI");
-        if (mini is not ("1" or "controls"))
+        if (mini is not ("1" or "controls" or "play"))
         {
             return;
         }
@@ -57,6 +58,10 @@ internal static class TestWindowPlacement
             if (mini == "controls")
             {
                 window.MiniPlayer?.Activate(TimeSpan.FromHours(1));
+            }
+            else if (mini == "play")
+            {
+                _ = App.GetService<IPlayer>().PlayAsync();
             }
         };
         _testTimer.Start();

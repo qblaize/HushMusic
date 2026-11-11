@@ -8,9 +8,22 @@ using HushMusic.Core.Models;
 
 namespace HushMusic.App.ViewModels.Pages;
 
-public sealed partial class ArtistViewModel(IBrowseApi browse, PageServices services) : PageViewModelBase(services)
+public sealed partial class ArtistViewModel(IBrowseApi browse, PinToggle pin, IBlocklist blocklist, PageServices services) : PageViewModelBase(services)
 {
     private string? _channelId;
+    private string? _cardArt;
+    private ArtistRef? _blockTarget;
+
+    /// <summary>The artist's songs stay out of radio, autoplay and the weekly mix (<see cref="IBlocklist"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BlockLabel))]
+    public partial bool IsBlocked { get; private set; }
+
+    /// <summary>The menu's "Don't play this artist" / "Unblock this artist".</summary>
+    public string BlockLabel => IsBlocked ? "Unblock this artist" : "Don't play this artist";
+
+    /// <summary>The menu's "Pin to sidebar" / "Unpin from sidebar".</summary>
+    public PinToggle Pin { get; } = pin;
 
     public ObservableCollection<TrackItem> TopSongs { get; } = [];
 
@@ -62,8 +75,28 @@ public sealed partial class ArtistViewModel(IBrowseApi browse, PageServices serv
     protected override Task OnNavigatedToCoreAsync(object? parameter)
     {
         _channelId = parameter as string;
+
+        // The page itself only has a wide banner: a pin made here uses the square photo of the card it was opened from.
+        _cardArt = SidebarPinItems.SquareArt(Services.Previews.Take<Artist>(_channelId));
+        blocklist.Changed -= OnBlocklistChanged;
+        blocklist.Changed += OnBlocklistChanged;
         return LoadAsync();
     }
+
+    protected override void OnNavigatedFromCore()
+    {
+        Pin.Detach();
+        blocklist.Changed -= OnBlocklistChanged;
+    }
+
+    [RelayCommand]
+    private Task ToggleBlockAsync() =>
+        _blockTarget is { } artist ? Actions.SetArtistBlockedAsync(artist, !blocklist.IsBlocked(artist)) : Task.CompletedTask;
+
+    // Also blocked or unblocked from a song's menu, or from Settings.
+    private void OnBlocklistChanged(object? sender, EventArgs e) => Services.Dispatcher.Run(SyncBlocked);
+
+    private void SyncBlocked() => IsBlocked = _blockTarget is { } artist && blocklist.IsBlocked(artist);
 
     protected override Task LoadAsync()
     {
@@ -85,6 +118,10 @@ public sealed partial class ArtistViewModel(IBrowseApi browse, PageServices serv
                 ShufflePlaylistId = page.ShufflePlaylistId;
                 RadioPlaylistId = page.RadioPlaylistId;
                 AllSongsPlaylistId = page.AllSongsPlaylistId;
+                var squareArt = _cardArt ?? SidebarPinItems.SquareArt(page.Artist);
+                Pin.Attach(SidebarPinItems.ForArtist(page.Artist with { BrowseId = channelId }, squareArt), refreshArt: squareArt is not null);
+                _blockTarget = new ArtistRef(page.Artist.Title, string.IsNullOrWhiteSpace(page.Artist.BrowseId) ? channelId : page.Artist.BrowseId);
+                SyncBlocked();
 
                 TopSongs.Clear();
                 foreach (var item in TrackItem.From(page.TopSongs))

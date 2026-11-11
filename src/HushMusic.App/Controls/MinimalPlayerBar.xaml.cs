@@ -96,7 +96,8 @@ public sealed partial class MinimalPlayerBar : UserControl
 
     // ===== More menu =====
 
-    // Repeat and the sleep timer have one checked choice each, read fresh on every open.
+    // Repeat and the sleep timer have one checked choice each, read fresh on every open; so are "Dislike" and "Don't play
+    // this artist" for the song playing, right under Like (which is hidden, with its separator, when signed out).
     private void OnMoreMenuOpening(object? sender, object e)
     {
         var repeat = ViewModel.Repeat;
@@ -104,6 +105,10 @@ public sealed partial class MinimalPlayerBar : UserControl
         RepeatAllItem.IsChecked = repeat == RepeatMode.All;
         RepeatOneItem.IsChecked = repeat == RepeatMode.One;
         SleepTimerMenuFlyout.Fill(SleepTimerItem.Items, NowPlaying.SleepTimer);
+        if (sender is MenuFlyout menu)
+        {
+            Items.TrackMenu.InsertTasteItems(menu, 1, ViewModel.Track, separatorAfter: !ViewModel.CanRate);
+        }
     }
 
     private void OnRepeatClick(object sender, RoutedEventArgs e) => ViewModel.SetRepeat(

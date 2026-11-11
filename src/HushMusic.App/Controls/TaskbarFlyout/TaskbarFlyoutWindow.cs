@@ -119,6 +119,7 @@ internal sealed class TaskbarFlyoutWindow : Window
         Place(moveFirst: true);
 
         IsOpen = true;
+        _view.SetOpen(true);
         if (activate)
         {
             AppWindow.Show(activateWindow: true);
@@ -146,6 +147,7 @@ internal sealed class TaskbarFlyoutWindow : Window
         IsOpen = false;
         _hiddenAt = DateTime.UtcNow;
         AppWindow.Hide();
+        _view.SetOpen(false);
     }
 
     /// <summary>Really closes the window (app exit): a hidden window still counts as open and keeps the app running.</summary>

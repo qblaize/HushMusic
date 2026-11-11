@@ -68,6 +68,9 @@ public interface INavigationService
 
     PageKey? CurrentPage { get; }
 
+    /// <summary>The parameter the current page was opened with (e.g. a playlist id).</summary>
+    object? CurrentParameter { get; }
+
     /// <summary>Raised after every navigation (including back).</summary>
     event EventHandler<PageKey?>? Navigated;
 
@@ -96,6 +99,8 @@ public sealed class NavigationService(PageRegistry registry, ILogger<NavigationS
     public bool CanGoBack => _frame?.CanGoBack == true;
 
     public PageKey? CurrentPage => _currentKey;
+
+    public object? CurrentParameter => _currentParameter;
 
     public event EventHandler<PageKey?>? Navigated;
 

@@ -23,6 +23,9 @@ public sealed record NewVideosRequest() : ExploreCategoryRequest("New music vide
 /// <summary>The full charts of one country ("ZZ" is Global).</summary>
 public sealed record ChartsRequest(string Country) : ExploreCategoryRequest("Charts");
 
+/// <summary>Releases from followed artists that a new-release notification announced (nothing to load).</summary>
+public sealed record FollowedReleasesRequest(IReadOnlyList<Album> Albums) : ExploreCategoryRequest("New from artists you follow");
+
 /// <summary>
 /// A shelf with an optional "See all". Cards and compact song rows ("Quick picks" style) are offered separately so a
 /// template can give each layout its own carousel.

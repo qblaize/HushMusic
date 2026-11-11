@@ -29,6 +29,12 @@ public static class TrackMenu
     public static readonly DependencyProperty HostProperty = DependencyProperty.RegisterAttached(
         "Host", typeof(object), typeof(TrackMenu), new PropertyMetadata(null));
 
+    private const string DislikeGlyph = "";
+    private const string BlockGlyph = "";
+
+    // Marks the items InsertTasteItems added, so the next opening replaces them.
+    private static readonly object TasteTag = new();
+
     private static Style? s_presenterStyle;
     private static Style? s_itemStyle;
     private static Style? s_subItemStyle;
@@ -167,12 +173,14 @@ public static class TrackMenu
             menu.Items.Add(actions.GetLikeStatus(track) == LikeStatus.Like
                 ? Item("Remove like", "", () => actions.RateAsync(track, LikeStatus.Indifferent))
                 : Item("Like", "", () => actions.RateAsync(track, LikeStatus.Like)));
+            menu.Items.Add(DislikeItem(actions, track));
             menu.Items.Add(Item("Add to playlist…", "", () => actions.AddToPlaylistAsync(single)));
         }
 
         var album = track.Album?.BrowseId;
         var artists = track.Artists.Where(a => !string.IsNullOrWhiteSpace(a.BrowseId)).ToList();
-        if (album is not null || artists.Count > 0)
+        var blockable = BlockableArtists(track);
+        if (album is not null || artists.Count > 0 || blockable.Count > 0)
         {
             menu.Items.Add(new MenuFlyoutSeparator());
         }
@@ -196,6 +204,8 @@ public static class TrackMenu
 
             menu.Items.Add(sub);
         }
+
+        AddBlockItems(menu.Items, actions, blockable);
 
         if (host?.CanRemoveFromPlaylist(track) == true)
         {
@@ -276,6 +286,91 @@ public static class TrackMenu
         menu.Items.Add(Item("Go to Radio", "\uEC05", () => { App.GetService<INavigationService>().NavigateTo(PageKey.Radio); }));
         return menu;
     }
+
+    /// <summary>
+    /// The song's "Dislike" (signed in) and "Don't play this artist" items, for menus built elsewhere (Up next, the minimal
+    /// player bar), inserted at <paramref name="index"/>. Items inserted at an earlier opening are replaced. Nothing for a
+    /// live station.
+    /// </summary>
+    public static void InsertTasteItems(MenuFlyout menu, int index, Track? track, bool separatorBefore = false, bool separatorAfter = false)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        for (var i = menu.Items.Count - 1; i >= 0; i--)
+        {
+            if (ReferenceEquals(menu.Items[i].Tag, TasteTag))
+            {
+                menu.Items.RemoveAt(i);
+            }
+        }
+
+        if (track is null || track.IsLiveRadio)
+        {
+            return;
+        }
+
+        var actions = App.GetService<IMediaItemActions>();
+        List<MenuFlyoutItemBase> items = [];
+        if (actions.IsSignedIn)
+        {
+            items.Add(DislikeItem(actions, track));
+        }
+
+        AddBlockItems(items, actions, BlockableArtists(track));
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        if (separatorBefore)
+        {
+            items.Insert(0, new MenuFlyoutSeparator());
+        }
+
+        if (separatorAfter)
+        {
+            items.Add(new MenuFlyoutSeparator());
+        }
+
+        index = Math.Clamp(index, 0, menu.Items.Count);
+        foreach (var entry in items)
+        {
+            entry.Tag = TasteTag;
+            menu.Items.Insert(index++, entry);
+        }
+    }
+
+    private static MenuFlyoutItem DislikeItem(IMediaItemActions actions, Track track) =>
+        actions.GetLikeStatus(track) == LikeStatus.Dislike
+            ? Item("Remove dislike", DislikeGlyph, () => actions.RateAsync(track, LikeStatus.Indifferent))
+            : Item("Dislike", DislikeGlyph, () => actions.RateAsync(track, LikeStatus.Dislike));
+
+    // "Don't play this artist", or a submenu with each artist of a song that has several. Blocked ones offer "Unblock".
+    private static void AddBlockItems(IList<MenuFlyoutItemBase> items, IMediaItemActions actions, IReadOnlyList<ArtistRef> artists)
+    {
+        if (artists.Count == 1)
+        {
+            var artist = artists[0];
+            items.Add(actions.IsArtistBlocked(artist)
+                ? Item("Unblock this artist", BlockGlyph, () => actions.SetArtistBlockedAsync(artist, false))
+                : Item("Don't play this artist", BlockGlyph, () => actions.SetArtistBlockedAsync(artist, true)));
+        }
+        else if (artists.Count > 1)
+        {
+            var sub = new MenuFlyoutSubItem { Text = "Don't play artist", Icon = new FontIcon { Glyph = BlockGlyph }, Style = SubItemStyle };
+            foreach (var artist in artists)
+            {
+                sub.Items.Add(actions.IsArtistBlocked(artist)
+                    ? Item($"Unblock {artist.Name}", null, () => actions.SetArtistBlockedAsync(artist, false))
+                    : Item(artist.Name, null, () => actions.SetArtistBlockedAsync(artist, true)));
+            }
+
+            items.Add(sub);
+        }
+    }
+
+    // Every named artist once (songs matched from live radio may name an artist without an id).
+    private static List<ArtistRef> BlockableArtists(Track track) =>
+        [.. track.Artists.Where(a => !string.IsNullOrWhiteSpace(a.Name)).DistinctBy(a => string.IsNullOrWhiteSpace(a.BrowseId) ? a.Name : a.BrowseId)];
 
     private static MenuFlyoutItem Item(string text, string? glyph, Func<Task> action)
     {

@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HushMusic.App.Services.Pages;
 using HushMusic.Core.Abstractions;
 using HushMusic.Core.Models;
+using HushMusic.Core.Services;
 
 namespace HushMusic.App.ViewModels.Pages;
 
@@ -15,12 +17,14 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
 
     private readonly ILibraryApi _library;
     private readonly IQueueService _queue;
+    private readonly IPlaylistExportService _export;
 
-    public LikedSongsViewModel(ILibraryApi library, IQueueService queue, PageServices services)
+    public LikedSongsViewModel(ILibraryApi library, IQueueService queue, IPlaylistExportService export, PageServices services)
         : base(services)
     {
         _library = library;
         _queue = queue;
+        _export = export;
         Tracks = TrackItem.CreateList((c, ct) => _library.GetLikedSongsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
         Filter = new TrackListFilter(Tracks, () => NavigationToken, TrackListOwnOrder.LikedSongs);
         Selection = new TrackSelection(Filter.Rows, services.Actions, () => Source);
@@ -36,8 +40,13 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
 
     public TrackSelection Selection { get; }
 
-    /// <summary>The thin progress bar: a reload, or the rest of the list loading for the filter or sort.</summary>
-    public bool ShowProgress => ShowBusyBar || Filter.IsLoadingRest;
+    /// <summary>The thin progress bar: a reload, the rest of the list loading for the filter or sort, or an export.</summary>
+    public bool ShowProgress => ShowBusyBar || Filter.IsLoadingRest || IsExporting;
+
+    /// <summary>"Export…" is loading every liked song and writing the file.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowProgress))]
+    public partial bool IsExporting { get; private set; }
 
     private static QueueSource Source => new(QueueSourceKind.LikedSongs, LikedMusicPlaylistId, "Liked songs");
 
@@ -128,6 +137,15 @@ public sealed partial class LikedSongsViewModel : SignedInPageViewModelBase, ITr
 
     [RelayCommand]
     private Task PlayTrackAsync(TrackItem? item) => item is null ? Task.CompletedTask : PlayFromTrackAsync(item.Track);
+
+    /// <summary>"Export…": every liked song, newest first (not just the ones a filter shows), as CSV or M3U.</summary>
+    [RelayCommand]
+    private Task ExportAsync() =>
+        _export.ExportAsync(
+            "Liked songs",
+            "playlist",
+            async ct => await PlaylistExport.LoadAllAsync(await _library.GetLikedSongsAsync(null, ct), _library.GetLikedSongsAsync, cancellationToken: ct),
+            busy => IsExporting = busy);
 
     private void OnFilterPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

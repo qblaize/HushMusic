@@ -104,7 +104,7 @@ public sealed class WeeklyMixTests : IDisposable
         ];
         IReadOnlyList<Track> artist = [Song("a1", "Art"), Song("dup", "R3"), Song("a1-video", "Art") with { Title = "Song a1" }];
 
-        var mix = WeeklyMixPlanner.Merge([radio, artist], HeardSongs.From([Play("heard", "R1", Now)]), id => id == "skipped", new Random(1));
+        var mix = WeeklyMixPlanner.Merge([radio, artist], HeardSongs.From([Play("heard", "R1", Now)]), t => t.VideoId == "skipped", new Random(1));
 
         Assert.Equal(["a1", "dup", "r1", "r2"], mix.Select(t => t.VideoId).Order());
     }
@@ -255,7 +255,7 @@ public sealed class WeeklyMixTests : IDisposable
     }
 
     private WeeklyMixService CreateService(IPlayLog log, IWatchApi watch, IBrowseApi browse, ISmartSkip? smartSkip = null) =>
-        new(log, watch, browse, new FakePlayer(), new AppPaths(_root), new Clock(Now), NullLogger<WeeklyMixService>.Instance, smartSkip)
+        new(log, watch, browse, new FakePlayer(), new AppPaths(_root), new Clock(Now), NullLogger<WeeklyMixService>.Instance, smartSkip is null ? null : new AutoQueueFilter(smartSkip))
         {
             RequestGap = TimeSpan.Zero,
         };

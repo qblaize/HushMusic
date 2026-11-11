@@ -109,6 +109,8 @@ Windows taskbar.
 
 - A hand-picked grid per genre: Deep House, Tech House, Smooth & Lounge, Fresh, Chillout, Techno and Lo-fi.
 - Search the whole [Radio Browser](https://www.radio-browser.info) directory, and keep favourites.
+- **Add your own station** by its stream link (a direct stream, or a .pls / .m3u link): Hush checks it, names it from
+  the stream and adds it to your favourites.
 - Stations show a LIVE badge and the song on air. Next and Previous switch stations.
 - Heard something you like? Click the song on air to find it on YouTube Music, then play it, queue it, like it or add
   it to a playlist. Now Playing keeps a list of what played on the station.

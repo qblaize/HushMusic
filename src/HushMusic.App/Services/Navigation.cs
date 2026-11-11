@@ -11,7 +11,6 @@ public enum PageKey
     Search,
     Library,
     LikedSongs,
-    Playlists,
     History,
     Settings,
 

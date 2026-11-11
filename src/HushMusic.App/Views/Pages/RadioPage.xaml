@@ -113,9 +113,10 @@
     <ScrollViewer x:Name="Scroller" VerticalAnchorRatio="NaN">
         <StackPanel Padding="{StaticResource PagePadding}">
             <!--  Title and the directory search.  -->
-            <Grid ColumnSpacing="16">
+            <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="2">
@@ -125,8 +126,22 @@
                         Style="{StaticResource PageTitleStyle}"
                         Text="Radio" />
                 </StackPanel>
-                <Grid
+                <!--  A station that isn't in the directory, by its stream link. It joins the favourites.  -->
+                <Button
                     Grid.Column="1"
+                    VerticalAlignment="Bottom"
+                    AutomationProperties.AutomationId="AddStation"
+                    AutomationProperties.Name="Add a station"
+                    Command="{x:Bind ViewModel.AddStationCommand}"
+                    Style="{StaticResource PillSecondaryButtonStyle}"
+                    ToolTipService.ToolTip="Add a station by its stream link">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="12" Glyph="&#xE710;" />
+                        <TextBlock Text="Add station" />
+                    </StackPanel>
+                </Button>
+                <Grid
+                    Grid.Column="2"
                     Width="280"
                     Height="36"
                     VerticalAlignment="Bottom"

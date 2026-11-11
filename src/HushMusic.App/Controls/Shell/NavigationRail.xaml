@@ -65,7 +65,7 @@
                 IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Radio'), Mode=OneWay}"
                 Label="Radio"
                 Style="{StaticResource RailButtonStyle}" />
-            <!-- Library and Playlists open when songs are dragged over them (their playlist cards take drops). -->
+            <!-- Library opens when songs are dragged over it (its playlist cards take drops). -->
             <shell:RailButton
                 AllowDrop="True"
                 Command="{x:Bind ViewModel.NavigateToCommand}"
@@ -83,17 +83,6 @@
                 Glyph="&#xEB51;"
                 IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'LikedSongs'), Mode=OneWay}"
                 Label="Liked songs"
-                Style="{StaticResource RailButtonStyle}" />
-            <shell:RailButton
-                AllowDrop="True"
-                Command="{x:Bind ViewModel.NavigateToCommand}"
-                CommandParameter="Playlists"
-                DragEnter="OnSpringDragOver"
-                DragLeave="OnSpringDragLeave"
-                DragOver="OnSpringDragOver"
-                Glyph="&#xE90B;"
-                IsSelected="{x:Bind shell:ShellBindings.IsPage(ViewModel.CurrentPage, 'Playlists'), Mode=OneWay}"
-                Label="Playlists"
                 Style="{StaticResource RailButtonStyle}" />
             <shell:RailButton
                 Command="{x:Bind ViewModel.NavigateToCommand}"

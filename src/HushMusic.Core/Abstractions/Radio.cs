@@ -19,6 +19,15 @@ public interface IRadioDirectory
     Task CountClickAsync(string stationId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Checks a stream link the user typed in before it becomes a station. Throws <see cref="HushException"/> with a
+/// message for the user when the link doesn't lead to audio.
+/// </summary>
+public interface IStationProbe
+{
+    Task<Radio.StationProbeResult> ProbeAsync(Uri link, CancellationToken cancellationToken = default);
+}
+
 /// <summary>The user's favourite radio stations, kept in a local file. Thread-safe; <see cref="Changed"/> is raised on the calling thread.</summary>
 public interface IRadioFavorites
 {

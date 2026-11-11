@@ -83,6 +83,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRadioNowPlaying>(sp => sp.GetRequiredService<RadioNowPlayingService>());
         services.AddHostedService<RadioClickReporter>();
         services.AddSingleton<IRadioTrackMatcher, RadioTrackMatcher>();
+        services.AddHttpClient(StationProbe.HttpClientName, StationProbe.Configure);
+        services.AddSingleton<IStationProbe, StationProbe>();
 
         // Lyrics from YouTube Music, a video's own captions and LRCLIB, in the user's order. The app replaces the
         // browse-id lookup with one shared with the "Related" tab.

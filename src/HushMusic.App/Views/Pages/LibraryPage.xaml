@@ -78,6 +78,18 @@
                     Style="{StaticResource TextActionButtonStyle}"
                     ToolTipService.ToolTip="Select several songs (or Ctrl-click them)"
                     Visibility="{x:Bind ViewModel.CanSelectSongs, Mode=OneWay}" />
+                <Button
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="New playlist"
+                    Command="{x:Bind ViewModel.CreatePlaylistCommand}"
+                    Style="{StaticResource PillSecondaryButtonStyle}"
+                    Visibility="{x:Bind ViewModel.CanCreatePlaylist, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="12" Glyph="&#xE710;" />
+                        <TextBlock Text="New playlist" />
+                    </StackPanel>
+                </Button>
             </Grid>
         </StackPanel>
 
@@ -163,6 +175,8 @@
             Visibility="{x:Bind ViewModel.RequiresSignIn, Mode=OneWay}" />
         <items:EmptyState
             Grid.Row="1"
+            ActionText="{x:Bind ViewModel.EmptyActionText, Mode=OneWay}"
+            Command="{x:Bind ViewModel.CreatePlaylistCommand}"
             Glyph="&#xE8F1;"
             Heading="Nothing here yet"
             Message="{x:Bind ViewModel.EmptyMessage, Mode=OneWay}"

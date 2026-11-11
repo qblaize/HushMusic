@@ -18,6 +18,7 @@ internal static class PageServiceRegistration
         services.AddSingleton<ILikeStateService, LikeStateService>();
         services.AddSingleton<INowPlayingService, NowPlayingService>();
         services.AddSingleton<IPlaylistDialogService, PlaylistDialogService>();
+        services.AddSingleton<IStationDialogService, StationDialogService>();
         services.AddSingleton<IPlaylistAdder, PlaylistAdder>();
         services.AddSingleton<IMediaItemActions, MediaItemActions>();
         services.AddSingleton<IStreamWarmup, StreamWarmup>();
@@ -41,7 +42,6 @@ internal static class PageServiceRegistration
         Register<SearchPage, SearchViewModel>(PageKey.Search);
         Register<LibraryPage, LibraryViewModel>(PageKey.Library);
         Register<LikedSongsPage, LikedSongsViewModel>(PageKey.LikedSongs);
-        Register<PlaylistsPage, PlaylistsViewModel>(PageKey.Playlists);
         Register<HistoryPage, HistoryViewModel>(PageKey.History);
         Register<AlbumDetailPage, AlbumViewModel>(PageKey.Album);
         Register<ArtistDetailPage, ArtistViewModel>(PageKey.Artist);

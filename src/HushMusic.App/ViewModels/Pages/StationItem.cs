@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HushMusic.App.Services.Pages;
 using HushMusic.Core.Models;
+using HushMusic.Core.Radio;
 
 namespace HushMusic.App.ViewModels.Pages;
 
@@ -111,7 +112,9 @@ public sealed partial class StationItem : ObservableObject
 
     public string FavoriteGlyph => IsFavorite ? "" : "";
 
-    public string FavoriteLabel => IsFavorite ? "Remove from favourites" : "Add to favourites";
+    public string FavoriteLabel => IsFavorite
+        ? CustomStations.IsCustom(Station) ? "Remove station" : "Remove from favourites"
+        : "Add to favourites";
 
     public IAsyncRelayCommand PlayCommand { get; }
 

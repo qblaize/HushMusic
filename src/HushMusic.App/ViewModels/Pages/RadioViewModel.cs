@@ -32,6 +32,7 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
     private readonly IPlayer _player;
     private readonly ISidebarPins _pins;
     private readonly ISidebarPinActions _pinActions;
+    private readonly IStationDialogService _stationDialogs;
     private readonly ILogger<RadioViewModel> _logger;
     private CancellationTokenSource? _directoryCts;
     private CancellationTokenSource? _searchCts;
@@ -47,6 +48,7 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         IPlayer player,
         ISidebarPins pins,
         ISidebarPinActions pinActions,
+        IStationDialogService stationDialogs,
         PageServices services,
         ILogger<RadioViewModel> logger)
         : base(services)
@@ -58,6 +60,7 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
         _player = player;
         _pins = pins;
         _pinActions = pinActions;
+        _stationDialogs = stationDialogs;
         _logger = logger;
         Genres = CuratedRadio.Genres;
         SelectedGenre = Genres.FirstOrDefault(g => g.Id == s_genreId) ?? Genres[0];
@@ -183,13 +186,63 @@ public sealed partial class RadioViewModel : PageViewModelBase, IStationHost
     public async Task ToggleFavoriteAsync(StationItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
+        var station = item.Station;
+        var removing = item.IsFavorite;
         try
         {
-            await _favorites.SetAsync(item.Station, !item.IsFavorite);
+            await _favorites.SetAsync(station, !removing);
         }
         catch (Exception ex)
         {
             ReportError("Couldn't update your favourite stations", ex);
+            return;
+        }
+
+        // A station added by hand lives only in the favourites: removing it deletes it, so it can come back.
+        if (removing && CustomStations.IsCustom(station))
+        {
+            Notifications.Show(new AppNotification(NotificationSeverity.Informational, "Station removed", station.Name)
+            {
+                Action = new NotificationAction("Undo", () => _ = RestoreStationAsync(station)),
+            });
+        }
+    }
+
+    private async Task RestoreStationAsync(RadioStation station)
+    {
+        try
+        {
+            await _favorites.SetAsync(station, true);
+        }
+        catch (Exception ex)
+        {
+            ReportError("Couldn't update your favourite stations", ex);
+        }
+    }
+
+    /// <summary>"Add station": a stream link the user types in, checked, saved with the favourites and played.</summary>
+    [RelayCommand]
+    private async Task AddStationAsync()
+    {
+        try
+        {
+            if (await _stationDialogs.PromptAddAsync() is not { } station)
+            {
+                return;
+            }
+
+            await _favorites.SetAsync(station, true);
+            Notifications.Show(new AppNotification(NotificationSeverity.Success, "Station added", $"{station.Name} is in your favourites."));
+            var stations = _favorites.Items.ToList();
+            var index = stations.FindIndex(s => s.Id == station.Id);
+            if (index >= 0)
+            {
+                await Actions.PlayTracksAsync([.. stations.Select(s => s.ToTrack())], index, new QueueSource(QueueSourceKind.LiveRadio, "favorites", "Favourite stations"));
+            }
+        }
+        catch (Exception ex)
+        {
+            ReportError("Couldn't add the station", ex);
         }
     }
 

@@ -22,14 +22,19 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
     private static readonly PropertyChangedEventArgs ShowRowSkeletonArgs = new(nameof(ShowRowSkeleton));
     private static readonly PropertyChangedEventArgs ShowTabBusyBarArgs = new(nameof(ShowTabBusyBar));
     private static readonly PropertyChangedEventArgs CanSelectSongsArgs = new(nameof(CanSelectSongs));
+    private static readonly PropertyChangedEventArgs CanCreatePlaylistArgs = new(nameof(CanCreatePlaylist));
 
     private readonly ILibraryApi _library;
+    private readonly IAccountActionsService _account;
+    private readonly IPlaylistDialogService _dialogs;
     private readonly HashSet<LibraryTab> _loadedTabs = [];
 
-    public LibraryViewModel(ILibraryApi library, PageServices services)
+    public LibraryViewModel(ILibraryApi library, IAccountActionsService account, IPlaylistDialogService dialogs, PageServices services)
         : base(services)
     {
         _library = library;
+        _account = account;
+        _dialogs = dialogs;
         Playlists = new IncrementalCollection<Playlist>((c, ct) => _library.GetPlaylistsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
         Songs = TrackItem.CreateList((c, ct) => _library.GetSongsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
         Albums = new IncrementalCollection<Album>((c, ct) => _library.GetAlbumsAsync(c, ct), HandleLoadMoreError, () => NavigationToken);
@@ -55,6 +60,8 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
     [NotifyPropertyChangedFor(nameof(IsArtistsTab))]
     [NotifyPropertyChangedFor(nameof(EmptyMessage))]
     [NotifyPropertyChangedFor(nameof(CanSelectSongs))]
+    [NotifyPropertyChangedFor(nameof(CanCreatePlaylist))]
+    [NotifyPropertyChangedFor(nameof(EmptyActionText))]
     public partial LibraryTab SelectedTab { get; set; }
 
     public bool IsPlaylistsTab => SelectedTab == LibraryTab.Playlists;
@@ -67,6 +74,12 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
 
     /// <summary>The Songs tab shows its "Select" button.</summary>
     public bool CanSelectSongs => IsSongsTab && !RequiresSignIn;
+
+    /// <summary>The Playlists tab shows its "New playlist" button.</summary>
+    public bool CanCreatePlaylist => IsPlaylistsTab && !RequiresSignIn;
+
+    /// <summary>The empty Playlists tab offers to create one.</summary>
+    public string? EmptyActionText => IsPlaylistsTab ? "New playlist" : null;
 
     /// <summary>The selected tab is loading for the first time (its list is still empty): show placeholders.</summary>
     public bool IsTabLoading => IsBusy && !RequiresSignIn && !_loadedTabs.Contains(SelectedTab);
@@ -171,6 +184,7 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
         if (e.PropertyName is nameof(RequiresSignIn))
         {
             base.OnPropertyChanged(CanSelectSongsArgs);
+            base.OnPropertyChanged(CanCreatePlaylistArgs);
         }
 
         if (e.PropertyName is nameof(IsBusy) or nameof(SelectedTab) or nameof(RequiresSignIn) or nameof(HasContent))
@@ -184,6 +198,33 @@ public sealed partial class LibraryViewModel : SignedInPageViewModelBase, ITrack
 
     [RelayCommand]
     private Task PlaySongAsync(TrackItem? item) => item is null ? Task.CompletedTask : PlayFromTrackAsync(item.Track);
+
+    [RelayCommand]
+    private async Task CreatePlaylistAsync()
+    {
+        var details = await _dialogs.PromptCreateAsync();
+        if (details is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _account.CreatePlaylistAsync(details.Title, details.Description, details.Privacy);
+            Notifications.Show(new AppNotification(NotificationSeverity.Success, "Playlist created", details.Title));
+        }
+        catch (Exception ex)
+        {
+            Notifications.ShowError("Couldn't create the playlist", ex);
+            return;
+        }
+
+        _loadedTabs.Remove(LibraryTab.Playlists);
+        if (IsPlaylistsTab)
+        {
+            await LoadAsync();
+        }
+    }
 
     /// <summary>"Your stats": local listening statistics (no account needed).</summary>
     [RelayCommand]

@@ -392,7 +392,7 @@ public sealed partial class PlaylistViewModel : PageViewModelBase, ITrackListHos
             }
             else
             {
-                Services.Navigation.NavigateTo(PageKey.Playlists);
+                Services.Navigation.NavigateTo(PageKey.Library);
             }
         }
         catch (Exception ex)

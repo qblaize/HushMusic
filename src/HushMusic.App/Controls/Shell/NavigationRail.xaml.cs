@@ -11,7 +11,7 @@ namespace HushMusic.App.Controls.Shell;
 /// </summary>
 public sealed partial class NavigationRail : UserControl
 {
-    // Hovering a drag this long over Library or Playlists opens it ("spring-loaded"), so songs can be dropped on a playlist.
+    // Hovering a drag this long over Library opens it ("spring-loaded"), so songs can be dropped on a playlist.
     private static readonly TimeSpan SpringDelay = TimeSpan.FromMilliseconds(650);
 
     private DispatcherQueueTimer? _springTimer;

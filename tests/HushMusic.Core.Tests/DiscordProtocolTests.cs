@@ -128,7 +128,7 @@ public sealed class DiscordActivityTests
         var activity = DiscordActivity.ForSong(Song(), Start, TimeSpan.FromSeconds(320));
 
         Assert.Equal(
-            """{"type":2,"status_display_type":1,"details":"One More Time","state":"Daft Punk, Romanthony","timestamps":{"start":1794340800000,"end":1794341120000},"assets":{"large_image":"https://lh3.googleusercontent.com/abc=w512-h512-l90-rj","large_text":"Discovery"}}""",
+            """{"type":2,"status_display_type":1,"details":"One More Time","state":"Daft Punk, Romanthony","timestamps":{"start":1794340800000,"end":1794341120000},"assets":{"large_image":"https://lh3.googleusercontent.com/abc=w512-h512-l90-rj","large_text":"Discovery"},"buttons":[{"label":"Download Hush","url":"https://github.com/qblaize/HushMusic"}]}""",
             activity.ToJsonString());
     }
 
@@ -155,8 +155,20 @@ public sealed class DiscordActivityTests
         var activity = DiscordActivity.ForStation(station, onAir, Start, station.LogoUrl);
 
         Assert.True(JsonNode.DeepEquals(
-            JsonNode.Parse("""{"type":2,"status_display_type":1,"details":"Air - La femme d'argent","state":"Radio Paradise","timestamps":{"start":1794340800000},"assets":{"large_image":"https://logo/p.png","large_text":"Radio Paradise"}}"""),
+            JsonNode.Parse("""{"type":2,"status_display_type":1,"details":"Air - La femme d'argent","state":"Radio Paradise","timestamps":{"start":1794340800000},"assets":{"large_image":"https://logo/p.png","large_text":"Radio Paradise"},"buttons":[{"label":"Download Hush","url":"https://github.com/qblaize/HushMusic"}]}"""),
             activity));
+    }
+
+    [Fact]
+    public void The_download_button_fits_discords_limits()
+    {
+        // Discord: at most two buttons, labels of 1 to 32 characters, links of 1 to 512.
+        var buttons = DiscordActivity.ForSong(Song(), Start, null)["buttons"]!.AsArray();
+
+        var button = Assert.Single(buttons);
+        Assert.InRange(((string?)button!["label"])!.Length, 1, 32);
+        Assert.InRange(((string?)button["url"])!.Length, 1, 512);
+        Assert.StartsWith("https://", (string?)button["url"], StringComparison.Ordinal);
     }
 
     [Fact]

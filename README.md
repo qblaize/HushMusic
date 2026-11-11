@@ -251,9 +251,10 @@ PC (not the browser version) and sets your status to "Listening to Hush": the so
 progress bar. In the member list it reads "Listening to" the artist.
 
 - Live stations show the song on air (or the station's name) with the station, and the time since you tuned in.
+- Friends see a **Download Hush** button that links here (Discord doesn't show your own buttons to you).
 - After 10 seconds of pause, or when playback stops, the status goes away; it comes back when you press play.
 - If Discord isn't running, Hush tries again every 30 to 60 seconds while music plays, so starting Discord later works.
-- Discord shows the status only while its own Activity Privacy settings let it share your activity.
+- Nothing showing? Discord shows the status only while User Settings → Activity Privacy → **Share my activity** is on.
 
 ## FAQ
 

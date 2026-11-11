@@ -28,6 +28,12 @@ public static partial class DiscordActivity
     /// <summary>The cover is asked for at this size.</summary>
     public const int CoverPixels = 512;
 
+    /// <summary>The link button under the status (Discord shows it to others, not to the user themselves).</summary>
+    public const string DownloadLabel = "Download Hush";
+
+    /// <inheritdoc cref="DownloadLabel"/>
+    public const string DownloadUrl = "https://github.com/qblaize/HushMusic";
+
     // Pads a one-character text to Discord's minimum without showing anything (it isn't whitespace, so it isn't trimmed).
     private const char Padding = '​';
 
@@ -147,6 +153,7 @@ public static partial class DiscordActivity
             activity["assets"] = assets;
         }
 
+        activity["buttons"] = new JsonArray(new JsonObject { ["label"] = DownloadLabel, ["url"] = DownloadUrl });
         return activity;
     }
 

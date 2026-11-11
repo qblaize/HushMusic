@@ -613,7 +613,7 @@
                     Style="{StaticResource SettingsSectionHeaderStyle}"
                     Text="{x:Bind helpers:Format.SectionHeader('Discord')}" />
                 <Border Style="{StaticResource SettingsGroupStyle}">
-                    <settings:SettingsRow Title="Show what you're playing on Discord" Description="Needs the Discord desktop app. Your status shows the song, the artist and the cover.">
+                    <settings:SettingsRow Title="Show what you're playing on Discord" Description="Needs the Discord desktop app, with Activity Privacy → Share my activity on. Your status shows the song, the artist, the cover and a Download Hush button.">
                         <ToggleSwitch AutomationProperties.AutomationId="ShowOnDiscordToggle" IsOn="{x:Bind ViewModel.ShowOnDiscord, Mode=TwoWay}" />
                     </settings:SettingsRow>
                 </Border>
